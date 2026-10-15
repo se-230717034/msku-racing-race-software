@@ -83,3 +83,32 @@ Endpoints:
 - `POST /api/v1/dynamics/full-car/simulate`
 - `POST /api/v1/dynamics/bicycle/simulate`
 
+## Deterministic engineering optimization
+
+The optimization engine is separated from model evaluation. A model adapter returns a metric map plus a feasibility state; a failed, singular, non-finite, nonconverged, out-of-domain, unstable, contact-losing, or constraint-violating evaluation has no numeric objective value. The search uses an internal large rejection penalty only to guide SciPy; rejected points are never returned as engineering candidates.
+
+For objective `j`, the normalized loss is
+
+`l_j = m_j / n_j` for minimization, or `l_j = |m_j-t_j| / n_j` for target control,
+
+where normalization `n_j` must be explicit, finite, and positive. The scalar objective is `sum(w_j l_j)` with positive explicit weights. This prevents unlike SI quantities from being combined implicitly.
+
+Bounded search uses serial SciPy differential evolution with a recorded integer seed, declared generation/population/tolerance settings, and polishing disabled. The declared convergence tolerance is passed as both SciPy's relative and absolute population-energy tolerance so near-zero target losses have a finite, explicit stopping scale. The baseline must itself be feasible. A reported optimum requires SciPy convergence and a final independent feasible evaluation. The result includes evaluation/rejection counts, convergence history, baseline comparison, and an input SHA-256.
+
+Pareto exploration repeats the bounded search with reproducible weighted sums. Two-objective weights are evenly spaced from `(0,1)` to `(1,0)`; higher-dimensional weights include each single-objective extreme and seeded Dirichlet weights. Duplicate and dominated feasible candidates are removed. Weighted sums can miss unsupported regions of a non-convex front, so the returned set is an exploration, not proof of the complete Pareto frontier.
+
+Local sensitivities use a bounded central finite difference at the selected optimum, falling back to one-sided differences at a bound. A failed neighboring model evaluation produces an unavailable derivative, never zero.
+
+Implemented adapters and metrics:
+
+- Kinematics variables: selected `hardpoints.<id>.<x|y|z>` coordinates. Metrics: bump-steer RMS, camber-change RMS, roll-centre migration RMS only when every state supports roll centre, and maximum absolute track change.
+- Quarter car variables: effective suspension/tire stiffness and damping. Metrics: sprung acceleration RMS and maximum absolute suspension travel.
+- Full car variables: per-corner unsprung mass and suspension/tire stiffness or damping. Metrics: body-heave acceleration RMS, maximum absolute suspension travel, pitch, and roll.
+- Bicycle variables: front/rear axle cornering stiffness and speed. Metrics: final yaw rate, maximum sideslip, lateral-acceleration RMS, and final lateral acceleration.
+
+Constraints are applied in SI. Kinematics requires valid geometry, minimum link length, requested travel limit, and a fully converged sweep. Ride optimization can require verified wheel contact and a travel limit. Bicycle optimization can require stable eigenvalues and always requires the production model's steering/sideslip/tire-slip domain gate. Unsupported objective or variable identifiers are rejected at the API boundary.
+
+The Optimization workspace previews candidate hardpoints with a temporary overlay. Preview does not mutate the active project. Applying a candidate requires the explicit apply button and does not change its physical-validation or engineering-approval state.
+
+Endpoint: `POST /api/v1/optimization/run`.
+

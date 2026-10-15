@@ -1,6 +1,6 @@
 # Limitations
 
-The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigid-link kinematics, the reliable Phase 3 quasi-static subset, and the Phase 4 linear 2DOF quarter-car subset.
+The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigid-link kinematics, the reliable Phase 3 quasi-static subset, Phase 4 quarter-car dynamics, and the Phase 5 linear full-car, bicycle, and optimization models.
 
 - All included hardpoints are synthetic demonstration values. They are not MSKU Racing vehicle data.
 - The solver is numerically verified and reference benchmarked as documented in `PHASE_2_VERIFICATION_REPORT.md`; the demonstration vehicle model remains physically unvalidated because no MSKU Racing CAD or physical comparison has been supplied.
@@ -33,12 +33,23 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
   boundaries/knots where integration is restarted.
 - Energy balance uses trapezoidal quadrature on requested output samples. It can expose inadequate
   output resolution but is not a proof of physical fidelity.
-- Full-car vertical dynamics and planar bicycle handling are `NOT_COMPUTABLE`. The repository does
-  not contain the required vehicle inertia/corner/tire data or independent validation references.
+- The 7DOF full-car model is linear and uses small heave/pitch/roll perturbations, fixed corner
+  locations, linear bilateral tires, and effective wheel springs/dampers. It does not couple the
+  stored suspension kinematics, compliance, stops, tire enveloping, lift-off, impact, or re-contact.
+- The bicycle model assumes constant longitudinal speed, small angles, and linear axle cornering
+  stiffness. It excludes roll/load transfer, saturation, load sensitivity, combined slip, relaxation
+  length, steering dynamics, bank, and aero. Synthetic stiffness values are not tire measurements.
+- Optimization uses bounded differential evolution. A fixed seed makes a configured run reproducible,
+  but it does not prove a global optimum. Weighted sums can miss a non-convex Pareto front.
+- Optimization accepts only implemented model metrics and fails closed on solver/constraint errors.
+  It cannot compensate for missing physical models or turn synthetic inputs into vehicle evidence.
+- Reported sensitivities are local finite differences and may be unavailable at a feasibility boundary.
+- Candidate geometry preview is non-mutating; explicit apply changes inputs only and does not grant
+  physical validation or engineering approval.
 - Mirroring is a view operation, not a saved second-corner model.
 - Browser local storage is device-local and has no revision history, access control, or collaboration.
 - No official MSKU Racing logo is bundled. The UI uses a text-only wordmark.
 - Hosted deployment is not configured because provider accounts and credentials were not provided.
 
-No structural stress, detailed nonlinear tyre force, full-car transient response, or handling response is calculated. Phases 2–4 are numerically benchmarked within their stated model scopes but physically unvalidated. Do not use this release for design sign-off or safety decisions.
+No structural stress or detailed nonlinear tyre force is calculated. Phases 2–5 are numerically benchmarked within their stated model scopes but physically unvalidated. Do not use this release for design sign-off or safety decisions.
 

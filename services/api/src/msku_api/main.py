@@ -12,6 +12,7 @@ from msku_engineering import (
     DYNAMICS_SOLVER_VERSION,
     FULL_CAR_SOLVER_VERSION,
     KINEMATICS_SOLVER_VERSION,
+    OPTIMIZATION_SOLVER_VERSION,
     QUASI_STATIC_SOLVER_VERSION,
     BicycleDomainLimits,
     BicycleInitialState,
@@ -23,6 +24,8 @@ from msku_engineering import (
     FullCarInitialState,
     FullCarParameters,
     FullCarRoadInputs,
+    ObjectiveDefinition,
+    OptimizationSettings,
     QuarterCarInitialState,
     QuarterCarParameters,
     RoadProfile,
@@ -33,6 +36,7 @@ from msku_engineering import (
     calculate_actuation_series,
     calculate_damper_force,
     calculate_vehicle_load_transfer,
+    run_optimization,
     simulate_bicycle,
     simulate_full_car,
     simulate_quarter_car,
@@ -41,6 +45,7 @@ from msku_engineering import (
     solve_upright_equilibrium,
     validate_corner,
 )
+from starlette.concurrency import run_in_threadpool
 
 from .models import (
     ActuationSeriesRequest,
@@ -56,6 +61,8 @@ from .models import (
     DynamicsDiagnosticsResponse,
     DynamicsInputProvenanceResponse,
     DynamicsSettingsInput,
+    EngineeringOptimizationRequest,
+    EngineeringOptimizationResponse,
     EquilibriumDiagnosticsResponse,
     FullCarDiagnosticsResponse,
     FullCarSampleResponse,
@@ -68,6 +75,11 @@ from .models import (
     KinematicsSweepResponse,
     KinematicStateResponse,
     MemberForceResponse,
+    OptimizationCandidateResponse,
+    OptimizationConvergenceResponse,
+    OptimizationDiagnosticsResponse,
+    OptimizationProvenanceResponse,
+    OptimizationSensitivityResponse,
     Phase3ValidationStatusResponse,
     Project,
     ProjectValidationResponse,
@@ -86,6 +98,7 @@ from .models import (
     VehicleLoadTransferResponse,
     WheelLoadsResponse,
 )
+from .optimization_adapter import build_optimization_adapter
 
 app = FastAPI(
     title="MSKU Racing Dynamics Studio API",
@@ -156,7 +169,12 @@ def _project_input_sha256(project: Project) -> str:
 
 
 def _request_input_sha256(
-    request: QuarterCarSimulationRequest | FullCarSimulationRequest | BicycleSimulationRequest,
+    request: (
+        QuarterCarSimulationRequest
+        | FullCarSimulationRequest
+        | BicycleSimulationRequest
+        | EngineeringOptimizationRequest
+    ),
 ) -> str:
     canonical = json.dumps(
         request.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -963,6 +981,130 @@ async def bicycle_simulation(
     )
 
 
+def _optimization_candidate_response(candidate: Any) -> OptimizationCandidateResponse:
+    return OptimizationCandidateResponse(
+        variableValues=dict(candidate.variable_values),
+        metrics=dict(candidate.metrics),
+        normalizedObjectives=dict(candidate.normalized_objectives),
+        weightedObjective=candidate.weighted_objective,
+    )
+
+
+@app.post(
+    "/api/v1/optimization/run",
+    response_model=EngineeringOptimizationResponse,
+)
+async def engineering_optimization(
+    request: EngineeringOptimizationRequest,
+) -> EngineeringOptimizationResponse:
+    try:
+        variables, evaluator, available_objectives = build_optimization_adapter(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    objective_definitions = tuple(
+        ObjectiveDefinition(
+            name=item.id,
+            weight=item.weight,
+            normalization=item.normalization,
+            goal=item.goal,
+            target=item.targetValue,
+        )
+        for item in request.objectives
+    )
+    settings = request.settings
+    result = await run_in_threadpool(
+        run_optimization,
+        variables,
+        objective_definitions,
+        evaluator,
+        OptimizationSettings(
+            seed=settings.seed,
+            maximum_generations=settings.maximumGenerations,
+            population_multiplier=settings.populationMultiplier,
+            convergence_tolerance=settings.convergenceTolerance,
+            pareto_points=settings.paretoPoints,
+            sensitivity_step_fraction=settings.sensitivityStepFraction,
+        ),
+    )
+    if request.model == "kinematics":
+        project = request.project
+        if project is None:
+            raise RuntimeError("Validated kinematics optimization payload is missing")
+        classification = project.dataClassification
+        source_label = project.name
+    else:
+        dynamics_payload = {
+            "quarter_car": request.quarterCar,
+            "full_car": request.fullCar,
+            "bicycle": request.bicycle,
+        }[request.model]
+        if dynamics_payload is None:
+            raise RuntimeError("Validated dynamics optimization payload is missing")
+        classification = dynamics_payload.dataClassification
+        source_label = dynamics_payload.sourceLabel
+    diagnostics = result.diagnostics
+    return EngineeringOptimizationResponse(
+        schemaVersion="1.0.0",
+        model=request.model,
+        calculationStatus=result.calculation_status,
+        validationStatus=_phase3_validation(result.calculation_status),
+        solverVersion=result.solver_version,
+        units={
+            "designVariables": "SI",
+            "objectives": "declared per objective identifier",
+            "sensitivity": "objective unit / design-variable unit",
+        },
+        availableObjectives=list(available_objectives),
+        baseline=(
+            _optimization_candidate_response(result.baseline)
+            if result.baseline is not None
+            else None
+        ),
+        optimized=(
+            _optimization_candidate_response(result.optimized)
+            if result.optimized is not None
+            else None
+        ),
+        paretoFront=[
+            _optimization_candidate_response(candidate) for candidate in result.pareto_front
+        ],
+        convergence=[
+            OptimizationConvergenceResponse(
+                generation=item.generation,
+                bestWeightedObjective=item.best_weighted_objective,
+                convergenceIndicator=item.convergence_indicator,
+            )
+            for item in result.convergence
+        ],
+        sensitivities=[
+            OptimizationSensitivityResponse(
+                variablePath=item.variable_name,
+                metricId=item.metric_name,
+                derivative=item.derivative,
+                step=item.step,
+                method=item.method,
+            )
+            for item in result.sensitivities
+        ],
+        diagnostics=OptimizationDiagnosticsResponse(
+            success=diagnostics.success,
+            message=diagnostics.message,
+            method=diagnostics.method,
+            evaluations=diagnostics.evaluations,
+            feasibleEvaluations=diagnostics.feasible_evaluations,
+            rejectedEvaluations=diagnostics.rejected_evaluations,
+            generations=diagnostics.generations,
+            seed=diagnostics.seed,
+        ),
+        provenance=OptimizationProvenanceResponse(
+            inputSha256=_request_input_sha256(request),
+            dataClassification=classification,
+            sourceLabel=source_label,
+        ),
+        warnings=list(result.warnings),
+    )
+
+
 @app.get("/api/v1/capabilities")
 async def capabilities() -> dict[str, Any]:
     return {
@@ -978,11 +1120,13 @@ async def capabilities() -> dict[str, Any]:
             "linear_full_car_7dof_dynamics",
             "linear_planar_bicycle_handling",
             "step_smooth_bump_half_sine_sine_and_sampled_road_inputs",
+            "deterministic_bounded_engineering_optimization",
+            "normalized_weighted_multi_objective_and_pareto",
+            "baseline_comparison_and_local_sensitivity",
         ],
         "notImplemented": [
             "rocker_kinematic_closure",
             "structural_stress_and_fatigue",
-            "optimization",
             "reports",
         ],
         "modelStatus": "unvalidated",
@@ -991,6 +1135,7 @@ async def capabilities() -> dict[str, Any]:
         "dynamicsSolverVersion": DYNAMICS_SOLVER_VERSION,
         "fullCarSolverVersion": FULL_CAR_SOLVER_VERSION,
         "bicycleSolverVersion": BICYCLE_SOLVER_VERSION,
+        "optimizationSolverVersion": OPTIMIZATION_SOLVER_VERSION,
         "qualityStates": [
             "VERIFIED_NUMERICALLY",
             "REFERENCE_BENCHMARKED",

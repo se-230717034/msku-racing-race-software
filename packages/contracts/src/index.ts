@@ -596,6 +596,121 @@ export const bicycleSimulationResponseSchema = z.object({
   samples: z.array(bicycleSampleSchema),
 });
 
+export const optimizationDesignVariableSchema = z.object({
+  path: z.string().min(1).max(160),
+  lowerBound: z.number().finite(),
+  upperBound: z.number().finite(),
+}).refine((value) => value.lowerBound < value.upperBound, {
+  message: "lowerBound must be less than upperBound",
+});
+
+export const optimizationObjectiveSchema = z.object({
+  id: z.string().min(1).max(120),
+  goal: z.enum(["minimize", "target"]),
+  targetValue: z.number().finite().nullable(),
+  weight: z.number().finite().positive(),
+  normalization: z.number().finite().positive(),
+}).refine((value) => value.goal !== "target" || value.targetValue !== null, {
+  message: "targetValue is required for a target objective",
+});
+
+export const engineeringOptimizationRequestSchema = z.object({
+  model: z.enum(["kinematics", "quarter_car", "full_car", "bicycle"]),
+  designVariables: z.array(optimizationDesignVariableSchema).min(1).max(24),
+  objectives: z.array(optimizationObjectiveSchema).min(1).max(8),
+  constraints: z.object({
+    minimumLinkLengthM: z.number().finite().positive(),
+    maximumAbsSuspensionTravelM: z.number().finite().positive().nullable(),
+    requireWheelContact: z.boolean(),
+    requireStableHandling: z.boolean(),
+  }),
+  settings: z.object({
+    seed: z.number().int().min(0).max(2 ** 32 - 1),
+    maximumGenerations: z.number().int().min(1).max(500),
+    populationMultiplier: z.number().int().min(4).max(50),
+    convergenceTolerance: z.number().finite().positive().max(0.1),
+    paretoPoints: z.number().int().min(0).max(31),
+    sensitivityStepFraction: z.number().finite().positive().max(0.1),
+  }),
+  project: projectSchema.nullable(),
+  kinematicsSweep: z.object({
+    startTravelM: z.number().finite().min(-0.25).max(0.25),
+    endTravelM: z.number().finite().min(-0.25).max(0.25),
+    steps: z.number().int().min(3).max(401),
+  }).nullable(),
+  kinematicsSolver: z.object({
+    residualToleranceM: z.number().finite().min(1e-12).max(1e-4),
+    maxFunctionEvaluations: z.number().int().min(50).max(5_000),
+  }).nullable(),
+  quarterCar: quarterCarSimulationRequestSchema.nullable(),
+  fullCar: fullCarSimulationRequestSchema.nullable(),
+  bicycle: bicycleSimulationRequestSchema.nullable(),
+}).superRefine((value, context) => {
+  const payload = {
+    kinematics: value.project,
+    quarter_car: value.quarterCar,
+    full_car: value.fullCar,
+    bicycle: value.bicycle,
+  }[value.model];
+  if (payload === null) {
+    context.addIssue({ code: "custom", message: `${value.model} model payload is required` });
+  }
+  if (value.model === "kinematics" && value.kinematicsSweep === null) {
+    context.addIssue({ code: "custom", message: "kinematicsSweep is required" });
+  }
+  if (value.settings.paretoPoints > 0 && value.objectives.length < 2) {
+    context.addIssue({ code: "custom", message: "Pareto generation requires two objectives" });
+  }
+});
+
+export const optimizationCandidateSchema = z.object({
+  variableValues: z.record(z.string(), z.number().finite()),
+  metrics: z.record(z.string(), z.number().finite()),
+  normalizedObjectives: z.record(z.string(), z.number().finite().nonnegative()),
+  weightedObjective: z.number().finite().nonnegative(),
+});
+
+export const engineeringOptimizationResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  model: z.enum(["kinematics", "quarter_car", "full_car", "bicycle"]),
+  calculationStatus: z.enum(["VERIFIED_NUMERICALLY", "FAILED"]),
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string().min(1),
+  units: z.record(z.string(), z.string()),
+  availableObjectives: z.array(z.string()),
+  baseline: optimizationCandidateSchema.nullable(),
+  optimized: optimizationCandidateSchema.nullable(),
+  paretoFront: z.array(optimizationCandidateSchema),
+  convergence: z.array(z.object({
+    generation: z.number().int().nonnegative(),
+    bestWeightedObjective: z.number().finite().nonnegative(),
+    convergenceIndicator: z.number().finite(),
+  })),
+  sensitivities: z.array(z.object({
+    variablePath: z.string(),
+    metricId: z.string(),
+    derivative: z.number().finite().nullable(),
+    step: z.number().finite().positive(),
+    method: z.enum(["central", "forward", "backward", "unavailable"]),
+  })),
+  diagnostics: z.object({
+    success: z.boolean(),
+    message: z.string(),
+    method: z.string(),
+    evaluations: z.number().int().nonnegative(),
+    feasibleEvaluations: z.number().int().nonnegative(),
+    rejectedEvaluations: z.number().int().nonnegative(),
+    generations: z.number().int().nonnegative(),
+    seed: z.number().int().nonnegative(),
+  }),
+  provenance: z.object({
+    inputSha256: z.string().regex(/^[0-9a-f]{64}$/),
+    dataClassification: z.enum(["demonstration", "team_private"]),
+    sourceLabel: z.string().min(1),
+  }),
+  warnings: z.array(z.string()),
+});
+
 export const solverMetadataSchema = z.object({
   name: z.literal("rigid_upright_double_wishbone"),
   version: z.string().min(1),
@@ -653,4 +768,9 @@ export type FullCarSimulationResponse = z.infer<typeof fullCarSimulationResponse
 export type BicycleSimulationRequest = z.infer<typeof bicycleSimulationRequestSchema>;
 export type BicycleSample = z.infer<typeof bicycleSampleSchema>;
 export type BicycleSimulationResponse = z.infer<typeof bicycleSimulationResponseSchema>;
+export type OptimizationDesignVariable = z.infer<typeof optimizationDesignVariableSchema>;
+export type OptimizationObjective = z.infer<typeof optimizationObjectiveSchema>;
+export type EngineeringOptimizationRequest = z.infer<typeof engineeringOptimizationRequestSchema>;
+export type OptimizationCandidate = z.infer<typeof optimizationCandidateSchema>;
+export type EngineeringOptimizationResponse = z.infer<typeof engineeringOptimizationResponseSchema>;
 

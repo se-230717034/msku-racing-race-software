@@ -1,6 +1,8 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 from msku_api.main import app
+from msku_api.models import EngineeringOptimizationRequest
+from msku_api.optimization_adapter import build_optimization_adapter
 
 
 @pytest.fixture
@@ -663,3 +665,255 @@ async def test_bicycle_api_suppresses_out_of_domain_result() -> None:
     assert payload["samples"] == []
     assert payload["diagnostics"]["domainAccepted"] is False
     assert "LINEAR_BICYCLE_DOMAIN_EXCEEDED" in payload["warnings"]
+
+
+def bicycle_optimization_request() -> dict[str, object]:
+    model = bicycle_request()
+    steering = model["steering"]
+    assert isinstance(steering, dict)
+    steering.update({"startTimeS": 0.05, "riseTimeS": 0.05, "amplitudeRad": 0.01})
+    model["settings"] = {
+        "durationS": 0.5,
+        "outputSamples": 51,
+        "relativeTolerance": 1.0e-7,
+        "absoluteTolerance": 1.0e-9,
+        "maximumStepS": 0.01,
+        "method": "DOP853",
+    }
+    return {
+        "model": "bicycle",
+        "designVariables": [
+            {
+                "path": "parameters.frontCorneringStiffnessNPerRad",
+                "lowerBound": 40000.0,
+                "upperBound": 60000.0,
+            }
+        ],
+        "objectives": [
+            {
+                "id": "final_yaw_rate_radps",
+                "goal": "target",
+                "targetValue": 0.09,
+                "weight": 1.0,
+                "normalization": 0.1,
+            }
+        ],
+        "constraints": {
+            "minimumLinkLengthM": 0.001,
+            "maximumAbsSuspensionTravelM": None,
+            "requireWheelContact": False,
+            "requireStableHandling": True,
+        },
+        "settings": {
+            "seed": 2307,
+            "maximumGenerations": 50,
+            "populationMultiplier": 6,
+            "convergenceTolerance": 1.0e-6,
+            "paretoPoints": 0,
+            "sensitivityStepFraction": 1.0e-4,
+        },
+        "project": None,
+        "kinematicsSweep": None,
+        "kinematicsSolver": None,
+        "quarterCar": None,
+        "fullCar": None,
+        "bicycle": model,
+    }
+
+
+@pytest.mark.anyio
+async def test_optimization_api_returns_traceable_bicycle_candidate() -> None:
+    request = bicycle_optimization_request()
+    async with api_client() as client:
+        response = await client.post("/api/v1/optimization/run", json=request)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+    assert payload["model"] == "bicycle"
+    assert payload["validationStatus"]["physical"] == "UNVALIDATED_PHYSICALLY"
+    assert payload["validationStatus"]["engineeringApproval"] == "NOT_APPROVED"
+    assert payload["baseline"] is not None
+    assert payload["optimized"] is not None
+    assert payload["optimized"]["weightedObjective"] <= payload["baseline"]["weightedObjective"]
+    value = payload["optimized"]["variableValues"][
+        "parameters.frontCorneringStiffnessNPerRad"
+    ]
+    assert 40000.0 <= value <= 60000.0
+    assert payload["diagnostics"]["seed"] == 2307
+    assert payload["diagnostics"]["rejectedEvaluations"] == 0
+    assert len(payload["provenance"]["inputSha256"]) == 64
+    assert payload["sensitivities"][0]["derivative"] is not None
+
+
+@pytest.mark.anyio
+async def test_optimization_api_rejects_unverified_objective() -> None:
+    request = bicycle_optimization_request()
+    request["objectives"] = [
+        {
+            "id": "invented_tire_temperature",
+            "goal": "minimize",
+            "targetValue": None,
+            "weight": 1.0,
+            "normalization": 1.0,
+        }
+    ]
+    async with api_client() as client:
+        response = await client.post("/api/v1/optimization/run", json=request)
+    assert response.status_code == 422
+    assert "Unsupported or unverified" in response.json()["detail"]
+
+
+def test_kinematics_optimization_adapter_enforces_geometry_and_link_constraint() -> None:
+    request = EngineeringOptimizationRequest.model_validate(
+        {
+            "model": "kinematics",
+            "designVariables": [
+                {
+                    "path": "hardpoints.tie_rod_inboard.y",
+                    "lowerBound": 0.2,
+                    "upperBound": 0.7,
+                },
+                {
+                    "path": "hardpoints.tie_rod_inboard.x",
+                    "lowerBound": -0.15,
+                    "upperBound": -0.05,
+                },
+                {
+                    "path": "hardpoints.tie_rod_inboard.z",
+                    "lowerBound": 0.2,
+                    "upperBound": 0.3,
+                },
+            ],
+            "objectives": [
+                {
+                    "id": "bump_steer_rms_rad",
+                    "goal": "minimize",
+                    "weight": 1.0,
+                    "normalization": 0.01,
+                }
+            ],
+            "constraints": {
+                "minimumLinkLengthM": 0.01,
+                "maximumAbsSuspensionTravelM": 0.02,
+                "requireWheelContact": False,
+                "requireStableHandling": False,
+            },
+            "settings": {
+                "seed": 2307,
+                "maximumGenerations": 5,
+                "populationMultiplier": 4,
+                "convergenceTolerance": 1.0e-4,
+                "paretoPoints": 0,
+                "sensitivityStepFraction": 1.0e-4,
+            },
+            "project": demo_project(),
+            "kinematicsSweep": {
+                "startTravelM": -0.01,
+                "endTravelM": 0.01,
+                "steps": 5,
+            },
+            "kinematicsSolver": {
+                "residualToleranceM": 1.0e-8,
+                "maxFunctionEvaluations": 500,
+            },
+        }
+    )
+    variables, evaluator, objectives = build_optimization_adapter(request)
+    assert objectives == (
+        "bump_steer_rms_rad",
+        "camber_variation_rms_rad",
+        "roll_center_migration_rms_m",
+        "maximum_abs_track_change_m",
+    )
+    baseline_values = {variable.name: variable.baseline for variable in variables}
+    baseline = evaluator(baseline_values)
+    assert baseline.feasible
+    assert baseline.metrics["bump_steer_rms_rad"] > 0.0
+
+    coincident_tie_rod = evaluator(
+        {
+            "hardpoints.tie_rod_inboard.y": 0.67,
+            "hardpoints.tie_rod_inboard.x": -0.09,
+            "hardpoints.tie_rod_inboard.z": 0.26,
+        }
+    )
+    assert not coincident_tie_rod.feasible
+    assert "MINIMUM_LINK_LENGTH_VIOLATION" in coincident_tie_rod.violations
+
+
+@pytest.mark.parametrize(
+    ("model", "path", "lower", "upper", "objective", "payload_key", "payload"),
+    [
+        (
+            "quarter_car",
+            "parameters.suspensionStiffnessNPerM",
+            20000.0,
+            40000.0,
+            "sprung_acceleration_rms_mps2",
+            "quarterCar",
+            quarter_car_request(),
+        ),
+        (
+            "full_car",
+            "parameters.corners.0.suspensionDampingNsPerM",
+            800.0,
+            3000.0,
+            "body_heave_acceleration_rms_mps2",
+            "fullCar",
+            full_car_request(),
+        ),
+        (
+            "bicycle",
+            "parameters.frontCorneringStiffnessNPerRad",
+            40000.0,
+            60000.0,
+            "maximum_abs_sideslip_rad",
+            "bicycle",
+            bicycle_request(),
+        ),
+    ],
+)
+def test_verified_dynamics_optimization_adapters_produce_real_metrics(
+    model: str,
+    path: str,
+    lower: float,
+    upper: float,
+    objective: str,
+    payload_key: str,
+    payload: dict[str, object],
+) -> None:
+    request_data: dict[str, object] = {
+        "model": model,
+        "designVariables": [{"path": path, "lowerBound": lower, "upperBound": upper}],
+        "objectives": [
+            {
+                "id": objective,
+                "goal": "minimize",
+                "targetValue": None,
+                "weight": 1.0,
+                "normalization": 1.0,
+            }
+        ],
+        "constraints": {
+            "minimumLinkLengthM": 0.001,
+            "maximumAbsSuspensionTravelM": 0.1,
+            "requireWheelContact": model != "bicycle",
+            "requireStableHandling": model == "bicycle",
+        },
+        "settings": {
+            "seed": 2307,
+            "maximumGenerations": 5,
+            "populationMultiplier": 4,
+            "convergenceTolerance": 1.0e-4,
+            "paretoPoints": 0,
+            "sensitivityStepFraction": 1.0e-4,
+        },
+        payload_key: payload,
+    }
+    request = EngineeringOptimizationRequest.model_validate(request_data)
+    variables, evaluator, available = build_optimization_adapter(request)
+    assert objective in available
+    evaluation = evaluator({variables[0].name: variables[0].baseline})
+    assert evaluation.feasible
+    assert objective in evaluation.metrics
+    assert evaluation.metrics[objective] >= 0.0

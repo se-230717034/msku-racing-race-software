@@ -1,6 +1,6 @@
 import { GizmoHelper, GizmoViewport, Line, OrbitControls } from "@react-three/drei";
 import { Canvas, type ThreeEvent, useThree } from "@react-three/fiber";
-import type { KinematicPose } from "@msku/contracts";
+import type { KinematicPose, Vec3 } from "@msku/contracts";
 import { useEffect, useMemo, useRef } from "react";
 import { Quaternion, Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -40,9 +40,10 @@ function CameraRig({ preset }: { preset: CameraPreset }) {
 interface ModelProps {
   mirrored?: boolean;
   pose?: KinematicPose;
+  hardpointOverrides?: Record<string, Vec3>;
 }
 
-function SuspensionModel({ mirrored = false, pose }: ModelProps) {
+function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelProps) {
   const project = useWorkspace((state) => state.project);
   const selectedId = useWorkspace((state) => state.selectedHardpointId);
   const select = useWorkspace((state) => state.setSelectedHardpoint);
@@ -52,7 +53,7 @@ function SuspensionModel({ mirrored = false, pose }: ModelProps) {
   const positionFor = (id: string): [number, number, number] => {
     const point = points.get(id);
     if (!point) throw new Error(`Hardpoint ${id} is missing from the viewport model.`);
-    const calculated = pose?.hardpoints[id] ?? point.position;
+    const calculated = pose?.hardpoints[id] ?? hardpointOverrides?.[id] ?? point.position;
     const value = mirrored ? mirrorAcrossVehicleCentreline(calculated) : calculated;
     return toThreePosition(value);
   };
@@ -124,9 +125,11 @@ export function SuspensionViewport({
   pose,
   mode = "geometry",
   forceVectors = [],
+  hardpointOverrides,
 }: {
   pose?: KinematicPose;
-  mode?: "geometry" | "kinematics" | "loads";
+  mode?: "geometry" | "kinematics" | "loads" | "optimization";
+  hardpointOverrides?: Record<string, Vec3>;
   forceVectors?: Array<{
     id: string;
     origin: { x: number; y: number; z: number };
@@ -148,7 +151,7 @@ export function SuspensionViewport({
         <directionalLight position={[1.5, 2.5, 1]} intensity={2.2} color="#ffffff" />
         <directionalLight position={[-1, 0.8, -1]} intensity={0.8} color="#ef233c" />
         <gridHelper args={[2, 20, "#29303d", "#171b23"]} position={[0, 0, 0]} />
-        <SuspensionModel pose={pose} />
+        <SuspensionModel pose={pose} hardpointOverrides={hardpointOverrides} />
         {maximumForce > 0 && forceVectors.map(({ id, origin, force }) => {
           const magnitude = Math.hypot(force.x, force.y, force.z);
           if (magnitude <= 1e-12) return null;
@@ -162,7 +165,7 @@ export function SuspensionViewport({
             />
           );
         })}
-        {mirror && <SuspensionModel mirrored pose={pose} />}
+        {mirror && <SuspensionModel mirrored pose={pose} hardpointOverrides={hardpointOverrides} />}
         <CameraRig preset={cameraPreset} />
         <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
           <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />

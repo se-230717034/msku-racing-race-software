@@ -110,9 +110,18 @@ Updated: 2026-10-15
 - [x] Independent state-matrix, matrix-exponential transient, steady-state, sign, integrator, instability, and domain tests
 - [x] Typed API and browser contracts plus calculated full-car and handling result workspaces
 - [x] Phase 5 engineering model documentation for completed dynamics models
-- [ ] Deterministic bounded optimization core, model adapters, Pareto exploration, and sensitivity analysis
-- [ ] Candidate preview/apply workflow and optimization verification report
-- [ ] Final Phase 5 quality gates and GitHub release commit
+- [x] Deterministic bounded optimization core with infeasible/non-finite model rejection
+- [x] Hardpoint, quarter-car, full-car, and bicycle verified-model adapters
+- [x] Explicit normalized weighted objectives and target objectives
+- [x] Reproducible seeded Pareto exploration with duplicate/dominance filtering
+- [x] Baseline comparison and bounded central/one-sided local sensitivity
+- [x] Geometry, link length, solver convergence, travel, contact, stability, and model-domain constraints
+- [x] Optimization workspace with model/objective/variable selection, SI bounds, run controls, and diagnostics
+- [x] Convergence and Pareto graphs plus baseline/candidate and sensitivity panels
+- [x] Non-mutating 3D candidate geometry preview and explicit apply action
+- [x] Analytical minima, bounds, normalization, Pareto, reproducibility, failure, sensitivity, API, contract, and browser tests
+- [x] Phase 5 model and quantitative verification documentation
+- [x] Final gates: 108 Python tests, 25 Vitest tests, 5 Chromium tests, Ruff, mypy, ESLint, TypeScript, and production build
 - [ ] MSKU Racing parameter provenance and independent rig/track validation
 
 ## Later phases

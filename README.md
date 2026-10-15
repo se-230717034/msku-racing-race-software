@@ -29,8 +29,11 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Independent eigenvalue/modal-decay tests, step and tolerance convergence, DOP853/Radau/BDF comparison, road interpolation, energy, contact, API, contract, and browser regression tests.
 - Linear 7DOF full-car ride model with body heave/pitch/roll, four unsprung masses, four independent roads, assembled physical matrices, seven natural modes, per-corner contact guarding, energy diagnostics, and calculated UI plots.
 - Constant-speed linear planar bicycle model derived from Newton-Euler balance with explicit axle cornering stiffnesses, stability/understeer diagnostics, analytical steady-state gains, domain-limit rejection, and calculated UI plots.
+- Deterministic bounded differential-evolution framework with explicit objective normalization, weighted multi-objective search, seeded Pareto exploration, feasibility rejection, baseline comparison, and local finite-difference sensitivity.
+- Verified adapters for hardpoint coordinates, supported quarter/full-car spring-damper parameters, and bicycle cornering stiffness/speed; unsupported metrics are rejected rather than fabricated.
+- Optimization workspace with variable/bound controls, convergence/Pareto plots, candidate diagnostics, non-mutating geometry preview, and explicit apply.
 
-See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), the Phase 3 and Phase 4 model/verification reports, the [Phase 5 engineering models](./docs/PHASE_5_ENGINEERING_MODELS.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), the Phase 3 and Phase 4 model/verification reports, the [Phase 5 engineering models](./docs/PHASE_5_ENGINEERING_MODELS.md), the [Phase 5 verification report](./docs/PHASE_5_VERIFICATION_REPORT.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 
@@ -58,7 +61,7 @@ npm run dev
 
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
 
-The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*`. Dynamics endpoints are `POST /api/v1/dynamics/quarter-car/simulate`, `POST /api/v1/dynamics/full-car/simulate`, and `POST /api/v1/dynamics/bicycle/simulate`. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions.
+The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*`. Dynamics endpoints are `POST /api/v1/dynamics/quarter-car/simulate`, `POST /api/v1/dynamics/full-car/simulate`, and `POST /api/v1/dynamics/bicycle/simulate`. Optimization uses `POST /api/v1/optimization/run`. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions.
 
 ## Quality checks
 

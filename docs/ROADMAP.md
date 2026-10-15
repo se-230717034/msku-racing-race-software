@@ -22,12 +22,14 @@ and physical validation remain open.
 
 Implemented reliable subset: benchmarked linear 2DOF quarter car, five configurable road profiles,
 three integration algorithms, energy/contact diagnostics, calculated playback, and guarded export.
-Advance to half/full-car and handling only with adequate mass/inertia/tire inputs and independent
-numerical and physical evidence.
+Phase 5 adds the outstanding linear full-car and bicycle models; physical correlation remains open.
 
 ## Phase 5 — Optimization
 
-Add reproducible sweeps, sensitivity, and bounded multi-objective search. Invalid geometry must never be accepted as an optimum.
+Implemented: reproducible bounded differential evolution, explicit normalized weighted objectives,
+seeded Pareto exploration, feasibility gates, baseline comparison, local sensitivity, four verified
+model adapters, and non-mutating candidate preview with explicit apply. Global-optimum proof,
+manufacturing/packaging constraints, and physical candidate validation remain open.
 
 ## Phase 6 — Professional workflows
 

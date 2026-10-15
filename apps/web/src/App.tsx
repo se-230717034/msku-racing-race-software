@@ -17,6 +17,9 @@ const QuasiStaticWorkspace = lazy(() =>
 const DynamicsWorkspace = lazy(() =>
   import("./components/DynamicsWorkspace").then((module) => ({ default: module.DynamicsWorkspace })),
 );
+const OptimizationWorkspace = lazy(() =>
+  import("./components/OptimizationWorkspace").then((module) => ({ default: module.OptimizationWorkspace })),
+);
 
 const modules: Array<{ id: ModuleId; label: string; icon: typeof Box; implemented: boolean }> = [
   { id: "workspace", label: "Workspace", icon: Database, implemented: true },
@@ -25,7 +28,7 @@ const modules: Array<{ id: ModuleId; label: string; icon: typeof Box; implemente
   { id: "loads", label: "Loads", icon: Scale, implemented: true },
   { id: "dynamics", label: "Dynamics", icon: Activity, implemented: true },
   { id: "road", label: "Road", icon: Route, implemented: false },
-  { id: "optimization", label: "Optimization", icon: Gauge, implemented: false },
+  { id: "optimization", label: "Optimization", icon: Gauge, implemented: true },
   { id: "reports", label: "Reports", icon: GitCompareArrows, implemented: false },
   { id: "validation", label: "Validation", icon: TestTubeDiagonal, implemented: false },
 ];
@@ -88,8 +91,8 @@ function WorkspaceOverview() {
         </section>
         <section className="overview-card span-two">
           <span className="eyebrow">IMPLEMENTATION GATE</span>
-          <h2>Phase 0–4 engineering foundation</h2>
-          <p>The geometry, rigid-link kinematics, guarded quasi-static loads, and benchmarked linear quarter-car, 7DOF full-car ride, and bicycle-handling workflows are operational. Optimization and reporting remain unavailable until their models and validation tests exist.</p>
+          <h2>Phase 0–5 engineering foundation</h2>
+          <p>The geometry, rigid-link kinematics, guarded quasi-static loads, benchmarked linear dynamics, and deterministic bounded optimization workflows are operational. Reporting remains unavailable until its models and validation tests exist.</p>
         </section>
       </div>
     </main>
@@ -162,6 +165,10 @@ export function App() {
       ) : activeModule === "dynamics" ? (
         <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING DYNAMICS WORKSPACE</span></main>}>
           <DynamicsWorkspace />
+        </Suspense>
+      ) : activeModule === "optimization" ? (
+        <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING OPTIMIZATION WORKSPACE</span></main>}>
+          <OptimizationWorkspace />
         </Suspense>
       ) : activeModule === "workspace" ? (
         <WorkspaceOverview />

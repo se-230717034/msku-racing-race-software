@@ -78,10 +78,20 @@ validation or approval change. See `PHASE_3_VERIFICATION_REPORT.md`.
   and export gating. See `PHASE_4_VERIFICATION_REPORT.md` for quantitative results.
 
 Still required: traceable MSKU Racing corner masses, wheel rates, tire vertical properties, damper
-dyno curves, corner weights, and independent rig/track response with uncertainty. Full-car and
-bicycle models remain `NOT_COMPUTABLE` until their inputs and independent references exist.
+dyno curves, corner weights, and independent rig/track response with uncertainty.
 
-## Later gates
+## Phase 5 evidence and remaining gate
 
-- Optimization: deterministic seeds, infeasibility cases, known objective functions, and full candidate revalidation.
+- Full-car matrices, generalized modes, exact undamped response, symmetric quarter-car reduction,
+  sign behavior, cross-integrator agreement, contact loss, and invalid ordering are tested.
+- Bicycle Newton-Euler matrices, analytical steady state, independent matrix exponential, steering
+  signs, cross-integrator agreement, instability, low speed, and linear-domain failure are tested.
+- Optimization tests cover analytical minima, bounds, explicit normalization, target objectives,
+  reproducibility, Pareto nondominance, failed-model rejection, and finite-difference sensitivity.
+- Real model adapters are exercised for hardpoints, spring/damping, full-car corner parameters, and
+  bicycle stiffness. API, TypeScript, and Chromium tests cover integration and quality states.
+
+Still required: independent CAD/rig/track correlation with traceable MSKU Racing inputs; an
+independent optimization method/budget study for any selected candidate; manufacturing and
+packaging constraints; and engineering review before a candidate is released.
 

@@ -42,6 +42,19 @@ from .kinematics import (
     solve_pose,
     solve_sweep,
 )
+from .optimization import (
+    OPTIMIZATION_SOLVER_VERSION,
+    Candidate,
+    ConvergencePoint,
+    DesignVariable,
+    ModelEvaluation,
+    ObjectiveDefinition,
+    OptimizationDiagnostics,
+    OptimizationResult,
+    OptimizationSettings,
+    Sensitivity,
+    run_optimization,
+)
 from .quasi_static import (
     PHYSICAL_STATUS as QUASI_STATIC_PHYSICAL_STATUS,
 )
@@ -130,6 +143,17 @@ __all__ = [
     "quarter_car_natural_frequencies",
     "road_state",
     "simulate_quarter_car",
+    "OPTIMIZATION_SOLVER_VERSION",
+    "Candidate",
+    "ConvergencePoint",
+    "DesignVariable",
+    "ModelEvaluation",
+    "ObjectiveDefinition",
+    "OptimizationDiagnostics",
+    "OptimizationResult",
+    "OptimizationSettings",
+    "Sensitivity",
+    "run_optimization",
     "BICYCLE_SOLVER_VERSION",
     "BicycleDiagnostics",
     "BicycleDomainLimits",

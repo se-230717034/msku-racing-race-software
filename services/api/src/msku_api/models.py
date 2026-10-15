@@ -697,3 +697,131 @@ class BicycleSimulationResponse(StrictModel):
     assumptions: list[str]
     warnings: list[str]
     samples: list[BicycleSampleResponse]
+
+
+class OptimizationDesignVariableInput(StrictModel):
+    path: str = Field(min_length=1, max_length=160)
+    lowerBound: float
+    upperBound: float
+
+    @model_validator(mode="after")
+    def ordered_bounds(self) -> OptimizationDesignVariableInput:
+        if self.lowerBound >= self.upperBound:
+            raise ValueError("lowerBound must be less than upperBound")
+        return self
+
+
+class OptimizationObjectiveInput(StrictModel):
+    id: str = Field(min_length=1, max_length=120)
+    goal: Literal["minimize", "target"] = "minimize"
+    targetValue: float | None = None
+    weight: float = Field(default=1.0, gt=0)
+    normalization: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def target_is_explicit(self) -> OptimizationObjectiveInput:
+        if self.goal == "target" and self.targetValue is None:
+            raise ValueError("targetValue is required for a target objective")
+        return self
+
+
+class OptimizationConstraintsInput(StrictModel):
+    minimumLinkLengthM: float = Field(default=0.001, gt=0)
+    maximumAbsSuspensionTravelM: float | None = Field(default=None, gt=0)
+    requireWheelContact: bool = True
+    requireStableHandling: bool = True
+
+
+class OptimizationSettingsInput(StrictModel):
+    seed: int = Field(default=2307, ge=0, le=2**32 - 1)
+    maximumGenerations: int = Field(default=60, ge=1, le=500)
+    populationMultiplier: int = Field(default=8, ge=4, le=50)
+    convergenceTolerance: float = Field(default=1.0e-6, gt=0, le=0.1)
+    paretoPoints: int = Field(default=0, ge=0, le=31)
+    sensitivityStepFraction: float = Field(default=1.0e-4, gt=0, le=0.1)
+
+
+class EngineeringOptimizationRequest(StrictModel):
+    model: Literal["kinematics", "quarter_car", "full_car", "bicycle"]
+    designVariables: list[OptimizationDesignVariableInput] = Field(min_length=1, max_length=24)
+    objectives: list[OptimizationObjectiveInput] = Field(min_length=1, max_length=8)
+    constraints: OptimizationConstraintsInput = Field(default_factory=OptimizationConstraintsInput)
+    settings: OptimizationSettingsInput = Field(default_factory=OptimizationSettingsInput)
+    project: Project | None = None
+    kinematicsSweep: SweepDefinition | None = None
+    kinematicsSolver: SolverConfiguration | None = None
+    quarterCar: QuarterCarSimulationRequest | None = None
+    fullCar: FullCarSimulationRequest | None = None
+    bicycle: BicycleSimulationRequest | None = None
+
+    @model_validator(mode="after")
+    def required_model_payload_exists(self) -> EngineeringOptimizationRequest:
+        payload = {
+            "kinematics": self.project,
+            "quarter_car": self.quarterCar,
+            "full_car": self.fullCar,
+            "bicycle": self.bicycle,
+        }[self.model]
+        if payload is None:
+            raise ValueError(f"{self.model} model payload is required")
+        if self.model == "kinematics" and self.kinematicsSweep is None:
+            raise ValueError("kinematicsSweep is required for kinematics optimization")
+        if self.settings.paretoPoints and len(self.objectives) < 2:
+            raise ValueError("paretoPoints requires at least two objectives")
+        return self
+
+
+class OptimizationCandidateResponse(StrictModel):
+    variableValues: dict[str, float]
+    metrics: dict[str, float]
+    normalizedObjectives: dict[str, float]
+    weightedObjective: float
+
+
+class OptimizationConvergenceResponse(StrictModel):
+    generation: int
+    bestWeightedObjective: float
+    convergenceIndicator: float
+
+
+class OptimizationSensitivityResponse(StrictModel):
+    variablePath: str
+    metricId: str
+    derivative: float | None
+    step: float
+    method: Literal["central", "forward", "backward", "unavailable"]
+
+
+class OptimizationDiagnosticsResponse(StrictModel):
+    success: bool
+    message: str
+    method: str
+    evaluations: int
+    feasibleEvaluations: int
+    rejectedEvaluations: int
+    generations: int
+    seed: int
+
+
+class OptimizationProvenanceResponse(StrictModel):
+    inputSha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    dataClassification: Literal["demonstration", "team_private"]
+    sourceLabel: str
+
+
+class EngineeringOptimizationResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    model: Literal["kinematics", "quarter_car", "full_car", "bicycle"]
+    calculationStatus: Literal["VERIFIED_NUMERICALLY", "FAILED"]
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    units: dict[str, str]
+    availableObjectives: list[str]
+    baseline: OptimizationCandidateResponse | None
+    optimized: OptimizationCandidateResponse | None
+    paretoFront: list[OptimizationCandidateResponse]
+    convergence: list[OptimizationConvergenceResponse]
+    sensitivities: list[OptimizationSensitivityResponse]
+    diagnostics: OptimizationDiagnosticsResponse
+    provenance: OptimizationProvenanceResponse
+    warnings: list[str]
