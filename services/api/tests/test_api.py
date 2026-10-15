@@ -480,3 +480,186 @@ async def test_quarter_car_api_rejects_invalid_sampled_road_as_failed_result() -
     assert payload["calculationStatus"] == "FAILED"
     assert payload["samples"] == []
     assert payload["warnings"] == ["INVALID_DYNAMICS_INPUT"]
+
+
+def full_car_request() -> dict[str, object]:
+    corner = {
+        "unsprungMassKg": 12.0,
+        "suspensionStiffnessNPerM": 30000.0,
+        "suspensionDampingNsPerM": 1800.0,
+        "tireStiffnessNPerM": 180000.0,
+        "tireDampingNsPerM": 0.0,
+        "staticTireLoadN": 1000.0,
+    }
+    road = {
+        "kind": "smooth_bump",
+        "amplitudeM": 0.005,
+        "startTimeS": 0.2,
+        "durationS": 0.15,
+        "frequencyHz": 1.0,
+        "sampleTimesS": [],
+        "sampleDisplacementsM": [],
+    }
+    return {
+        "dataClassification": "demonstration",
+        "sourceLabel": "Synthetic Phase 5 full-car API regression fixture",
+        "parameters": {
+            "sprungMassKg": 300.0,
+            "pitchInertiaKgM2": 120.0,
+            "rollInertiaKgM2": 80.0,
+            "corners": [
+                {**corner, "xPositionM": 0.8, "yPositionM": 0.6},
+                {**corner, "xPositionM": 0.8, "yPositionM": -0.6},
+                {**corner, "xPositionM": -0.8, "yPositionM": 0.6},
+                {**corner, "xPositionM": -0.8, "yPositionM": -0.6},
+            ],
+        },
+        "roadProfiles": [road, road, road, road],
+        "initialState": {
+            "bodyHeaveM": 0.0,
+            "bodyHeaveVelocityMps": 0.0,
+            "pitchRad": 0.0,
+            "pitchRateRadps": 0.0,
+            "rollRad": 0.0,
+            "rollRateRadps": 0.0,
+            "unsprungDisplacementsM": [0.0, 0.0, 0.0, 0.0],
+            "unsprungVelocitiesMps": [0.0, 0.0, 0.0, 0.0],
+        },
+        "settings": {
+            "durationS": 1.0,
+            "outputSamples": 201,
+            "relativeTolerance": 1.0e-8,
+            "absoluteTolerance": 1.0e-10,
+            "maximumStepS": 0.002,
+            "method": "DOP853",
+        },
+    }
+
+
+@pytest.mark.anyio
+async def test_full_car_api_returns_symmetric_calculated_response() -> None:
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/dynamics/full-car/simulate", json=full_car_request()
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+    assert payload["validationStatus"]["reference"] == "REFERENCE_BENCHMARKED"
+    assert payload["validationStatus"]["physical"] == "UNVALIDATED_PHYSICALLY"
+    assert payload["solverVersion"] == "5.0.0"
+    assert len(payload["inputProvenance"]["inputSha256"]) == 64
+    assert payload["cornerOrder"] == [
+        "front_left", "front_right", "rear_left", "rear_right"
+    ]
+    assert len(payload["naturalFrequenciesHz"]) == 7
+    assert len(payload["samples"]) == 201
+    assert max(abs(item["pitchRad"]) for item in payload["samples"]) < 1.0e-10
+    assert max(abs(item["rollRad"]) for item in payload["samples"]) < 1.0e-10
+    assert payload["diagnostics"]["contactAccepted"] is True
+
+
+@pytest.mark.anyio
+async def test_full_car_api_suppresses_samples_after_one_corner_contact_loss() -> None:
+    request = full_car_request()
+    parameters = request["parameters"]
+    assert isinstance(parameters, dict)
+    corners = parameters["corners"]
+    assert isinstance(corners, list)
+    corners[0] = {**corners[0], "staticTireLoadN": 50.0}
+    request["roadProfiles"] = [
+        {
+            "kind": "sine", "amplitudeM": 0.0, "startTimeS": 0.0,
+            "durationS": 0.1, "frequencyHz": 1.0,
+            "sampleTimesS": [], "sampleDisplacementsM": [],
+        }
+    ] * 4
+    initial = request["initialState"]
+    assert isinstance(initial, dict)
+    initial["unsprungDisplacementsM"] = [0.01, 0.0, 0.0, 0.0]
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/dynamics/full-car/simulate", json=request
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "FAILED"
+    assert payload["samples"] == []
+    assert payload["diagnostics"]["contactAccepted"] is False
+    assert payload["diagnostics"]["contactLossCorner"] == "front_left"
+
+
+def bicycle_request() -> dict[str, object]:
+    return {
+        "dataClassification": "demonstration",
+        "sourceLabel": "Synthetic Phase 5 bicycle API regression fixture",
+        "parameters": {
+            "massKg": 300.0,
+            "yawInertiaKgM2": 150.0,
+            "cgToFrontAxleM": 0.8,
+            "cgToRearAxleM": 0.8,
+            "frontCorneringStiffnessNPerRad": 50000.0,
+            "rearCorneringStiffnessNPerRad": 50000.0,
+            "speedMps": 15.0,
+        },
+        "steering": {
+            "kind": "smooth_step",
+            "amplitudeRad": 0.02,
+            "startTimeS": 0.2,
+            "riseTimeS": 0.1,
+            "frequencyHz": 1.0,
+            "sampleTimesS": [],
+            "sampleAnglesRad": [],
+        },
+        "initialState": {"lateralVelocityMps": 0.0, "yawRateRadps": 0.0},
+        "domainLimits": {
+            "maximumAbsSteeringRad": 0.15,
+            "maximumAbsSideslipRad": 0.15,
+            "maximumAbsTireSlipRad": 0.15,
+        },
+        "settings": {
+            "durationS": 1.5,
+            "outputSamples": 301,
+            "relativeTolerance": 1.0e-8,
+            "absoluteTolerance": 1.0e-10,
+            "maximumStepS": 0.002,
+            "method": "DOP853",
+        },
+    }
+
+
+@pytest.mark.anyio
+async def test_bicycle_api_returns_stable_traceable_response() -> None:
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/dynamics/bicycle/simulate", json=bicycle_request()
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+    assert payload["validationStatus"]["reference"] == "REFERENCE_BENCHMARKED"
+    assert payload["validationStatus"]["physical"] == "UNVALIDATED_PHYSICALLY"
+    assert payload["solverVersion"] == "5.0.0"
+    assert len(payload["inputProvenance"]["inputSha256"]) == 64
+    assert len(payload["samples"]) == 301
+    assert payload["samples"][-1]["yawRateRadps"] > 0.0
+    assert payload["diagnostics"]["stable"] is True
+    assert payload["diagnostics"]["domainAccepted"] is True
+
+
+@pytest.mark.anyio
+async def test_bicycle_api_suppresses_out_of_domain_result() -> None:
+    request = bicycle_request()
+    steering = request["steering"]
+    assert isinstance(steering, dict)
+    steering["amplitudeRad"] = 0.2
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/dynamics/bicycle/simulate", json=request
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "FAILED"
+    assert payload["samples"] == []
+    assert payload["diagnostics"]["domainAccepted"] is False
+    assert "LINEAR_BICYCLE_DOMAIN_EXCEEDED" in payload["warnings"]

@@ -262,6 +262,9 @@ button { color: inherit; }
 .dynamics-charts { min-height: 230px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border-bottom: 1px solid var(--line); background: var(--line); }
 .dynamics-diagnostics { min-height: 190px; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 1px; background: var(--line); }
 .dynamics-diagnostics .engineering-card { min-height: 190px; }
+.advanced-dynamics-summary { grid-template-columns: 1fr 1fr; }
+.advanced-dynamics-summary .engineering-card { min-height: 260px; padding: 14px; }
+.advanced-dynamics-summary input[type="range"] { width: 100%; margin: 18px 0; accent-color: var(--accent); }
 
 .statusbar { display: flex; align-items: center; gap: 20px; padding: 0 14px; border-top: 1px solid var(--line); color: #667080; background: #090b0f; font: 8px/1 ui-monospace, monospace; letter-spacing: 0.06em; }
 .statusbar span { display: flex; align-items: center; gap: 5px; }.status-spacer { flex: 1; }

@@ -8,21 +8,33 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from msku_engineering import (
+    BICYCLE_SOLVER_VERSION,
     DYNAMICS_SOLVER_VERSION,
+    FULL_CAR_SOLVER_VERSION,
     KINEMATICS_SOLVER_VERSION,
     QUASI_STATIC_SOLVER_VERSION,
+    BicycleDomainLimits,
+    BicycleInitialState,
+    BicycleParameters,
     DynamicsSettings,
     EquilibriumSettings,
     ExternalWrench,
+    FullCarCornerParameters,
+    FullCarInitialState,
+    FullCarParameters,
+    FullCarRoadInputs,
     QuarterCarInitialState,
     QuarterCarParameters,
     RoadProfile,
     SolverSettings,
+    SteeringProfile,
     TwoForceMember,
     VehicleLoadTransferInput,
     calculate_actuation_series,
     calculate_damper_force,
     calculate_vehicle_load_transfer,
+    simulate_bicycle,
+    simulate_full_car,
     simulate_quarter_car,
     solve_pose,
     solve_sweep,
@@ -34,12 +46,21 @@ from .models import (
     ActuationSeriesRequest,
     ActuationSeriesResponse,
     AxleLoadsResponse,
+    BicycleDiagnosticsResponse,
+    BicycleSampleResponse,
+    BicycleSimulationRequest,
+    BicycleSimulationResponse,
     DamperForceRequest,
     DamperForceResponse,
     DiagnosticResponse,
     DynamicsDiagnosticsResponse,
     DynamicsInputProvenanceResponse,
+    DynamicsSettingsInput,
     EquilibriumDiagnosticsResponse,
+    FullCarDiagnosticsResponse,
+    FullCarSampleResponse,
+    FullCarSimulationRequest,
+    FullCarSimulationResponse,
     InputProvenanceResponse,
     KinematicMetricsResponse,
     KinematicPoseResponse,
@@ -53,6 +74,7 @@ from .models import (
     QuarterCarSampleResponse,
     QuarterCarSimulationRequest,
     QuarterCarSimulationResponse,
+    RoadProfileInput,
     SolverDiagnosticsResponse,
     SolverMetadataResponse,
     SpringSampleResponse,
@@ -133,11 +155,36 @@ def _project_input_sha256(project: Project) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _request_input_sha256(request: QuarterCarSimulationRequest) -> str:
+def _request_input_sha256(
+    request: QuarterCarSimulationRequest | FullCarSimulationRequest | BicycleSimulationRequest,
+) -> str:
     canonical = json.dumps(
         request.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _road_profile(value: RoadProfileInput) -> RoadProfile:
+    return RoadProfile(
+        kind=value.kind,
+        amplitude_m=value.amplitudeM,
+        start_time_s=value.startTimeS,
+        duration_s=value.durationS,
+        frequency_hz=value.frequencyHz,
+        sample_times_s=tuple(value.sampleTimesS),
+        sample_displacements_m=tuple(value.sampleDisplacementsM),
+    )
+
+
+def _dynamics_settings(value: DynamicsSettingsInput) -> DynamicsSettings:
+    return DynamicsSettings(
+        duration_s=value.durationS,
+        output_samples=value.outputSamples,
+        relative_tolerance=value.relativeTolerance,
+        absolute_tolerance=value.absoluteTolerance,
+        maximum_step_s=value.maximumStepS,
+        method=value.method,
+    )
 
 
 def _project_provenance(project: Project) -> InputProvenanceResponse:
@@ -655,6 +702,267 @@ async def quarter_car_simulation(
     )
 
 
+@app.post(
+    "/api/v1/dynamics/full-car/simulate",
+    response_model=FullCarSimulationResponse,
+)
+async def full_car_simulation(
+    request: FullCarSimulationRequest,
+) -> FullCarSimulationResponse:
+    parameters = request.parameters
+    initial = request.initialState
+    result = simulate_full_car(
+        FullCarParameters(
+            sprung_mass_kg=parameters.sprungMassKg,
+            pitch_inertia_kg_m2=parameters.pitchInertiaKgM2,
+            roll_inertia_kg_m2=parameters.rollInertiaKgM2,
+            corners=tuple(
+                FullCarCornerParameters(
+                    x_position_m=corner.xPositionM,
+                    y_position_m=corner.yPositionM,
+                    unsprung_mass_kg=corner.unsprungMassKg,
+                    suspension_stiffness_n_per_m=corner.suspensionStiffnessNPerM,
+                    suspension_damping_ns_per_m=corner.suspensionDampingNsPerM,
+                    tire_stiffness_n_per_m=corner.tireStiffnessNPerM,
+                    tire_damping_ns_per_m=corner.tireDampingNsPerM,
+                    static_tire_load_n=corner.staticTireLoadN,
+                )
+                for corner in parameters.corners
+            ),
+        ),
+        FullCarRoadInputs(profiles=tuple(_road_profile(road) for road in request.roadProfiles)),
+        FullCarInitialState(
+            body_heave_m=initial.bodyHeaveM,
+            body_heave_velocity_mps=initial.bodyHeaveVelocityMps,
+            pitch_rad=initial.pitchRad,
+            pitch_rate_radps=initial.pitchRateRadps,
+            roll_rad=initial.rollRad,
+            roll_rate_radps=initial.rollRateRadps,
+            unsprung_displacements_m=tuple(initial.unsprungDisplacementsM),
+            unsprung_velocities_mps=tuple(initial.unsprungVelocitiesMps),
+        ),
+        _dynamics_settings(request.settings),
+    )
+    diagnostics = result.diagnostics
+    return FullCarSimulationResponse(
+        schemaVersion="1.0.0",
+        modelName="linear_full_car_7dof",
+        calculationStatus=result.calculation_status,
+        validationStatus=_phase3_validation(result.calculation_status),
+        solverVersion=result.solver_version,
+        units={
+            "time": "s",
+            "length": "m",
+            "angle": "rad",
+            "velocity": "m/s",
+            "angularVelocity": "rad/s",
+            "acceleration": "m/s^2",
+            "angularAcceleration": "rad/s^2",
+            "force": "N",
+            "energy": "J",
+            "power": "W",
+        },
+        inputProvenance=DynamicsInputProvenanceResponse(
+            dataClassification=request.dataClassification,
+            sourceLabel=request.sourceLabel,
+            inputSha256=_request_input_sha256(request),
+        ),
+        naturalFrequenciesHz=(
+            list(result.natural_frequencies_hz)
+            if result.natural_frequencies_hz is not None
+            else None
+        ),
+        cornerOrder=["front_left", "front_right", "rear_left", "rear_right"],
+        diagnostics=FullCarDiagnosticsResponse(
+            solverSuccess=diagnostics.solver_success,
+            finiteStates=diagnostics.finite_states,
+            contactAccepted=diagnostics.contact_accepted,
+            functionEvaluations=diagnostics.function_evaluations,
+            jacobianEvaluations=diagnostics.jacobian_evaluations,
+            luDecompositions=diagnostics.lu_decompositions,
+            integrationMethod=diagnostics.integration_method,
+            relativeTolerance=diagnostics.relative_tolerance,
+            absoluteTolerance=diagnostics.absolute_tolerance,
+            maximumStepS=diagnostics.maximum_step_s,
+            acceptedSteps=diagnostics.accepted_steps,
+            minimumAcceptedStepS=diagnostics.minimum_accepted_step_s,
+            maximumAcceptedStepS=diagnostics.maximum_accepted_step_s,
+            massMatrixCondition=diagnostics.mass_matrix_condition,
+            stiffnessMatrixCondition=diagnostics.stiffness_matrix_condition,
+            initialEnergyJ=diagnostics.initial_energy_j,
+            finalEnergyJ=diagnostics.final_energy_j,
+            roadInputWorkJ=diagnostics.road_input_work_j,
+            dissipatedEnergyJ=diagnostics.dissipated_energy_j,
+            energyBalanceResidualJ=diagnostics.energy_balance_residual_j,
+            relativeEnergyBalanceError=diagnostics.relative_energy_balance_error,
+            minimumTotalContactForceN=diagnostics.minimum_total_contact_force_n,
+            contactLossCorner=diagnostics.contact_loss_corner,
+            message=diagnostics.message,
+        ),
+        assumptions=[
+            "LINEAR_SEVEN_DOF_FULL_CAR",
+            "BODY_HEAVE_PITCH_ROLL_AND_FOUR_UNSPRUNG_VERTICAL_DOF",
+            "STATIC_EQUILIBRIUM_PERTURBATION_COORDINATES",
+            "SMALL_PITCH_AND_ROLL_ANGLES",
+            "LINEAR_BILATERAL_TIRES",
+            "NO_SUSPENSION_KINEMATIC_OR_COMPLIANCE_COUPLING",
+        ],
+        warnings=list(result.warnings),
+        samples=[
+            FullCarSampleResponse(
+                timeS=item.time_s,
+                roadDisplacementsM=list(item.road_displacements_m),
+                roadVelocitiesMps=list(item.road_velocities_mps),
+                bodyHeaveM=item.body_heave_m,
+                bodyHeaveVelocityMps=item.body_heave_velocity_mps,
+                bodyHeaveAccelerationMps2=item.body_heave_acceleration_mps2,
+                pitchRad=item.pitch_rad,
+                pitchRateRadps=item.pitch_rate_radps,
+                pitchAccelerationRadps2=item.pitch_acceleration_radps2,
+                rollRad=item.roll_rad,
+                rollRateRadps=item.roll_rate_radps,
+                rollAccelerationRadps2=item.roll_acceleration_radps2,
+                unsprungDisplacementsM=list(item.unsprung_displacements_m),
+                unsprungVelocitiesMps=list(item.unsprung_velocities_mps),
+                unsprungAccelerationsMps2=list(item.unsprung_accelerations_mps2),
+                suspensionTravelsM=list(item.suspension_travels_m),
+                tireCompressionsM=list(item.tire_compressions_m),
+                suspensionForcesOnBodyN=list(item.suspension_forces_on_body_n),
+                tireForceIncrementsN=list(item.tire_force_increments_n),
+                totalTireContactForcesN=list(item.total_tire_contact_forces_n),
+                mechanicalEnergyJ=item.mechanical_energy_j,
+                dissipatedPowerW=item.dissipated_power_w,
+                roadInputPowerW=item.road_input_power_w,
+            )
+            for item in result.samples
+        ],
+    )
+
+
+@app.post(
+    "/api/v1/dynamics/bicycle/simulate",
+    response_model=BicycleSimulationResponse,
+)
+async def bicycle_simulation(
+    request: BicycleSimulationRequest,
+) -> BicycleSimulationResponse:
+    parameters = request.parameters
+    steering = request.steering
+    initial = request.initialState
+    limits = request.domainLimits
+    result = simulate_bicycle(
+        BicycleParameters(
+            mass_kg=parameters.massKg,
+            yaw_inertia_kg_m2=parameters.yawInertiaKgM2,
+            cg_to_front_axle_m=parameters.cgToFrontAxleM,
+            cg_to_rear_axle_m=parameters.cgToRearAxleM,
+            front_cornering_stiffness_n_per_rad=parameters.frontCorneringStiffnessNPerRad,
+            rear_cornering_stiffness_n_per_rad=parameters.rearCorneringStiffnessNPerRad,
+            speed_mps=parameters.speedMps,
+        ),
+        SteeringProfile(
+            kind=steering.kind,
+            amplitude_rad=steering.amplitudeRad,
+            start_time_s=steering.startTimeS,
+            rise_time_s=steering.riseTimeS,
+            frequency_hz=steering.frequencyHz,
+            sample_times_s=tuple(steering.sampleTimesS),
+            sample_angles_rad=tuple(steering.sampleAnglesRad),
+        ),
+        BicycleInitialState(
+            lateral_velocity_mps=initial.lateralVelocityMps,
+            yaw_rate_radps=initial.yawRateRadps,
+        ),
+        BicycleDomainLimits(
+            maximum_abs_steering_rad=limits.maximumAbsSteeringRad,
+            maximum_abs_sideslip_rad=limits.maximumAbsSideslipRad,
+            maximum_abs_tire_slip_rad=limits.maximumAbsTireSlipRad,
+        ),
+        _dynamics_settings(request.settings),
+    )
+    diagnostics = result.diagnostics
+    return BicycleSimulationResponse(
+        schemaVersion="1.0.0",
+        modelName="linear_planar_bicycle",
+        calculationStatus=result.calculation_status,
+        validationStatus=_phase3_validation(result.calculation_status),
+        solverVersion=result.solver_version,
+        units={
+            "time": "s",
+            "length": "m",
+            "angle": "rad",
+            "velocity": "m/s",
+            "angularVelocity": "rad/s",
+            "acceleration": "m/s^2",
+            "force": "N",
+            "corneringStiffness": "N/rad",
+        },
+        inputProvenance=DynamicsInputProvenanceResponse(
+            dataClassification=request.dataClassification,
+            sourceLabel=request.sourceLabel,
+            inputSha256=_request_input_sha256(request),
+        ),
+        diagnostics=BicycleDiagnosticsResponse(
+            solverSuccess=diagnostics.solver_success,
+            finiteStates=diagnostics.finite_states,
+            stable=diagnostics.stable,
+            domainAccepted=diagnostics.domain_accepted,
+            functionEvaluations=diagnostics.function_evaluations,
+            jacobianEvaluations=diagnostics.jacobian_evaluations,
+            luDecompositions=diagnostics.lu_decompositions,
+            integrationMethod=diagnostics.integration_method,
+            relativeTolerance=diagnostics.relative_tolerance,
+            absoluteTolerance=diagnostics.absolute_tolerance,
+            maximumStepS=diagnostics.maximum_step_s,
+            acceptedSteps=diagnostics.accepted_steps,
+            minimumAcceptedStepS=diagnostics.minimum_accepted_step_s,
+            maximumAcceptedStepS=diagnostics.maximum_accepted_step_s,
+            eigenvaluesReal=(
+                list(diagnostics.eigenvalues_real)
+                if diagnostics.eigenvalues_real is not None
+                else None
+            ),
+            eigenvaluesImag=(
+                list(diagnostics.eigenvalues_imag)
+                if diagnostics.eigenvalues_imag is not None
+                else None
+            ),
+            understeerCoefficientS2PerM=diagnostics.understeer_coefficient_s2_per_m,
+            characteristicSpeedMps=diagnostics.characteristic_speed_mps,
+            criticalSpeedMps=diagnostics.critical_speed_mps,
+            steadyStateYawRateGainPerS=diagnostics.steady_state_yaw_rate_gain_per_s,
+            steadyStateSideslipGain=diagnostics.steady_state_sideslip_gain,
+            maximumAbsSideslipRad=diagnostics.maximum_abs_sideslip_rad,
+            maximumAbsFrontSlipRad=diagnostics.maximum_abs_front_slip_rad,
+            maximumAbsRearSlipRad=diagnostics.maximum_abs_rear_slip_rad,
+            message=diagnostics.message,
+        ),
+        assumptions=[
+            "LINEAR_PLANAR_BICYCLE",
+            "CONSTANT_LONGITUDINAL_SPEED",
+            "SMALL_STEERING_SIDESLIP_AND_TIRE_SLIP_ANGLES",
+            "LINEAR_AXLE_CORNERING_STIFFNESSES",
+            "NO_LOAD_TRANSFER_COMBINED_SLIP_ROLL_OR_AERO",
+        ],
+        warnings=list(result.warnings),
+        samples=[
+            BicycleSampleResponse(
+                timeS=item.time_s,
+                steeringRad=item.steering_rad,
+                lateralVelocityMps=item.lateral_velocity_mps,
+                yawRateRadps=item.yaw_rate_radps,
+                sideslipRad=item.sideslip_rad,
+                lateralAccelerationMps2=item.lateral_acceleration_mps2,
+                frontSlipAngleRad=item.front_slip_angle_rad,
+                rearSlipAngleRad=item.rear_slip_angle_rad,
+                frontLateralForceN=item.front_lateral_force_n,
+                rearLateralForceN=item.rear_lateral_force_n,
+            )
+            for item in result.samples
+        ],
+    )
+
+
 @app.get("/api/v1/capabilities")
 async def capabilities() -> dict[str, Any]:
     return {
@@ -667,11 +975,11 @@ async def capabilities() -> dict[str, Any]:
             "actuation_motion_ratio_and_linear_spring",
             "velocity_explicit_linear_damper",
             "linear_quarter_car_2dof_dynamics",
+            "linear_full_car_7dof_dynamics",
+            "linear_planar_bicycle_handling",
             "step_smooth_bump_half_sine_sine_and_sampled_road_inputs",
         ],
         "notImplemented": [
-            "full_car_vertical_dynamics",
-            "planar_bicycle_handling",
             "rocker_kinematic_closure",
             "structural_stress_and_fatigue",
             "optimization",
@@ -681,6 +989,8 @@ async def capabilities() -> dict[str, Any]:
         "solverVersion": KINEMATICS_SOLVER_VERSION,
         "quasiStaticSolverVersion": QUASI_STATIC_SOLVER_VERSION,
         "dynamicsSolverVersion": DYNAMICS_SOLVER_VERSION,
+        "fullCarSolverVersion": FULL_CAR_SOLVER_VERSION,
+        "bicycleSolverVersion": BICYCLE_SOLVER_VERSION,
         "qualityStates": [
             "VERIFIED_NUMERICALLY",
             "REFERENCE_BENCHMARKED",

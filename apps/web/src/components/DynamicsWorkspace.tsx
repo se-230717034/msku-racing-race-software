@@ -20,6 +20,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { AdvancedDynamicsWorkspace, type DynamicsModel } from "./AdvancedDynamicsWorkspace";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const displacementVisualScale = 8;
@@ -190,7 +191,7 @@ function exportCsv(result: QuarterCarSimulationResponse): void {
   URL.revokeObjectURL(link.href);
 }
 
-export function DynamicsWorkspace() {
+function QuarterCarWorkspace({ onModelChange }: { onModelChange: (model: DynamicsModel) => void }) {
   const [request, setRequest] = useState<QuarterCarSimulationRequest>(initialRequest);
   const [sampledTimes, setSampledTimes] = useState("0, 0.2, 0.4, 0.6");
   const [sampledDisplacements, setSampledDisplacements] = useState("0, 0.01, -0.005, 0");
@@ -278,7 +279,7 @@ export function DynamicsWorkspace() {
   return (
     <div className="dynamics-workspace">
       <header className="dynamics-toolbar">
-        <div><span className="eyebrow">PHASE 4 · VERIFIED QUARTER CAR</span><strong>Road & vehicle dynamics</strong></div>
+        <div><span className="eyebrow">PHASE 5 · VERIFIED LINEAR DYNAMICS</span><strong>Road & vehicle dynamics</strong></div>
         <span>Calculated SI response · physically unvalidated</span>
         <button type="button" onClick={() => result && exportCsv(result)} disabled={result?.calculationStatus !== "VERIFIED_NUMERICALLY"}>
           <Download size={14} /> Export unvalidated CSV
@@ -289,8 +290,8 @@ export function DynamicsWorkspace() {
         <aside className="dynamics-inputs">
           <section className="inspector-section">
             <div className="section-heading"><span className="eyebrow">MODEL SELECTION</span><StatusChip status={result?.calculationStatus} /></div>
-            <label className="select-field"><span>Dynamics model</span><select aria-label="Dynamics model" value="quarter_car" onChange={() => undefined}><option value="quarter_car">2DOF quarter car</option><option disabled>Full-car vertical — NOT COMPUTABLE</option><option disabled>Bicycle handling — NOT COMPUTABLE</option></select></label>
-            <p className="field-note">Only the benchmarked linear quarter-car model is enabled. No full-car or handling outputs are inferred.</p>
+            <label className="select-field"><span>Dynamics model</span><select aria-label="Dynamics model" value="quarter_car" onChange={(event) => onModelChange(event.target.value as DynamicsModel)}><option value="quarter_car">2DOF quarter car</option><option value="full_car">7DOF full-car ride</option><option value="bicycle">Planar bicycle handling</option></select></label>
+            <p className="field-note">Select a separately benchmarked linear model. Results remain physically unvalidated until correlated with measured vehicle data.</p>
           </section>
 
           <section className="inspector-section">
@@ -372,4 +373,11 @@ export function DynamicsWorkspace() {
       </div>
     </div>
   );
+}
+
+export function DynamicsWorkspace() {
+  const [model, setModel] = useState<DynamicsModel>("quarter_car");
+  return model === "quarter_car"
+    ? <QuarterCarWorkspace onModelChange={setModel} />
+    : <AdvancedDynamicsWorkspace model={model} onModelChange={setModel} />;
 }

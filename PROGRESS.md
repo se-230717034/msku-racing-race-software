@@ -94,12 +94,28 @@ Updated: 2026-10-15
 - [x] Road interpolation, force-sign, equilibrium, passivity, invalid-input, contact, API, contract, and browser tests
 - [x] Phase 4 engineering-model and verification documentation
 - [x] Final gates: 77 Python tests, 19 Vitest tests, 3 Chromium tests, Ruff, mypy, ESLint, TypeScript, and production build
-- [ ] Full-car heave/pitch/roll model — `NOT_COMPUTABLE`; required parameter set and reference evidence not supplied
-- [ ] Planar bicycle handling model — `NOT_COMPUTABLE`; tire cornering data and reference evidence not supplied
+- [x] Full-car heave/pitch/roll model completed in Phase 5 with explicit demonstration parameters
+- [x] Planar bicycle handling model completed in Phase 5 with explicit demonstration parameters
+- [ ] MSKU Racing parameter provenance and independent rig/track validation
+
+## Phase 5 — Dynamics completion and optimization
+
+- [x] Linear 7DOF full-car model with body heave, pitch, roll, and four unsprung coordinates
+- [x] Four independent road inputs and per-corner suspension, tire, mass, and static-load parameters
+- [x] Matrix assembly, generalized natural modes, energy accounting, and contact-loss suppression
+- [x] Symmetry, sign, modal, quarter-car equivalence, cross-integrator, contact, and invalid-geometry tests
+- [x] Constant-speed two-state linear planar bicycle model derived from Newton-Euler balance
+- [x] Slip/force states, stability eigenvalues, understeer, characteristic/critical speed, and analytical steady response
+- [x] Explicit linear-domain limits with failed-result suppression
+- [x] Independent state-matrix, matrix-exponential transient, steady-state, sign, integrator, instability, and domain tests
+- [x] Typed API and browser contracts plus calculated full-car and handling result workspaces
+- [x] Phase 5 engineering model documentation for completed dynamics models
+- [ ] Deterministic bounded optimization core, model adapters, Pareto exploration, and sensitivity analysis
+- [ ] Candidate preview/apply workflow and optimization verification report
+- [ ] Final Phase 5 quality gates and GitHub release commit
 - [ ] MSKU Racing parameter provenance and independent rig/track validation
 
 ## Later phases
 
-- [ ] Phase 5 optimization
 - [ ] Phase 6 professional workflows
 

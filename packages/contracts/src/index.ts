@@ -389,6 +389,213 @@ export const quarterCarSimulationResponseSchema = z.object({
   samples: z.array(quarterCarSampleSchema),
 });
 
+export const fullCarCornerParametersSchema = z.object({
+  xPositionM: z.number().finite(),
+  yPositionM: z.number().finite(),
+  unsprungMassKg: z.number().finite().positive(),
+  suspensionStiffnessNPerM: z.number().finite().positive(),
+  suspensionDampingNsPerM: z.number().finite().nonnegative(),
+  tireStiffnessNPerM: z.number().finite().positive(),
+  tireDampingNsPerM: z.number().finite().nonnegative(),
+  staticTireLoadN: z.number().finite().nonnegative().nullable(),
+});
+
+const dynamicsSettingsSchema = z.object({
+  durationS: z.number().finite().positive(),
+  outputSamples: z.number().int().min(2).max(20001),
+  relativeTolerance: z.number().finite().min(1e-12).max(1e-2),
+  absoluteTolerance: z.number().finite().min(1e-14).max(1e-3),
+  maximumStepS: z.number().finite().positive(),
+  method: z.enum(["DOP853", "Radau", "BDF"]),
+});
+
+export const fullCarSimulationRequestSchema = z.object({
+  dataClassification: z.enum(["demonstration", "team_private"]),
+  sourceLabel: z.string().min(1).max(160),
+  parameters: z.object({
+    sprungMassKg: z.number().finite().positive(),
+    pitchInertiaKgM2: z.number().finite().positive(),
+    rollInertiaKgM2: z.number().finite().positive(),
+    corners: z.array(fullCarCornerParametersSchema).length(4),
+  }),
+  roadProfiles: z.array(roadProfileSchema).length(4),
+  initialState: z.object({
+    bodyHeaveM: z.number().finite(),
+    bodyHeaveVelocityMps: z.number().finite(),
+    pitchRad: z.number().finite(),
+    pitchRateRadps: z.number().finite(),
+    rollRad: z.number().finite(),
+    rollRateRadps: z.number().finite(),
+    unsprungDisplacementsM: z.array(z.number().finite()).length(4),
+    unsprungVelocitiesMps: z.array(z.number().finite()).length(4),
+  }),
+  settings: dynamicsSettingsSchema,
+});
+
+export const fullCarSampleSchema = z.object({
+  timeS: z.number().finite(),
+  roadDisplacementsM: z.array(z.number().finite()).length(4),
+  roadVelocitiesMps: z.array(z.number().finite()).length(4),
+  bodyHeaveM: z.number().finite(),
+  bodyHeaveVelocityMps: z.number().finite(),
+  bodyHeaveAccelerationMps2: z.number().finite(),
+  pitchRad: z.number().finite(),
+  pitchRateRadps: z.number().finite(),
+  pitchAccelerationRadps2: z.number().finite(),
+  rollRad: z.number().finite(),
+  rollRateRadps: z.number().finite(),
+  rollAccelerationRadps2: z.number().finite(),
+  unsprungDisplacementsM: z.array(z.number().finite()).length(4),
+  unsprungVelocitiesMps: z.array(z.number().finite()).length(4),
+  unsprungAccelerationsMps2: z.array(z.number().finite()).length(4),
+  suspensionTravelsM: z.array(z.number().finite()).length(4),
+  tireCompressionsM: z.array(z.number().finite()).length(4),
+  suspensionForcesOnBodyN: z.array(z.number().finite()).length(4),
+  tireForceIncrementsN: z.array(z.number().finite()).length(4),
+  totalTireContactForcesN: z.array(z.number().finite().nullable()).length(4),
+  mechanicalEnergyJ: z.number().finite(),
+  dissipatedPowerW: z.number().finite(),
+  roadInputPowerW: z.number().finite(),
+});
+
+export const fullCarSimulationResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  modelName: z.literal("linear_full_car_7dof"),
+  calculationStatus: phase3CalculationStatusSchema,
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string().min(1),
+  units: z.record(z.string(), z.string()),
+  inputProvenance: z.object({
+    dataClassification: z.enum(["demonstration", "team_private"]),
+    sourceLabel: z.string().min(1),
+    inputSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  }),
+  naturalFrequenciesHz: z.array(z.number().finite().positive()).length(7).nullable(),
+  cornerOrder: z.tuple([
+    z.literal("front_left"), z.literal("front_right"),
+    z.literal("rear_left"), z.literal("rear_right"),
+  ]),
+  diagnostics: z.object({
+    solverSuccess: z.boolean(),
+    finiteStates: z.boolean(),
+    contactAccepted: z.boolean().nullable(),
+    functionEvaluations: z.number().int().nonnegative(),
+    jacobianEvaluations: z.number().int().nonnegative(),
+    luDecompositions: z.number().int().nonnegative(),
+    integrationMethod: z.enum(["DOP853", "Radau", "BDF"]),
+    relativeTolerance: z.number().finite().positive(),
+    absoluteTolerance: z.number().finite().positive(),
+    maximumStepS: z.number().finite().positive(),
+    acceptedSteps: z.number().int().nonnegative(),
+    minimumAcceptedStepS: z.number().finite().positive().nullable(),
+    maximumAcceptedStepS: z.number().finite().positive().nullable(),
+    massMatrixCondition: z.number().finite().positive().nullable(),
+    stiffnessMatrixCondition: z.number().finite().positive().nullable(),
+    initialEnergyJ: z.number().finite().nullable(),
+    finalEnergyJ: z.number().finite().nullable(),
+    roadInputWorkJ: z.number().finite().nullable(),
+    dissipatedEnergyJ: z.number().finite().nullable(),
+    energyBalanceResidualJ: z.number().finite().nullable(),
+    relativeEnergyBalanceError: z.number().finite().nonnegative().nullable(),
+    minimumTotalContactForceN: z.number().finite().nullable(),
+    contactLossCorner: z.string().nullable(),
+    message: z.string(),
+  }),
+  assumptions: z.array(z.string()),
+  warnings: z.array(z.string()),
+  samples: z.array(fullCarSampleSchema),
+});
+
+export const bicycleSimulationRequestSchema = z.object({
+  dataClassification: z.enum(["demonstration", "team_private"]),
+  sourceLabel: z.string().min(1).max(160),
+  parameters: z.object({
+    massKg: z.number().finite().positive(),
+    yawInertiaKgM2: z.number().finite().positive(),
+    cgToFrontAxleM: z.number().finite().positive(),
+    cgToRearAxleM: z.number().finite().positive(),
+    frontCorneringStiffnessNPerRad: z.number().finite().positive(),
+    rearCorneringStiffnessNPerRad: z.number().finite().positive(),
+    speedMps: z.number().finite().positive(),
+  }),
+  steering: z.object({
+    kind: z.enum(["step", "smooth_step", "sine", "sampled"]),
+    amplitudeRad: z.number().finite(),
+    startTimeS: z.number().finite().nonnegative(),
+    riseTimeS: z.number().finite(),
+    frequencyHz: z.number().finite(),
+    sampleTimesS: z.array(z.number().finite()),
+    sampleAnglesRad: z.array(z.number().finite()),
+  }),
+  initialState: z.object({
+    lateralVelocityMps: z.number().finite(),
+    yawRateRadps: z.number().finite(),
+  }),
+  domainLimits: z.object({
+    maximumAbsSteeringRad: z.number().finite().positive(),
+    maximumAbsSideslipRad: z.number().finite().positive(),
+    maximumAbsTireSlipRad: z.number().finite().positive(),
+  }),
+  settings: dynamicsSettingsSchema,
+});
+
+export const bicycleSampleSchema = z.object({
+  timeS: z.number().finite(),
+  steeringRad: z.number().finite(),
+  lateralVelocityMps: z.number().finite(),
+  yawRateRadps: z.number().finite(),
+  sideslipRad: z.number().finite(),
+  lateralAccelerationMps2: z.number().finite(),
+  frontSlipAngleRad: z.number().finite(),
+  rearSlipAngleRad: z.number().finite(),
+  frontLateralForceN: z.number().finite(),
+  rearLateralForceN: z.number().finite(),
+});
+
+export const bicycleSimulationResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  modelName: z.literal("linear_planar_bicycle"),
+  calculationStatus: phase3CalculationStatusSchema,
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string().min(1),
+  units: z.record(z.string(), z.string()),
+  inputProvenance: z.object({
+    dataClassification: z.enum(["demonstration", "team_private"]),
+    sourceLabel: z.string().min(1),
+    inputSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  }),
+  diagnostics: z.object({
+    solverSuccess: z.boolean(),
+    finiteStates: z.boolean(),
+    stable: z.boolean().nullable(),
+    domainAccepted: z.boolean(),
+    functionEvaluations: z.number().int().nonnegative(),
+    jacobianEvaluations: z.number().int().nonnegative(),
+    luDecompositions: z.number().int().nonnegative(),
+    integrationMethod: z.enum(["DOP853", "Radau", "BDF"]),
+    relativeTolerance: z.number().finite().positive(),
+    absoluteTolerance: z.number().finite().positive(),
+    maximumStepS: z.number().finite().positive(),
+    acceptedSteps: z.number().int().nonnegative(),
+    minimumAcceptedStepS: z.number().finite().positive().nullable(),
+    maximumAcceptedStepS: z.number().finite().positive().nullable(),
+    eigenvaluesReal: z.array(z.number().finite()).length(2).nullable(),
+    eigenvaluesImag: z.array(z.number().finite()).length(2).nullable(),
+    understeerCoefficientS2PerM: z.number().finite().nullable(),
+    characteristicSpeedMps: z.number().finite().positive().nullable(),
+    criticalSpeedMps: z.number().finite().positive().nullable(),
+    steadyStateYawRateGainPerS: z.number().finite().nullable(),
+    steadyStateSideslipGain: z.number().finite().nullable(),
+    maximumAbsSideslipRad: z.number().finite().nonnegative().nullable(),
+    maximumAbsFrontSlipRad: z.number().finite().nonnegative().nullable(),
+    maximumAbsRearSlipRad: z.number().finite().nonnegative().nullable(),
+    message: z.string(),
+  }),
+  assumptions: z.array(z.string()),
+  warnings: z.array(z.string()),
+  samples: z.array(bicycleSampleSchema),
+});
+
 export const solverMetadataSchema = z.object({
   name: z.literal("rigid_upright_double_wishbone"),
   version: z.string().min(1),
@@ -439,4 +646,11 @@ export type RoadProfile = z.infer<typeof roadProfileSchema>;
 export type QuarterCarSimulationRequest = z.infer<typeof quarterCarSimulationRequestSchema>;
 export type QuarterCarSample = z.infer<typeof quarterCarSampleSchema>;
 export type QuarterCarSimulationResponse = z.infer<typeof quarterCarSimulationResponseSchema>;
+export type FullCarCornerParameters = z.infer<typeof fullCarCornerParametersSchema>;
+export type FullCarSimulationRequest = z.infer<typeof fullCarSimulationRequestSchema>;
+export type FullCarSample = z.infer<typeof fullCarSampleSchema>;
+export type FullCarSimulationResponse = z.infer<typeof fullCarSimulationResponseSchema>;
+export type BicycleSimulationRequest = z.infer<typeof bicycleSimulationRequestSchema>;
+export type BicycleSample = z.infer<typeof bicycleSampleSchema>;
+export type BicycleSimulationResponse = z.infer<typeof bicycleSimulationResponseSchema>;
 

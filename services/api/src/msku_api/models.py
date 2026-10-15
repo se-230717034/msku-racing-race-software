@@ -490,3 +490,210 @@ class QuarterCarSimulationResponse(StrictModel):
     assumptions: list[str]
     warnings: list[str]
     samples: list[QuarterCarSampleResponse]
+
+
+class FullCarCornerParametersInput(StrictModel):
+    xPositionM: float
+    yPositionM: float
+    unsprungMassKg: float
+    suspensionStiffnessNPerM: float
+    suspensionDampingNsPerM: float
+    tireStiffnessNPerM: float
+    tireDampingNsPerM: float = 0.0
+    staticTireLoadN: float | None = None
+
+
+class FullCarParametersInput(StrictModel):
+    sprungMassKg: float
+    pitchInertiaKgM2: float
+    rollInertiaKgM2: float
+    corners: list[FullCarCornerParametersInput] = Field(min_length=4, max_length=4)
+
+
+class FullCarInitialStateInput(StrictModel):
+    bodyHeaveM: float = 0.0
+    bodyHeaveVelocityMps: float = 0.0
+    pitchRad: float = 0.0
+    pitchRateRadps: float = 0.0
+    rollRad: float = 0.0
+    rollRateRadps: float = 0.0
+    unsprungDisplacementsM: list[float] = Field(
+        default_factory=lambda: [0.0, 0.0, 0.0, 0.0], min_length=4, max_length=4
+    )
+    unsprungVelocitiesMps: list[float] = Field(
+        default_factory=lambda: [0.0, 0.0, 0.0, 0.0], min_length=4, max_length=4
+    )
+
+
+class FullCarSimulationRequest(StrictModel):
+    dataClassification: Literal["demonstration", "team_private"]
+    sourceLabel: str = Field(min_length=1, max_length=160)
+    parameters: FullCarParametersInput
+    roadProfiles: list[RoadProfileInput] = Field(min_length=4, max_length=4)
+    initialState: FullCarInitialStateInput = Field(default_factory=FullCarInitialStateInput)
+    settings: DynamicsSettingsInput = Field(default_factory=DynamicsSettingsInput)
+
+
+class FullCarSampleResponse(StrictModel):
+    timeS: float
+    roadDisplacementsM: list[float]
+    roadVelocitiesMps: list[float]
+    bodyHeaveM: float
+    bodyHeaveVelocityMps: float
+    bodyHeaveAccelerationMps2: float
+    pitchRad: float
+    pitchRateRadps: float
+    pitchAccelerationRadps2: float
+    rollRad: float
+    rollRateRadps: float
+    rollAccelerationRadps2: float
+    unsprungDisplacementsM: list[float]
+    unsprungVelocitiesMps: list[float]
+    unsprungAccelerationsMps2: list[float]
+    suspensionTravelsM: list[float]
+    tireCompressionsM: list[float]
+    suspensionForcesOnBodyN: list[float]
+    tireForceIncrementsN: list[float]
+    totalTireContactForcesN: list[float | None]
+    mechanicalEnergyJ: float
+    dissipatedPowerW: float
+    roadInputPowerW: float
+
+
+class FullCarDiagnosticsResponse(StrictModel):
+    solverSuccess: bool
+    finiteStates: bool
+    contactAccepted: bool | None
+    functionEvaluations: int
+    jacobianEvaluations: int
+    luDecompositions: int
+    integrationMethod: Literal["DOP853", "Radau", "BDF"]
+    relativeTolerance: float
+    absoluteTolerance: float
+    maximumStepS: float
+    acceptedSteps: int
+    minimumAcceptedStepS: float | None
+    maximumAcceptedStepS: float | None
+    massMatrixCondition: float | None
+    stiffnessMatrixCondition: float | None
+    initialEnergyJ: float | None
+    finalEnergyJ: float | None
+    roadInputWorkJ: float | None
+    dissipatedEnergyJ: float | None
+    energyBalanceResidualJ: float | None
+    relativeEnergyBalanceError: float | None
+    minimumTotalContactForceN: float | None
+    contactLossCorner: str | None
+    message: str
+
+
+class FullCarSimulationResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    modelName: Literal["linear_full_car_7dof"]
+    calculationStatus: Phase3CalculationStatus
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    units: dict[str, str]
+    inputProvenance: DynamicsInputProvenanceResponse
+    naturalFrequenciesHz: list[float] | None
+    cornerOrder: list[str]
+    diagnostics: FullCarDiagnosticsResponse
+    assumptions: list[str]
+    warnings: list[str]
+    samples: list[FullCarSampleResponse]
+
+
+class BicycleParametersInput(StrictModel):
+    massKg: float
+    yawInertiaKgM2: float
+    cgToFrontAxleM: float
+    cgToRearAxleM: float
+    frontCorneringStiffnessNPerRad: float
+    rearCorneringStiffnessNPerRad: float
+    speedMps: float
+
+
+class SteeringProfileInput(StrictModel):
+    kind: Literal["step", "smooth_step", "sine", "sampled"]
+    amplitudeRad: float = 0.0
+    startTimeS: float = 0.0
+    riseTimeS: float = 0.1
+    frequencyHz: float = 1.0
+    sampleTimesS: list[float] = Field(default_factory=list)
+    sampleAnglesRad: list[float] = Field(default_factory=list)
+
+
+class BicycleInitialStateInput(StrictModel):
+    lateralVelocityMps: float = 0.0
+    yawRateRadps: float = 0.0
+
+
+class BicycleDomainLimitsInput(StrictModel):
+    maximumAbsSteeringRad: float = 0.15
+    maximumAbsSideslipRad: float = 0.15
+    maximumAbsTireSlipRad: float = 0.15
+
+
+class BicycleSimulationRequest(StrictModel):
+    dataClassification: Literal["demonstration", "team_private"]
+    sourceLabel: str = Field(min_length=1, max_length=160)
+    parameters: BicycleParametersInput
+    steering: SteeringProfileInput
+    initialState: BicycleInitialStateInput = Field(default_factory=BicycleInitialStateInput)
+    domainLimits: BicycleDomainLimitsInput = Field(default_factory=BicycleDomainLimitsInput)
+    settings: DynamicsSettingsInput = Field(default_factory=DynamicsSettingsInput)
+
+
+class BicycleSampleResponse(StrictModel):
+    timeS: float
+    steeringRad: float
+    lateralVelocityMps: float
+    yawRateRadps: float
+    sideslipRad: float
+    lateralAccelerationMps2: float
+    frontSlipAngleRad: float
+    rearSlipAngleRad: float
+    frontLateralForceN: float
+    rearLateralForceN: float
+
+
+class BicycleDiagnosticsResponse(StrictModel):
+    solverSuccess: bool
+    finiteStates: bool
+    stable: bool | None
+    domainAccepted: bool
+    functionEvaluations: int
+    jacobianEvaluations: int
+    luDecompositions: int
+    integrationMethod: Literal["DOP853", "Radau", "BDF"]
+    relativeTolerance: float
+    absoluteTolerance: float
+    maximumStepS: float
+    acceptedSteps: int
+    minimumAcceptedStepS: float | None
+    maximumAcceptedStepS: float | None
+    eigenvaluesReal: list[float] | None
+    eigenvaluesImag: list[float] | None
+    understeerCoefficientS2PerM: float | None
+    characteristicSpeedMps: float | None
+    criticalSpeedMps: float | None
+    steadyStateYawRateGainPerS: float | None
+    steadyStateSideslipGain: float | None
+    maximumAbsSideslipRad: float | None
+    maximumAbsFrontSlipRad: float | None
+    maximumAbsRearSlipRad: float | None
+    message: str
+
+
+class BicycleSimulationResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    modelName: Literal["linear_planar_bicycle"]
+    calculationStatus: Phase3CalculationStatus
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    units: dict[str, str]
+    inputProvenance: DynamicsInputProvenanceResponse
+    diagnostics: BicycleDiagnosticsResponse
+    assumptions: list[str]
+    warnings: list[str]
+    samples: list[BicycleSampleResponse]

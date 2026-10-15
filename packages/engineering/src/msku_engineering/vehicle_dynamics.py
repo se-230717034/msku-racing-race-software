@@ -131,6 +131,51 @@ def _finite(values: tuple[float, ...]) -> bool:
     return bool(np.all(np.isfinite(np.asarray(values, dtype=np.float64))))
 
 
+def validate_road_profile(
+    road: RoadProfile,
+    duration_s: float,
+    tire_damping_ns_per_m: float,
+) -> str | None:
+    """Validate one scalar road input against a simulation interval."""
+    if road.kind not in ("step", "smooth_bump", "half_sine", "sine", "sampled"):
+        return "Unsupported road profile."
+    if not _finite((road.amplitude_m, road.start_time_s, road.duration_s, road.frequency_hz)):
+        return "Road parameters must be finite."
+    if road.start_time_s < 0.0 or road.start_time_s > duration_s:
+        return "Road start time must lie inside the simulation interval."
+    if road.kind in ("smooth_bump", "half_sine") and road.duration_s <= 0.0:
+        return "Bump duration must be positive."
+    if road.kind == "sine" and road.frequency_hz <= 0.0:
+        return "Sine frequency must be positive."
+    if road.kind == "step" and tire_damping_ns_per_m > 0.0:
+        return "A displacement step has undefined road velocity and cannot use tire damping."
+    if road.kind == "sampled":
+        if len(road.sample_times_s) < 2 or len(road.sample_times_s) != len(
+            road.sample_displacements_m
+        ):
+            return "Sampled road arrays must have equal length and at least two points."
+        if not _finite((*road.sample_times_s, *road.sample_displacements_m)):
+            return "Sampled road values must be finite."
+        if any(
+            second <= first
+            for first, second in zip(road.sample_times_s, road.sample_times_s[1:], strict=True)
+        ):
+            return "Sampled road time coordinates must be strictly increasing."
+    return None
+
+
+def road_breakpoints(profile: RoadProfile, duration_s: float) -> tuple[float, ...]:
+    """Return integration boundaries required by a piecewise road definition."""
+    breakpoints: set[float] = {0.0, duration_s}
+    if profile.kind in ("step", "smooth_bump", "half_sine", "sine"):
+        breakpoints.add(profile.start_time_s)
+    if profile.kind in ("smooth_bump", "half_sine"):
+        breakpoints.add(profile.start_time_s + profile.duration_s)
+    if profile.kind == "sampled":
+        breakpoints.update(profile.sample_times_s)
+    return tuple(sorted(point for point in breakpoints if 0.0 <= point <= duration_s))
+
+
 def _validate_inputs(
     parameters: QuarterCarParameters,
     road: RoadProfile,
@@ -187,31 +232,7 @@ def _validate_inputs(
         or settings.method not in ("DOP853", "Radau", "BDF")
     ):
         return "Simulation duration, samples, tolerances, step, or method are invalid."
-    if road.kind not in ("step", "smooth_bump", "half_sine", "sine", "sampled"):
-        return "Unsupported road profile."
-    if not _finite((road.amplitude_m, road.start_time_s, road.duration_s, road.frequency_hz)):
-        return "Road parameters must be finite."
-    if road.start_time_s < 0.0 or road.start_time_s > settings.duration_s:
-        return "Road start time must lie inside the simulation interval."
-    if road.kind in ("smooth_bump", "half_sine") and road.duration_s <= 0.0:
-        return "Bump duration must be positive."
-    if road.kind == "sine" and road.frequency_hz <= 0.0:
-        return "Sine frequency must be positive."
-    if road.kind == "step" and parameters.tire_damping_ns_per_m > 0.0:
-        return "A displacement step has undefined road velocity and cannot use tire damping."
-    if road.kind == "sampled":
-        if len(road.sample_times_s) < 2 or len(road.sample_times_s) != len(
-            road.sample_displacements_m
-        ):
-            return "Sampled road arrays must have equal length and at least two points."
-        if not _finite((*road.sample_times_s, *road.sample_displacements_m)):
-            return "Sampled road values must be finite."
-        if any(
-            second <= first
-            for first, second in zip(road.sample_times_s, road.sample_times_s[1:], strict=True)
-        ):
-            return "Sampled road time coordinates must be strictly increasing."
-    return None
+    return validate_road_profile(road, settings.duration_s, parameters.tire_damping_ns_per_m)
 
 
 def road_state(profile: RoadProfile, time_s: float) -> tuple[float, float]:
@@ -373,16 +394,7 @@ def simulate_quarter_car(
         dtype=np.float64,
     )
     output_times = np.linspace(0.0, settings.duration_s, settings.output_samples)
-    breakpoints: set[float] = {0.0, settings.duration_s}
-    if road.kind in ("step", "smooth_bump", "half_sine", "sine"):
-        breakpoints.add(road.start_time_s)
-    if road.kind in ("smooth_bump", "half_sine"):
-        breakpoints.add(road.start_time_s + road.duration_s)
-    if road.kind == "sampled":
-        breakpoints.update(road.sample_times_s)
-    ordered_breakpoints = sorted(
-        point for point in breakpoints if 0.0 <= point <= settings.duration_s
-    )
+    ordered_breakpoints = road_breakpoints(road, settings.duration_s)
     intervals = list(zip(ordered_breakpoints, ordered_breakpoints[1:], strict=False))
 
     solutions: list[Callable[[float], NDArray[np.float64]]] = []

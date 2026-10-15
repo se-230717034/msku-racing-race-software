@@ -89,7 +89,7 @@ function WorkspaceOverview() {
         <section className="overview-card span-two">
           <span className="eyebrow">IMPLEMENTATION GATE</span>
           <h2>Phase 0–4 engineering foundation</h2>
-          <p>The geometry, rigid-link kinematics, guarded quasi-static loads, and benchmarked 2DOF quarter-car dynamics workflows are operational. Full-car dynamics, handling, optimization, and reporting remain deliberately unavailable until their models and validation tests exist.</p>
+          <p>The geometry, rigid-link kinematics, guarded quasi-static loads, and benchmarked linear quarter-car, 7DOF full-car ride, and bicycle-handling workflows are operational. Optimization and reporting remain unavailable until their models and validation tests exist.</p>
         </section>
       </div>
     </main>
