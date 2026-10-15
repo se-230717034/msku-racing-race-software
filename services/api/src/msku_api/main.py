@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from msku_engineering import SolverSettings, solve_sweep, validate_corner
+from msku_engineering import (
+    KINEMATICS_SOLVER_VERSION,
+    SolverSettings,
+    solve_sweep,
+    validate_corner,
+)
 
 from .models import (
     DiagnosticResponse,
+    InputProvenanceResponse,
     KinematicMetricsResponse,
     KinematicPoseResponse,
     KinematicsSweepRequest,
@@ -17,6 +25,8 @@ from .models import (
     Project,
     ProjectValidationResponse,
     SolverDiagnosticsResponse,
+    SolverMetadataResponse,
+    ValidationStatusResponse,
     Vec3,
 )
 
@@ -81,6 +91,13 @@ def _vec3(values: tuple[float, float, float]) -> Vec3:
     return Vec3(x=values[0], y=values[1], z=values[2])
 
 
+def _project_input_sha256(project: Project) -> str:
+    canonical = json.dumps(
+        project.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 @app.post("/api/v1/kinematics/sweep", response_model=KinematicsSweepResponse)
 async def kinematics_sweep(request: KinematicsSweepRequest) -> KinematicsSweepResponse:
     project = request.project
@@ -102,6 +119,10 @@ async def kinematics_sweep(request: KinematicsSweepRequest) -> KinematicsSweepRe
         )
 
     try:
+        settings = SolverSettings(
+            residual_tolerance_m=request.solver.residualToleranceM,
+            max_function_evaluations=request.solver.maxFunctionEvaluations,
+        )
         result = solve_sweep(
             points,
             request.sweep.startTravelM,
@@ -111,10 +132,7 @@ async def kinematics_sweep(request: KinematicsSweepRequest) -> KinematicsSweepRe
             project.suspension.wheel.staticCamberRad,
             project.suspension.wheel.staticToeRad,
             project.suspension.corner,
-            SolverSettings(
-                residual_tolerance_m=request.solver.residualToleranceM,
-                max_function_evaluations=request.solver.maxFunctionEvaluations,
-            ),
+            settings,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -150,10 +168,15 @@ async def kinematics_sweep(request: KinematicsSweepRequest) -> KinematicsSweepRe
         states.append(
             KinematicStateResponse(
                 travelM=state.travel_m,
+                calculationStatus=state.calculation_status,
                 pose=pose,
                 metrics=metrics,
                 diagnostics=SolverDiagnosticsResponse(
                     converged=state.diagnostics.converged,
+                    optimizerSuccess=state.diagnostics.optimizer_success,
+                    residualsAccepted=state.diagnostics.residuals_accepted,
+                    jacobianAccepted=state.diagnostics.jacobian_accepted,
+                    continuityAccepted=state.diagnostics.continuity_accepted,
                     residualNormM=state.diagnostics.residual_norm_m,
                     maxAbsResidualM=state.diagnostics.max_abs_residual_m,
                     jacobianRank=state.diagnostics.jacobian_rank,
@@ -175,6 +198,37 @@ async def kinematics_sweep(request: KinematicsSweepRequest) -> KinematicsSweepRe
             "bumpSteerGradient": "rad/m",
         },
         allConverged=result.all_converged,
+        validationStatus=ValidationStatusResponse(
+            numerical=result.calculation_status,
+            reference=result.reference_status,
+            physical=result.physical_status,
+            engineeringApproval="NOT_APPROVED",
+        ),
+        solver=SolverMetadataResponse(
+            name="rigid_upright_double_wishbone",
+            version=result.solver_version,
+            residualToleranceM=settings.residual_tolerance_m,
+            rankRelativeTolerance=settings.rank_relative_tolerance,
+            conditionLimit=settings.condition_limit,
+            continuityPositionLimitM=settings.continuity_position_limit_m,
+            continuityRotationLimitRad=settings.continuity_rotation_limit_rad,
+            maximumTravelStepM=settings.max_travel_step_m,
+            maxFunctionEvaluations=settings.max_function_evaluations,
+            gradientMethod="second_order_nonuniform_finite_difference",
+        ),
+        inputProvenance=InputProvenanceResponse(
+            projectId=project.projectId,
+            projectName=project.name,
+            dataClassification=project.dataClassification,
+            declaredModelStatus=project.modelStatus,
+            projectInputSha256=_project_input_sha256(project),
+        ),
+        warnings=[
+            *(item.code for item in geometry_diagnostics if item.severity == "warning"),
+            "RIGID_LINK_IDEAL_JOINT_MODEL",
+            "ROLL_CENTER_REQUIRES_SYMMETRIC_MIRRORED_OPPOSITE_CORNER",
+            "PHYSICAL_VALIDATION_EVIDENCE_NOT_ATTACHED",
+        ],
         residualToleranceM=result.residual_tolerance_m,
         states=states,
     )
@@ -196,4 +250,11 @@ async def capabilities() -> dict[str, Any]:
             "reports",
         ],
         "modelStatus": "unvalidated",
+        "solverVersion": KINEMATICS_SOLVER_VERSION,
+        "qualityStates": [
+            "VERIFIED_NUMERICALLY",
+            "REFERENCE_BENCHMARKED",
+            "UNVALIDATED_PHYSICALLY",
+            "FAILED",
+        ],
     }

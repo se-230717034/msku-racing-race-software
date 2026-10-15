@@ -57,6 +57,10 @@ export function KinematicsPanel({
           <span className="unit-chip">tol {sweep.residualToleranceM.toExponential(0)} m</span>
         </div>
         <dl className="solver-diagnostics">
+          <div><dt>Optimizer</dt><dd>{diagnostics?.optimizerSuccess ? "accepted" : "failed"}</dd></div>
+          <div><dt>Residual check</dt><dd>{diagnostics?.residualsAccepted ? "accepted" : "failed"}</dd></div>
+          <div><dt>Jacobian check</dt><dd>{diagnostics?.jacobianAccepted ? "accepted" : "failed"}</dd></div>
+          <div><dt>Continuity check</dt><dd>{diagnostics?.continuityAccepted ? "accepted" : "failed"}</dd></div>
           <div><dt>Max residual</dt><dd>{diagnostics?.maxAbsResidualM == null ? "—" : `${diagnostics.maxAbsResidualM.toExponential(3)} m`}</dd></div>
           <div><dt>Residual norm</dt><dd>{diagnostics?.residualNormM == null ? "—" : `${diagnostics.residualNormM.toExponential(3)} m`}</dd></div>
           <div><dt>Jacobian rank</dt><dd>{diagnostics?.jacobianRank ?? "—"} / 6</dd></div>
@@ -69,12 +73,27 @@ export function KinematicsPanel({
         )}
       </section>
 
+      <section className="inspector-section">
+        <span className="eyebrow">CALCULATION QUALITY</span>
+        <dl className="solver-diagnostics quality-status">
+          <div><dt>Numerical</dt><dd>{sweep.validationStatus.numerical}</dd></div>
+          <div><dt>Reference</dt><dd>{sweep.validationStatus.reference}</dd></div>
+          <div><dt>Physical</dt><dd>{sweep.validationStatus.physical}</dd></div>
+          <div><dt>Approval</dt><dd>{sweep.validationStatus.engineeringApproval}</dd></div>
+          <div><dt>Solver</dt><dd>v{sweep.solver.version}</dd></div>
+          <div title={sweep.inputProvenance.projectInputSha256}><dt>Input SHA-256</dt><dd>{sweep.inputProvenance.projectInputSha256.slice(0, 12)}…</dd></div>
+        </dl>
+        <ul className="solver-warnings">
+          {sweep.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+        </ul>
+      </section>
+
       <section className="inspector-section grow model-note">
         <span className="eyebrow">MODEL SCOPE</span>
         <p>Rigid links and joints; no compliance, loads, tire forces, or transient dynamics.</p>
-        <p>Roll-centre height assumes a mirrored symmetric opposite corner and uses the current tire contact plane.</p>
+        <p>Roll-centre height is a geometric front-view result. It assumes an exact mirrored opposite corner and a rigid circular tire contact point; unsupported pivot/arm projections return no value.</p>
         <p>Positive travel is bump. Positive toe is toe-in; positive camber tilts the wheel top outward.</p>
-        <b>UNVALIDATED</b>
+        <b>NOT PHYSICALLY VALIDATED — NOT FOR DESIGN SIGN-OFF</b>
       </section>
     </aside>
   );

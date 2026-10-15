@@ -69,6 +69,8 @@ export function KinematicsWorkspace() {
   }, [geometryDiagnostics, project, setError, setLoading, setSweep]);
 
   const selectedState = sweep?.states[selectedIndex];
+  const exportAllowed = sweep?.allConverged === true
+    && sweep.validationStatus.numerical === "VERIFIED_NUMERICALLY";
 
   return (
     <div className="kinematics-workspace">
@@ -91,7 +93,12 @@ export function KinematicsWorkspace() {
           onChange={(event) => setSelectedIndex(Number(event.target.value))}
         />
         <span>+50 mm</span>
-        <button type="button" disabled={!sweep} onClick={() => sweep && downloadKinematicsCsv(sweep, project.name)}>
+        <button
+          type="button"
+          disabled={!exportAllowed}
+          title={exportAllowed ? "Export unvalidated engineering data with provenance" : "Export blocked: the sweep contains failed or unreliable states"}
+          onClick={() => sweep && exportAllowed && downloadKinematicsCsv(sweep, project.name)}
+        >
           <Download size={14} /> Export CSV
         </button>
       </div>

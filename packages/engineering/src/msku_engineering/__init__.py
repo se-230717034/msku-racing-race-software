@@ -2,6 +2,9 @@
 
 from .geometry import Diagnostic, GeometryError, Link, link_lengths, validate_corner
 from .kinematics import (
+    KINEMATICS_SOLVER_VERSION,
+    PHYSICAL_STATUS,
+    REFERENCE_STATUS,
     KinematicMetrics,
     KinematicPose,
     KinematicState,
@@ -15,10 +18,13 @@ from .kinematics import (
 __all__ = [
     "Diagnostic",
     "GeometryError",
+    "KINEMATICS_SOLVER_VERSION",
     "KinematicMetrics",
     "KinematicPose",
     "KinematicState",
     "Link",
+    "PHYSICAL_STATUS",
+    "REFERENCE_STATUS",
     "SolverDiagnostics",
     "SolverSettings",
     "SweepResult",

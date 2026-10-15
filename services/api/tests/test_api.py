@@ -130,8 +130,25 @@ async def test_kinematics_sweep_returns_converged_states_and_diagnostics() -> No
         payload = response.json()
         assert payload["modelStatus"] == "unvalidated"
         assert payload["allConverged"] is True
+        assert payload["validationStatus"] == {
+            "numerical": "VERIFIED_NUMERICALLY",
+            "reference": "REFERENCE_BENCHMARKED",
+            "physical": "UNVALIDATED_PHYSICALLY",
+            "engineeringApproval": "NOT_APPROVED",
+        }
+        assert payload["solver"]["version"] == "2.5.0"
+        assert payload["solver"]["maximumTravelStepM"] == 0.025
+        assert len(payload["inputProvenance"]["projectInputSha256"]) == 64
+        assert "PHYSICAL_VALIDATION_EVIDENCE_NOT_ATTACHED" in payload["warnings"]
         assert len(payload["states"]) == 13
+        assert all(
+            state["calculationStatus"] == "VERIFIED_NUMERICALLY"
+            for state in payload["states"]
+        )
         assert all(state["diagnostics"]["converged"] for state in payload["states"])
+        assert all(state["diagnostics"]["residualsAccepted"] for state in payload["states"])
+        assert all(state["diagnostics"]["jacobianAccepted"] for state in payload["states"])
+        assert all(state["diagnostics"]["continuityAccepted"] for state in payload["states"])
         assert all(
             state["diagnostics"]["maxAbsResidualM"] <= payload["residualToleranceM"]
             for state in payload["states"]
@@ -159,16 +176,55 @@ async def test_kinematics_rejects_invalid_static_geometry() -> None:
 
 @pytest.mark.anyio
 async def test_kinematics_serializes_non_convergence_without_fake_pose() -> None:
+    project = demo_project()
+    suspension = project["suspension"]
+    assert isinstance(suspension, dict)
+    hardpoints = suspension["hardpoints"]
+    assert isinstance(hardpoints, list)
+    by_id = {point["id"]: point for point in hardpoints}
+    by_id["tie_rod_inboard"]["position"] = dict(by_id["uca_front_inboard"]["position"])
+    by_id["tie_rod_outboard"]["position"] = dict(by_id["uca_outboard"]["position"])
     request = {
-        "project": demo_project(),
-        "sweep": {"startTravelM": -0.25, "endTravelM": 0.25, "steps": 5},
+        "project": project,
+        "sweep": {"startTravelM": -0.01, "endTravelM": 0.01, "steps": 5},
     }
     async with api_client() as client:
         response = await client.post("/api/v1/kinematics/sweep", json=request)
         assert response.status_code == 200
         payload = response.json()
         assert payload["allConverged"] is False
+        assert payload["validationStatus"]["numerical"] == "FAILED"
         failed = [state for state in payload["states"] if not state["diagnostics"]["converged"]]
         assert failed
         assert all(state["pose"] is None and state["metrics"] is None for state in failed)
-        assert all("NON_CONVERGENCE" in state["warnings"] for state in failed)
+        assert all(state["calculationStatus"] == "FAILED" for state in failed)
+        assert any("NON_CONVERGENCE" in state["warnings"] for state in failed)
+
+
+@pytest.mark.anyio
+async def test_kinematics_rejects_unverified_coarse_travel_steps() -> None:
+    request = {
+        "project": demo_project(),
+        "sweep": {"startTravelM": -0.05, "endTravelM": 0.05, "steps": 3},
+    }
+    async with api_client() as client:
+        response = await client.post("/api/v1/kinematics/sweep", json=request)
+        assert response.status_code == 422
+        assert "verified maximum" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_declared_project_status_cannot_promote_physical_validation() -> None:
+    project = demo_project()
+    project["modelStatus"] = "experimentally_validated"
+    request = {
+        "project": project,
+        "sweep": {"startTravelM": -0.01, "endTravelM": 0.01, "steps": 5},
+    }
+    async with api_client() as client:
+        response = await client.post("/api/v1/kinematics/sweep", json=request)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["inputProvenance"]["declaredModelStatus"] == "experimentally_validated"
+        assert payload["validationStatus"]["physical"] == "UNVALIDATED_PHYSICALLY"
+        assert payload["validationStatus"]["engineeringApproval"] == "NOT_APPROVED"

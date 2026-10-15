@@ -16,6 +16,11 @@ test("edits geometry and runs the constrained kinematics workflow", async ({ pag
   await expect(page.getByText("converged", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("ALIGNMENT", { exact: true })).toBeVisible();
   await expect(page.getByText("SOLVER DIAGNOSTICS", { exact: true })).toBeVisible();
+  await expect(page.getByText("CALCULATION QUALITY", { exact: true })).toBeVisible();
+  await expect(page.getByText("VERIFIED_NUMERICALLY", { exact: true })).toBeVisible();
+  await expect(page.getByText("REFERENCE_BENCHMARKED", { exact: true })).toBeVisible();
+  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeEnabled();
 
   const slider = page.getByLabel("Wheel travel");
   await slider.fill("30");

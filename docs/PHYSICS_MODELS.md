@@ -38,22 +38,24 @@ Six nonlinear residual equations solve the six pose unknowns:
 5. tie-rod current length minus static length
 6. wheel-centre Z minus requested Z
 
-SciPy's trust-region nonlinear least-squares solver evaluates these constraints. Each bump/rebound branch begins at the static pose and uses the previous converged solution as its next initial estimate. A state is accepted only if the optimizer succeeds, the maximum absolute residual is within the configured tolerance, the 6×6 constraint Jacobian has full rank, and its condition number stays below the configured limit. Failed and unattempted continuation points are returned explicitly without a pose or metrics.
+SciPy's trust-region nonlinear least-squares solver proposes a candidate. Each bump/rebound branch begins at an accepted static pose and uses the previous accepted solution as its next initial estimate. Acceptance independently recomputes physical residuals, then checks optimizer success, finite values, residual tolerance, full rank and condition of a central-difference dimensionless 6×6 Jacobian, and pose continuity. Failed and unattempted continuation points are returned explicitly without a pose or metrics. Travel spacing above `0.025 m` is rejected because it is outside the tested continuation envelope.
 
 ## Derived alignment and geometry
 
 - Static camber and toe are explicit wheel-reference inputs; the demo values are zero.
 - Positive camber means wheel top outward. Positive toe means toe-in on either side.
 - Current camber and toe come from the solved rigid rotation applied to the configured wheel axis.
-- Camber gain and bump-steer gradient are finite-difference derivatives over solved wheel travel, reported internally in `rad/m`.
+- Camber gain and bump-steer gradient are finite-difference derivatives over contiguous accepted wheel-travel states, reported internally in `rad/m`. Toe is unwrapped; derivatives never bridge a failed state.
 - Caster and KPI/SAI come from the current lower-to-upper ball-joint kingpin axis.
 - Track change is signed outward wheel-centre displacement.
-- The front-view instant centre intersects projected upper/lower control-arm lines. Each virtual inner point is where its 3D chassis pivot axis meets the outboard joint's X plane.
-- Roll-centre height intersects the contact-patch-to-instant-centre line with the vehicle centre plane. It assumes a mirrored symmetric opposite corner and is referenced to the current tire contact plane.
+- The front-view instant centre intersects projected upper/lower control-arm instantaneous-motion lines. Each virtual inner point is where its 3D chassis pivot axis meets the corresponding ball-joint X plane.
+- Roll-centre height intersects the rigid-circular-wheel contact-point-to-instant-centre line with the vehicle centre plane. It assumes a mirrored symmetric opposite corner and is referenced to the current contact plane. Unsupported pivot axes and parallel, degenerate, or ill-conditioned projections return no roll-centre value.
 
 ## Phase 2 validity and failure cases
 
-The solver is tested against a closed-form equal-length parallel-arm translation, zero-motion identity, rigid-length residuals, left/right mirror symmetry, derivative finiteness, and unreachable travel. Parallel projected arms, an inner pivot axis parallel to the evaluation plane, singular/ill-conditioned Jacobians, out-of-range geometry, and non-convergence are surfaced as warnings or failures.
+The solver is tested against a closed-form equal-length parallel-arm translation, an unequal-length asymmetric alternate-formulation reference, zero-motion identity, rigid-length residuals, left/right mirror symmetry, nonzero alignment, step-size convergence, deterministic hardpoint perturbations, unit similarity, singular constraints, optimizer failure, continuity rejection, and unreachable travel. See `PHASE_2_VERIFICATION_REPORT.md` for equations and discrepancies.
+
+Quality has three independent dimensions: an accepted sweep is `VERIFIED_NUMERICALLY`; solver version `2.5.0` is `REFERENCE_BENCHMARKED`; the vehicle model remains `UNVALIDATED_PHYSICALLY`. Any rejected state makes the sweep `FAILED`. None of these states constitutes engineering approval.
 
 The software implementation has analytical benchmark evidence, but the demonstration vehicle geometry remains `unvalidated` because no MSKU Racing CAD motion study or physical measurement was provided.
 

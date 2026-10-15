@@ -7,6 +7,13 @@
 - `benchmarked`: agreement has been demonstrated against a documented independent reference over a stated range.
 - `experimentally_validated`: agreement has been demonstrated against physical measurement with documented uncertainty.
 
+Runtime Phase 2 responses use more explicit orthogonal states:
+
+- `VERIFIED_NUMERICALLY`: all requested states pass finite-value, independent residual, scaled-Jacobian, and continuity checks;
+- `REFERENCE_BENCHMARKED`: the stated solver version passes repository analytical and alternative-formulation references;
+- `UNVALIDATED_PHYSICALLY`: no approved CAD/measurement evidence is attached;
+- `FAILED`: at least one state is rejected or unattempted.
+
 The included project is `demonstration`; its model is `unvalidated`.
 
 ## Phase 0/1 evidence
@@ -23,9 +30,11 @@ The included project is `demonstration`; its model is `unvalidated`.
 Implemented automated evidence:
 
 1. A closed-form parallel equal-length-arm fixture independently predicts lateral translation `sqrt(L² - dz²) - L`, zero upright rotation, zero camber change, and zero bump steer.
-2. Every fixed link is checked against its static length at every converged sweep point with a `1e-8 m` default maximum residual.
-3. Zero-motion identity, left/right mirror symmetry, finite alignment gradients, unreachable travel, schema/API behavior, and explicit failure responses are tested.
-4. Every output records residual norm, maximum residual, Jacobian rank, condition number, function evaluations, warnings, solver units, and model status.
+2. An unequal-length asymmetric 3D fixture is cross-checked with XYZ Euler variables, normalized squared-distance equations, and MINPACK hybrid root finding rather than the production rotation-vector/length-residual/least-squares formulation.
+3. Step refinement demonstrates the expected central-difference convergence trend at static; deterministic ±0.2 mm hardpoint perturbations exercise local sensitivity and branch continuity.
+4. Every fixed link is checked against its static length at every converged sweep point with a `1e-8 m` default maximum residual.
+5. Zero-motion identity, left/right mirror symmetry, nonzero alignment, gradient isolation around failures, singularity, unreachable travel, schema/API behavior, and explicit failure responses are tested.
+6. Every output records residual norm, maximum residual, scaled-Jacobian rank/condition, optimizer/residual/Jacobian/continuity acceptance, function evaluations, warnings, units, solver version/tolerances, input SHA-256, and separated quality states.
 
 Still required before the MSKU Racing vehicle model may be called benchmarked or experimentally validated:
 

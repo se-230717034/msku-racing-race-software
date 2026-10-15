@@ -185,6 +185,7 @@ button { color: inherit; }
 .solver-diagnostics div { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #222832; }
 .solver-diagnostics dt { color: #747e8d; font-size: 9px; }
 .solver-diagnostics dd { margin: 0; color: #b8c0cb; font: 9px/1 ui-monospace, monospace; }
+.quality-status dd { max-width: 145px; overflow-wrap: anywhere; color: #f0b56e; text-align: right; }
 .solver-failure { padding: 9px; border-left: 2px solid var(--red); color: #ff9baa; background: #281117; font-size: 9px; line-height: 1.45; }
 .solver-warnings { margin: 8px 0 0; padding: 0; color: #f5bd69; list-style: none; font: 8px/1.5 ui-monospace, monospace; }
 .solver-warnings li::before { content: "WARN · "; color: #a16a19; }

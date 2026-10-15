@@ -31,7 +31,8 @@ Caster is positive when the upper kingpin point is rearward of the lower point. 
 | Quantity | Internal/API unit | Phase 1 UI |
 |---|---:|---:|
 | position, length, radius, width | metre (`m`) | millimetre (`mm`) |
-| angle (future) | radian (`rad`) | degree (`deg`) where labeled |
+| angle | radian (`rad`) | degree (`deg`) where labeled |
+| angle gradient vs travel | radian per metre (`rad/m`) | degree per 10 mm (`deg/10mm`) |
 | force (future) | newton (`N`) | newton (`N`) |
 | mass (future) | kilogram (`kg`) | kilogram (`kg`) |
 | time (future) | second (`s`) | second (`s`) |

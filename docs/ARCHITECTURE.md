@@ -42,7 +42,7 @@ JSON/local storage -> structural validation -> geometry diagnostics -> editor/vi
                                                            |
                                                            +-> persistence allowed only if valid
 
-kinematics request -> FastAPI -> engineering solver -> diagnostics + units + status
+kinematics request -> FastAPI -> engineering solver -> diagnostics + units + quality + provenance
 future force/dynamics request -> FastAPI -> engineering solver -> diagnostics + units + status
 ```
 
@@ -52,5 +52,7 @@ future force/dynamics request -> FastAPI -> engineering solver -> diagnostics + 
 - Contract errors identify the invalid field and reject the whole import.
 - Geometry errors identify affected hardpoints and block persistence.
 - API errors use structured HTTP responses.
-- The kinematics solver returns non-convergence rather than a plausible-looking pose; future solvers must preserve this behavior.
+- The kinematics solver returns no pose or metrics after constraint, rank, conditioning, derived-geometry, or continuity failure.
+- Runtime quality separates numerical verification, reference benchmarking, and physical validation. A project-declared status cannot promote calculated physical status.
+- Kinematics exports require a wholly accepted sweep and remain explicitly `NOT_APPROVED` while physical evidence is absent.
 

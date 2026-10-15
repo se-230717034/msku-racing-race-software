@@ -109,6 +109,10 @@ class KinematicsSweepRequest(StrictModel):
 
 class SolverDiagnosticsResponse(StrictModel):
     converged: bool
+    optimizerSuccess: bool
+    residualsAccepted: bool
+    jacobianAccepted: bool
+    continuityAccepted: bool
     residualNormM: float | None
     maxAbsResidualM: float | None
     jacobianRank: int
@@ -141,10 +145,41 @@ class KinematicPoseResponse(StrictModel):
 
 class KinematicStateResponse(StrictModel):
     travelM: float
+    calculationStatus: Literal["VERIFIED_NUMERICALLY", "FAILED"]
     pose: KinematicPoseResponse | None
     metrics: KinematicMetricsResponse | None
     diagnostics: SolverDiagnosticsResponse
     warnings: list[str]
+
+
+class ValidationStatusResponse(StrictModel):
+    numerical: Literal["VERIFIED_NUMERICALLY", "FAILED"]
+    reference: Literal["REFERENCE_BENCHMARKED"]
+    physical: Literal["UNVALIDATED_PHYSICALLY"]
+    engineeringApproval: Literal["NOT_APPROVED"]
+
+
+class SolverMetadataResponse(StrictModel):
+    name: Literal["rigid_upright_double_wishbone"]
+    version: str
+    residualToleranceM: float
+    rankRelativeTolerance: float
+    conditionLimit: float
+    continuityPositionLimitM: float
+    continuityRotationLimitRad: float
+    maximumTravelStepM: float
+    maxFunctionEvaluations: int
+    gradientMethod: Literal["second_order_nonuniform_finite_difference"]
+
+
+class InputProvenanceResponse(StrictModel):
+    projectId: str
+    projectName: str
+    dataClassification: Literal["demonstration", "team_private"]
+    declaredModelStatus: Literal[
+        "demonstration", "unvalidated", "benchmarked", "experimentally_validated"
+    ]
+    projectInputSha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class KinematicsSweepResponse(StrictModel):
@@ -152,5 +187,9 @@ class KinematicsSweepResponse(StrictModel):
     modelStatus: Literal["unvalidated"]
     units: dict[str, str]
     allConverged: bool
+    validationStatus: ValidationStatusResponse
+    solver: SolverMetadataResponse
+    inputProvenance: InputProvenanceResponse
+    warnings: list[str]
     residualToleranceM: float
     states: list[KinematicStateResponse]

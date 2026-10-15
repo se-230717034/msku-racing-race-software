@@ -102,6 +102,10 @@ export const parseProject = (input: unknown): Project => projectSchema.parse(inp
 
 export const solverDiagnosticsSchema = z.object({
   converged: z.boolean(),
+  optimizerSuccess: z.boolean(),
+  residualsAccepted: z.boolean(),
+  jacobianAccepted: z.boolean(),
+  continuityAccepted: z.boolean(),
   residualNormM: z.number().finite().nullable(),
   maxAbsResidualM: z.number().finite().nullable(),
   jacobianRank: z.number().int().min(0),
@@ -134,10 +138,44 @@ export const kinematicPoseSchema = z.object({
 
 export const kinematicStateSchema = z.object({
   travelM: z.number().finite(),
+  calculationStatus: z.enum(["VERIFIED_NUMERICALLY", "FAILED"]),
   pose: kinematicPoseSchema.nullable(),
   metrics: kinematicMetricsSchema.nullable(),
   diagnostics: solverDiagnosticsSchema,
   warnings: z.array(z.string()),
+});
+
+export const validationStatusSchema = z.object({
+  numerical: z.enum(["VERIFIED_NUMERICALLY", "FAILED"]),
+  reference: z.literal("REFERENCE_BENCHMARKED"),
+  physical: z.literal("UNVALIDATED_PHYSICALLY"),
+  engineeringApproval: z.literal("NOT_APPROVED"),
+});
+
+export const solverMetadataSchema = z.object({
+  name: z.literal("rigid_upright_double_wishbone"),
+  version: z.string().min(1),
+  residualToleranceM: z.number().finite().positive(),
+  rankRelativeTolerance: z.number().finite().positive(),
+  conditionLimit: z.number().finite().positive(),
+  continuityPositionLimitM: z.number().finite().positive(),
+  continuityRotationLimitRad: z.number().finite().positive(),
+  maximumTravelStepM: z.number().finite().positive(),
+  maxFunctionEvaluations: z.number().int().positive(),
+  gradientMethod: z.literal("second_order_nonuniform_finite_difference"),
+});
+
+export const inputProvenanceSchema = z.object({
+  projectId: z.string().min(1),
+  projectName: z.string().min(1),
+  dataClassification: z.enum(["demonstration", "team_private"]),
+  declaredModelStatus: z.enum([
+    "demonstration",
+    "unvalidated",
+    "benchmarked",
+    "experimentally_validated",
+  ]),
+  projectInputSha256: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
 export const kinematicsSweepResponseSchema = z.object({
@@ -150,6 +188,10 @@ export const kinematicsSweepResponseSchema = z.object({
     bumpSteerGradient: z.literal("rad/m"),
   }),
   allConverged: z.boolean(),
+  validationStatus: validationStatusSchema,
+  solver: solverMetadataSchema,
+  inputProvenance: inputProvenanceSchema,
+  warnings: z.array(z.string()),
   residualToleranceM: z.number().finite().positive(),
   states: z.array(kinematicStateSchema).min(1),
 });
@@ -158,5 +200,8 @@ export type SolverDiagnostics = z.infer<typeof solverDiagnosticsSchema>;
 export type KinematicMetrics = z.infer<typeof kinematicMetricsSchema>;
 export type KinematicPose = z.infer<typeof kinematicPoseSchema>;
 export type KinematicState = z.infer<typeof kinematicStateSchema>;
+export type ValidationStatus = z.infer<typeof validationStatusSchema>;
+export type SolverMetadata = z.infer<typeof solverMetadataSchema>;
+export type InputProvenance = z.infer<typeof inputProvenanceSchema>;
 export type KinematicsSweepResponse = z.infer<typeof kinematicsSweepResponseSchema>;
 

@@ -46,6 +46,15 @@ Updated: 2026-10-15
 - [x] Per-point residual, Jacobian rank/condition, evaluation count, warnings, and failure messages
 - [x] CSV export with units, solver diagnostics, and warnings
 - [x] Zero-motion, length preservation, left/right symmetry, failure, API, and closed-form analytical benchmark tests
+- [x] Phase 2.5 mathematical audit and independent equation derivations
+- [x] Dimensionless Jacobian, independent residual evaluation, and branch/discontinuity rejection
+- [x] Unequal-length asymmetric reference solve using alternate variables, residual form, and root method
+- [x] Travel-step convergence and deterministic hardpoint-uncertainty sensitivity studies
+- [x] Unsupported roll-centre suppression and rigid-wheel contact-point correction
+- [x] Multidimensional numerical/reference/physical quality states visible in the UI
+- [x] Input SHA-256, solver version/tolerances, warnings, units, and approval state in exports
+- [x] Failed-sweep export blocking
+- [x] Phase 2 verification report with quantitative discrepancies and remaining risks
 - [ ] MSKU Racing CAD motion-study or physical-measurement comparison — required before changing model status from `unvalidated`
 
 ## Later phases

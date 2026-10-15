@@ -4,7 +4,7 @@ An original, browser-based suspension engineering application for MSKU Racing. T
 
 Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specification. The visible model status is `demonstration / unvalidated`.
 
-The numerical solver is checked against a closed-form parallel-arm fixture, but the demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
+Solver version `2.5.0` is checked against closed-form geometry, an independently parameterized unequal-length 3D reference solve, step-size convergence, mirroring, perturbation, singularity, and failure-path tests. The demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
 
 ## Implemented
 
@@ -13,12 +13,13 @@ The numerical solver is checked against a closed-form parallel-arm fixture, but 
 - Immediate structural and geometry diagnostics. Invalid models cannot be saved or exported.
 - Versioned JSON project import/export and browser-local save/load.
 - FastAPI health and project-validation endpoints backed by a separate Python engineering package.
-- Nonlinear 3D bump/rebound solver using five fixed link lengths, a rigid upright transform, continuation, residual tolerances, Jacobian rank/conditioning, and explicit non-convergence states.
+- Nonlinear 3D bump/rebound solver using five fixed link lengths, a rigid upright transform, static-centred continuation, independently re-evaluated residuals, a dimensionless Jacobian rank/condition check, discontinuity rejection, and explicit failure states.
 - Synchronized solved 3D poses, interactive wheel-travel control, camber, toe/bump steer, caster, KPI, track change, and symmetric-axle roll-centre results.
-- Interactive travel graphs, per-point numerical diagnostics, and traceable CSV export.
-- Automated contract, analytical benchmark, symmetry, geometry, storage, API, and numerical-core tests.
+- Interactive travel graphs, per-point numerical diagnostics, and provenance-bearing CSV export that is blocked for failed sweeps.
+- Separate `VERIFIED_NUMERICALLY`, `REFERENCE_BENCHMARKED`, `UNVALIDATED_PHYSICALLY`, and `FAILED` quality states; engineering approval remains `NOT_APPROVED`.
+- Automated contract, analytical and alternative-formulation benchmark, step-convergence, perturbation, symmetry, geometry, storage, API, and numerical-core tests.
 
-See [PROGRESS.md](./PROGRESS.md) for the live checklist and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 
