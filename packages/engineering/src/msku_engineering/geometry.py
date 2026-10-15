@@ -68,9 +68,12 @@ def link_lengths(points: Mapping[str, Sequence[float]]) -> dict[str, float]:
 
 
 def validate_corner(
-    points: Mapping[str, Sequence[float]], wheel_radius_m: float, wheel_width_m: float
+    points: Mapping[str, Sequence[float]],
+    wheel_radius_m: float,
+    wheel_width_m: float,
+    corner: Literal["front_left", "front_right"] = "front_left",
 ) -> list[Diagnostic]:
-    """Validate a front-left static corner without claiming mechanism feasibility."""
+    """Validate one static corner without claiming mechanism feasibility."""
     diagnostics: list[Diagnostic] = []
 
     try:
@@ -121,25 +124,34 @@ def validate_corner(
         "lca_rear_inboard",
         "tie_rod_inboard",
     )
-    minimum_outboard_y = min(
+    outboard_y = (
         resolved["uca_outboard"][1],
         resolved["lca_outboard"][1],
         resolved["tie_rod_outboard"][1],
     )
-    misplaced = tuple(
-        point_id for point_id in inboard_ids if resolved[point_id][1] >= minimum_outboard_y
-    )
+    if corner == "front_left":
+        boundary = min(outboard_y)
+        misplaced = tuple(point_id for point_id in inboard_ids if resolved[point_id][1] >= boundary)
+    else:
+        boundary = max(outboard_y)
+        misplaced = tuple(point_id for point_id in inboard_ids if resolved[point_id][1] <= boundary)
     if misplaced:
         diagnostics.append(
             Diagnostic(
                 "error",
-                "LEFT_CORNER_ORDER",
-                "Front-left inboard joints must be inboard of the outboard joints (+Y is left).",
+                "CORNER_ORDER",
+                "Inboard joints must be closer to the vehicle centreline than outboard joints.",
                 misplaced,
             )
         )
 
-    if resolved["wheel_center"][1] < max(resolved["uca_outboard"][1], resolved["lca_outboard"][1]):
+    upright_y = (resolved["uca_outboard"][1], resolved["lca_outboard"][1])
+    wheel_is_inboard = (
+        resolved["wheel_center"][1] < max(upright_y)
+        if corner == "front_left"
+        else resolved["wheel_center"][1] > min(upright_y)
+    )
+    if wheel_is_inboard:
         diagnostics.append(
             Diagnostic(
                 "warning",

@@ -3,7 +3,7 @@ name = "msku-engineering"
 version = "0.1.0"
 description = "Pure geometry and numerical core for MSKU Racing Dynamics Studio"
 requires-python = ">=3.12"
-dependencies = ["numpy>=2.1,<3"]
+dependencies = ["numpy>=2.1,<3", "scipy>=1.14,<2"]
 
 [build-system]
 requires = ["hatchling"]

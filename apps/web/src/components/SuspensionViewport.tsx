@@ -1,9 +1,11 @@
 import { GizmoHelper, GizmoViewport, Line, OrbitControls } from "@react-three/drei";
 import { Canvas, type ThreeEvent, useThree } from "@react-three/fiber";
+import type { KinematicPose } from "@msku/contracts";
 import { useEffect, useMemo, useRef } from "react";
+import { Quaternion, Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
-import { LINKS, mirrorAcrossVehicleCentreline, pointMap, toThreePosition } from "../domain/geometry";
+import { LINKS, mirrorAcrossVehicleCentreline, pointMap, staticWheelAxis, toThreePosition } from "../domain/geometry";
 import { useWorkspace, type CameraPreset } from "../store/workspace";
 
 const LINK_COLORS = {
@@ -37,9 +39,10 @@ function CameraRig({ preset }: { preset: CameraPreset }) {
 
 interface ModelProps {
   mirrored?: boolean;
+  pose?: KinematicPose;
 }
 
-function SuspensionModel({ mirrored = false }: ModelProps) {
+function SuspensionModel({ mirrored = false, pose }: ModelProps) {
   const project = useWorkspace((state) => state.project);
   const selectedId = useWorkspace((state) => state.selectedHardpointId);
   const select = useWorkspace((state) => state.setSelectedHardpoint);
@@ -49,9 +52,23 @@ function SuspensionModel({ mirrored = false }: ModelProps) {
   const positionFor = (id: string): [number, number, number] => {
     const point = points.get(id);
     if (!point) throw new Error(`Hardpoint ${id} is missing from the viewport model.`);
-    const value = mirrored ? mirrorAcrossVehicleCentreline(point.position) : point.position;
+    const calculated = pose?.hardpoints[id] ?? point.position;
+    const value = mirrored ? mirrorAcrossVehicleCentreline(calculated) : calculated;
     return toThreePosition(value);
   };
+
+  const wheelQuaternion = useMemo((): [number, number, number, number] => {
+    const configured = staticWheelAxis(
+      project.suspension.corner,
+      project.suspension.wheel.staticCamberRad,
+      project.suspension.wheel.staticToeRad,
+    );
+    const source = pose?.wheelAxis ?? configured;
+    const vehicleAxis = mirrored ? mirrorAcrossVehicleCentreline(source) : source;
+    const threeAxis = new Vector3(vehicleAxis.x, vehicleAxis.z, -vehicleAxis.y).normalize();
+    const quaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), threeAxis);
+    return [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
+  }, [mirrored, pose, project.suspension.corner, project.suspension.wheel.staticCamberRad, project.suspension.wheel.staticToeRad]);
 
   return (
     <group>
@@ -89,7 +106,7 @@ function SuspensionModel({ mirrored = false }: ModelProps) {
       ))}
 
       {visibility.wheel && (
-        <mesh position={positionFor("wheel_center")}>
+        <mesh position={positionFor("wheel_center")} quaternion={wheelQuaternion}>
           <torusGeometry args={[
             Math.max(project.suspension.wheel.radius - project.suspension.wheel.width / 2, 0.01),
             Math.max(project.suspension.wheel.width / 2, 0.005),
@@ -103,20 +120,26 @@ function SuspensionModel({ mirrored = false }: ModelProps) {
   );
 }
 
-export function SuspensionViewport() {
+export function SuspensionViewport({
+  pose,
+  mode = "geometry",
+}: {
+  pose?: KinematicPose;
+  mode?: "geometry" | "kinematics";
+}) {
   const cameraPreset = useWorkspace((state) => state.cameraPreset);
   const mirror = useWorkspace((state) => state.visibility.mirror);
 
   return (
-    <div className="viewport" data-testid="suspension-viewport">
+    <div className={`viewport ${mode}`} data-testid="suspension-viewport">
       <Canvas camera={{ position: CAMERA_POSITIONS.perspective, fov: 38, near: 0.01, far: 100 }} dpr={[1, 2]}>
         <color attach="background" args={["#080a0e"]} />
         <ambientLight intensity={0.72} />
         <directionalLight position={[1.5, 2.5, 1]} intensity={2.2} color="#ffffff" />
         <directionalLight position={[-1, 0.8, -1]} intensity={0.8} color="#ef233c" />
         <gridHelper args={[2, 20, "#29303d", "#171b23"]} position={[0, 0, 0]} />
-        <SuspensionModel />
-        {mirror && <SuspensionModel mirrored />}
+        <SuspensionModel pose={pose} />
+        {mirror && <SuspensionModel mirrored pose={pose} />}
         <CameraRig preset={cameraPreset} />
         <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
           <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />

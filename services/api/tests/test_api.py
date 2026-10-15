@@ -115,3 +115,60 @@ async def test_unknown_schema_version_is_rejected() -> None:
     async with api_client() as client:
         response = await client.post("/api/v1/projects/validate", json=project)
         assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_kinematics_sweep_returns_converged_states_and_diagnostics() -> None:
+    request = {
+        "project": demo_project(),
+        "sweep": {"startTravelM": -0.03, "endTravelM": 0.03, "steps": 13},
+        "solver": {"residualToleranceM": 1.0e-8, "maxFunctionEvaluations": 500},
+    }
+    async with api_client() as client:
+        response = await client.post("/api/v1/kinematics/sweep", json=request)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["modelStatus"] == "unvalidated"
+        assert payload["allConverged"] is True
+        assert len(payload["states"]) == 13
+        assert all(state["diagnostics"]["converged"] for state in payload["states"])
+        assert all(
+            state["diagnostics"]["maxAbsResidualM"] <= payload["residualToleranceM"]
+            for state in payload["states"]
+        )
+        assert all(state["pose"] is not None for state in payload["states"])
+
+
+@pytest.mark.anyio
+async def test_kinematics_rejects_invalid_static_geometry() -> None:
+    project = demo_project()
+    suspension = project["suspension"]
+    assert isinstance(suspension, dict)
+    hardpoints = suspension["hardpoints"]
+    assert isinstance(hardpoints, list)
+    upper = next(point for point in hardpoints if point["id"] == "uca_outboard")
+    upper["position"]["z"] = 0.1
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/kinematics/sweep",
+            json={"project": project, "sweep": {"steps": 5}},
+        )
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["code"] == "UPRIGHT_ORDER"
+
+
+@pytest.mark.anyio
+async def test_kinematics_serializes_non_convergence_without_fake_pose() -> None:
+    request = {
+        "project": demo_project(),
+        "sweep": {"startTravelM": -0.25, "endTravelM": 0.25, "steps": 5},
+    }
+    async with api_client() as client:
+        response = await client.post("/api/v1/kinematics/sweep", json=request)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["allConverged"] is False
+        failed = [state for state in payload["states"] if not state["diagnostics"]["converged"]]
+        assert failed
+        assert all(state["pose"] is None and state["metrics"] is None for state in failed)
+        assert all("NON_CONVERGENCE" in state["warnings"] for state in failed)

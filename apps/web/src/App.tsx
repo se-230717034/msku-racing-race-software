@@ -1,5 +1,5 @@
 import { Activity, AlertTriangle, Box, CheckCircle2, Database, Gauge, GitCompareArrows, Menu, Route, TestTubeDiagonal, Waypoints } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { GeometryInspector } from "./components/GeometryInspector";
 import { GeometryToolbar } from "./components/GeometryToolbar";
@@ -8,10 +8,14 @@ import { SuspensionViewport } from "./components/SuspensionViewport";
 import { validateProjectGeometry } from "./domain/geometry";
 import { useWorkspace, type ModuleId } from "./store/workspace";
 
+const KinematicsWorkspace = lazy(() =>
+  import("./components/KinematicsWorkspace").then((module) => ({ default: module.KinematicsWorkspace })),
+);
+
 const modules: Array<{ id: ModuleId; label: string; icon: typeof Box; implemented: boolean }> = [
   { id: "workspace", label: "Workspace", icon: Database, implemented: true },
   { id: "geometry", label: "Geometry", icon: Box, implemented: true },
-  { id: "kinematics", label: "Kinematics", icon: Waypoints, implemented: false },
+  { id: "kinematics", label: "Kinematics", icon: Waypoints, implemented: true },
   { id: "dynamics", label: "Dynamics", icon: Activity, implemented: false },
   { id: "road", label: "Road", icon: Route, implemented: false },
   { id: "optimization", label: "Optimization", icon: Gauge, implemented: false },
@@ -48,7 +52,7 @@ function WorkspaceOverview() {
       <div className="overview-title">
         <span className="eyebrow">PROJECT CONTROL</span>
         <h1>Workspace</h1>
-        <p>Project data, model integrity, and implementation status. No calculated suspension outputs exist in this release.</p>
+        <p>Project data, model integrity, and implementation status. Kinematics outputs remain explicitly unvalidated until comparison with independent team or CAD measurements.</p>
       </div>
       <div className="overview-grid">
         <section className="overview-card span-two">
@@ -77,8 +81,8 @@ function WorkspaceOverview() {
         </section>
         <section className="overview-card span-two">
           <span className="eyebrow">IMPLEMENTATION GATE</span>
-          <h2>Phase 0 + Phase 1 vertical slice</h2>
-          <p>The geometry workflow is operational. Kinematics, loads, dynamics, road simulation, optimization, and reporting remain deliberately unavailable until their models and validation tests exist.</p>
+          <h2>Phase 0–2 engineering foundation</h2>
+          <p>The geometry workflow and rigid-link kinematics solver are operational. Loads, dynamics, road simulation, optimization, and reporting remain deliberately unavailable until their models and validation tests exist.</p>
         </section>
       </div>
     </main>
@@ -140,6 +144,10 @@ export function App() {
           <SuspensionViewport />
           <GeometryInspector />
         </div>
+      ) : activeModule === "kinematics" ? (
+        <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING NUMERICAL WORKSPACE</span></main>}>
+          <KinematicsWorkspace />
+        </Suspense>
       ) : activeModule === "workspace" ? (
         <WorkspaceOverview />
       ) : (

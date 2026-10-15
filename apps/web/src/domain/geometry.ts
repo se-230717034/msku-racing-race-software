@@ -63,6 +63,25 @@ export const toThreePosition = (point: Vec3): [number, number, number] => [
   -point.y,
 ];
 
+export const staticWheelAxis = (
+  corner: Project["suspension"]["corner"],
+  camberRad: number,
+  toeRad: number,
+): Vec3 => {
+  const side = corner === "front_left" ? 1 : -1;
+  const afterCamber = {
+    x: 0,
+    y: side * Math.cos(camberRad),
+    z: -Math.sin(camberRad),
+  };
+  const toeRotation = -side * toeRad;
+  return {
+    x: Math.cos(toeRotation) * afterCamber.x - Math.sin(toeRotation) * afterCamber.y,
+    y: Math.sin(toeRotation) * afterCamber.x + Math.cos(toeRotation) * afterCamber.y,
+    z: afterCamber.z,
+  };
+};
+
 export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] => {
   const diagnostics: GeometryDiagnostic[] = [];
   const points = pointMap(project.suspension.hardpoints);
@@ -149,11 +168,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     });
   }
 
-  const minimumOutboardY = Math.min(
-    upperOutboard.position.y,
-    lowerOutboard.position.y,
-    tieOutboard.position.y,
-  );
+  const outboardY = [upperOutboard.position.y, lowerOutboard.position.y, tieOutboard.position.y];
   const inboardIds = [
     "uca_front_inboard",
     "uca_rear_inboard",
@@ -161,17 +176,24 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     "lca_rear_inboard",
     "tie_rod_inboard",
   ];
-  const misplaced = inboardIds.filter((id) => points.get(id)!.position.y >= minimumOutboardY);
+  const isLeft = project.suspension.corner === "front_left";
+  const boundary = isLeft ? Math.min(...outboardY) : Math.max(...outboardY);
+  const misplaced = inboardIds.filter((id) =>
+    isLeft ? points.get(id)!.position.y >= boundary : points.get(id)!.position.y <= boundary,
+  );
   if (misplaced.length > 0) {
     diagnostics.push({
       severity: "error",
-      code: "LEFT_CORNER_ORDER",
-      message: "Front-left inboard joints must be inboard of the outboard joints (+Y is left).",
+      code: "CORNER_ORDER",
+      message: "Inboard joints must be closer to the vehicle centreline than outboard joints.",
       pointIds: misplaced,
     });
   }
 
-  if (wheelCenter.position.y < Math.max(upperOutboard.position.y, lowerOutboard.position.y)) {
+  const wheelIsInboard = isLeft
+    ? wheelCenter.position.y < Math.max(upperOutboard.position.y, lowerOutboard.position.y)
+    : wheelCenter.position.y > Math.min(upperOutboard.position.y, lowerOutboard.position.y);
+  if (wheelIsInboard) {
     diagnostics.push({
       severity: "warning",
       code: "WHEEL_CENTER_INBOARD",
@@ -189,6 +211,12 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
   }
   if (width >= 2 * radius) {
     diagnostics.push({ severity: "warning", code: "WHEEL_PROPORTION", message: "Wheel width is at least the wheel diameter; verify units.", pointIds: [] });
+  }
+  if (!Number.isFinite(project.suspension.wheel.staticCamberRad) || Math.abs(project.suspension.wheel.staticCamberRad) > 0.35) {
+    diagnostics.push({ severity: "error", code: "STATIC_CAMBER_RANGE", message: "Static camber must be finite and within ±20.05 degrees.", pointIds: [] });
+  }
+  if (!Number.isFinite(project.suspension.wheel.staticToeRad) || Math.abs(project.suspension.wheel.staticToeRad) > 0.35) {
+    diagnostics.push({ severity: "error", code: "STATIC_TOE_RANGE", message: "Static toe must be finite and within ±20.05 degrees.", pointIds: [] });
   }
 
   return diagnostics;

@@ -26,7 +26,7 @@ interface WorkspaceState {
   setCameraPreset: (preset: CameraPreset) => void;
   toggleVisibility: (key: keyof VisibilityState) => void;
   updateHardpoint: (id: string, axis: keyof Vec3, metres: number) => void;
-  updateWheel: (field: "radius" | "width", metres: number) => void;
+  updateWheel: (field: keyof Project["suspension"]["wheel"], value: number) => void;
   renameProject: (name: string) => void;
   replaceProject: (project: Project) => void;
   resetDemo: (projectId?: string) => void;
@@ -67,13 +67,13 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
         },
       }),
     })),
-  updateWheel: (field, metres) =>
+  updateWheel: (field, value) =>
     set((state) => ({
       project: stamp({
         ...state.project,
         suspension: {
           ...state.project.suspension,
-          wheel: { ...state.project.suspension.wheel, [field]: metres },
+          wheel: { ...state.project.suspension.wheel, [field]: value },
         },
       }),
     })),

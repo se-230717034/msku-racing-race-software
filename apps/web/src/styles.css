@@ -88,6 +88,7 @@ button { color: inherit; }
 .viewport { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #080a0e; }
 .viewport canvas { display: block; }
 .viewport::before { content: "STATIC GEOMETRY · NO KINEMATICS"; position: absolute; top: 12px; left: 13px; z-index: 2; padding: 5px 7px; border: 1px solid #3c2630; color: #d57c8b; background: #170d12cc; font: 600 8px/1 ui-monospace, monospace; letter-spacing: 0.12em; pointer-events: none; }
+.viewport.kinematics::before { content: "SOLVED KINEMATICS · UNVALIDATED"; }
 .viewport-legend { position: absolute; left: 13px; bottom: 13px; display: flex; gap: 12px; padding: 7px 9px; border: 1px solid #232a34; border-radius: 3px; color: #7f8897; background: #0b0e13dc; font: 9px/1 ui-monospace, monospace; pointer-events: none; }
 .viewport-legend span { display: flex; align-items: center; gap: 4px; }
 .axis { width: 5px; height: 5px; border-radius: 50%; }
@@ -114,6 +115,7 @@ button { color: inherit; }
 .numeric-field input { width: 100%; min-width: 0; height: 34px; padding: 0 6px; border: 1px solid #303744; border-radius: 3px; outline: none; color: white; background: #171b22; font: 10px/1 ui-monospace, monospace; }
 .numeric-field em { color: #616b7a; font: normal 8px/1 ui-monospace, monospace; }
 .field-note { margin: 10px 0 0; color: #616b7a; font-size: 9px; }
+.alignment-inputs { margin-top: 10px; padding-top: 10px; border-top: 1px solid #242a34; }
 .diagnostic-empty { margin: 12px 0; padding: 10px; border-left: 2px solid #397e55; color: #91a29a; background: #101a15; font-size: 10px; line-height: 1.5; }
 .diagnostic-list { display: grid; gap: 7px; margin: 12px 0; padding: 0; list-style: none; }
 .diagnostic-list li { display: grid; gap: 4px; padding: 8px; border-left: 2px solid var(--amber); background: #211b10; }
@@ -149,6 +151,46 @@ button { color: inherit; }
 .not-implemented strong { margin: 6px 0 4px; color: #ff8ea0; font: 750 10px/1 ui-monospace, monospace; letter-spacing: 0.15em; text-transform: uppercase; }
 .not-implemented p { max-width: 590px; }
 
+.kinematics-workspace { min-height: 0; display: grid; grid-template-rows: 38px 54px minmax(0, 1fr); }
+.travel-toolbar { display: grid; grid-template-columns: auto auto minmax(180px, 1fr) auto auto; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--line); background: #0d1016; }
+.travel-toolbar > span { color: #687282; font: 8px/1 ui-monospace, monospace; }
+.travel-toolbar input[type="range"] { width: 100%; accent-color: var(--red); cursor: pointer; }
+.travel-toolbar button { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #363d49; border-radius: 3px; color: #c7ccd4; background: #181c24; font-size: 9px; cursor: pointer; }
+.travel-toolbar button:disabled { opacity: 0.35; cursor: not-allowed; }
+.travel-readout { min-width: 178px; display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 9px; }
+.travel-readout .eyebrow { grid-column: 1 / -1; margin-bottom: 4px; }
+.travel-readout strong { color: #f5f7fa; font: 700 14px/1 ui-monospace, monospace; }
+.travel-readout b { color: #ff8da0; font: 700 8px/1 ui-monospace, monospace; }
+.kinematics-content { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 338px; }
+.kinematics-main { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(300px, 58%) minmax(230px, 42%); }
+.kinematics-viewport-wrap { position: relative; min-height: 0; overflow: hidden; border-bottom: 1px solid var(--line); }
+.kinematics-viewport-wrap .viewport { width: 100%; height: 100%; }
+.solver-overlay { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; gap: 9px; color: #c8ced7; background: #080a0ecf; font: 700 10px/1.4 ui-monospace, monospace; }
+.solver-overlay.error { padding: 20px; color: #ff8da0; text-align: center; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.kinematics-charts { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+.chart-card { min-width: 0; min-height: 0; display: grid; grid-template-rows: 34px minmax(0, 1fr); padding: 0 8px 5px; background: #0c0f14; }
+.chart-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 8px; }
+.chart-heading span { color: #8992a1; font: 700 9px/1 ui-monospace, monospace; letter-spacing: 0.08em; }
+.chart-heading b { color: #596374; font: 600 8px/1 ui-monospace, monospace; }
+.chart-placeholder { display: grid; place-items: center; color: #697383; background: #0c0f14; font: 9px/1 ui-monospace, monospace; }
+.kinematics-panel { border-left: 1px solid var(--line); }
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 10px; background: #292f39; }
+.result-metric { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 7px; padding: 9px; background: #12161d; }
+.result-metric span { grid-column: 1 / -1; overflow: hidden; color: #6f7988; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.result-metric strong { overflow: hidden; color: #ecf0f5; font: 700 13px/1 ui-monospace, monospace; text-overflow: ellipsis; }
+.result-metric em { align-self: end; color: #667181; font: normal 7px/1 ui-monospace, monospace; }
+.solver-diagnostics { display: grid; gap: 0; margin: 10px 0 0; }
+.solver-diagnostics div { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #222832; }
+.solver-diagnostics dt { color: #747e8d; font-size: 9px; }
+.solver-diagnostics dd { margin: 0; color: #b8c0cb; font: 9px/1 ui-monospace, monospace; }
+.solver-failure { padding: 9px; border-left: 2px solid var(--red); color: #ff9baa; background: #281117; font-size: 9px; line-height: 1.45; }
+.solver-warnings { margin: 8px 0 0; padding: 0; color: #f5bd69; list-style: none; font: 8px/1.5 ui-monospace, monospace; }
+.solver-warnings li::before { content: "WARN · "; color: #a16a19; }
+.model-note p { color: #818b99; font-size: 9px; line-height: 1.55; }
+.model-note b { display: inline-block; margin-top: 6px; padding: 4px 7px; border: 1px solid #6d2837; color: #ff8da0; background: #2b1018; font: 700 8px/1 ui-monospace, monospace; letter-spacing: 0.1em; }
+
 .statusbar { display: flex; align-items: center; gap: 20px; padding: 0 14px; border-top: 1px solid var(--line); color: #667080; background: #090b0f; font: 8px/1 ui-monospace, monospace; letter-spacing: 0.06em; }
 .statusbar span { display: flex; align-items: center; gap: 5px; }.status-spacer { flex: 1; }
 .dot { width: 5px; height: 5px; border-radius: 50%; }.dot.red { background: var(--red); box-shadow: 0 0 7px #ef233c80; }
@@ -169,5 +211,6 @@ button { color: inherit; }
   .geometry-workspace { grid-template-columns: 1fr; grid-template-rows: 38px minmax(320px, 1fr) minmax(0, auto); overflow-y: auto; }.geometry-toolbar { grid-column: 1; }.viewport { min-height: 420px; }.inspector { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
   .viewport-legend span:last-child { display: none; }.overview { padding: 28px 18px; }.overview-grid { grid-template-columns: 1fr; }.overview-card.span-two { grid-column: span 1; }.overview-card dl { grid-template-columns: repeat(2, 1fr); }
   .statusbar { gap: 10px; overflow: hidden; }.statusbar span:nth-child(2), .statusbar span:nth-child(3) { display: none; }
+  .kinematics-workspace { overflow-y: auto; grid-template-rows: 38px auto auto; }.travel-toolbar { grid-template-columns: auto minmax(120px, 1fr) auto; padding: 8px 10px; }.travel-readout { grid-column: 1 / -1; }.travel-toolbar button { grid-column: 1 / -1; justify-self: start; }.kinematics-content { grid-template-columns: 1fr; }.kinematics-main { grid-template-rows: 420px 500px; }.kinematics-charts { grid-template-columns: 1fr; }.kinematics-panel { border-left: 0; border-top: 1px solid var(--line); }
 }
 

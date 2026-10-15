@@ -36,11 +36,13 @@ export const projectSchema = z.object({
   }),
   suspension: z.object({
     type: z.literal("double_wishbone"),
-    corner: z.literal("front_left"),
+    corner: z.enum(["front_left", "front_right"]),
     hardpoints: z.array(hardpointSchema).length(9),
     wheel: z.object({
       radius: z.number().finite().positive(),
       width: z.number().finite().positive(),
+      staticCamberRad: z.number().finite().min(-0.35).max(0.35).default(0),
+      staticToeRad: z.number().finite().min(-0.35).max(0.35).default(0),
     }),
   }),
 });
@@ -92,9 +94,69 @@ export const createDemoProject = (projectId = "msku-demo-front-left"): Project =
       { id: "tie_rod_outboard", label: "Tie rod outboard", group: "steering", position: { x: -0.09, y: 0.67, z: 0.26 } },
       { id: "wheel_center", label: "Wheel centre", group: "wheel", position: { x: 0.0, y: 0.72, z: 0.285 } },
     ],
-    wheel: { radius: 0.2286, width: 0.18 },
+    wheel: { radius: 0.2286, width: 0.18, staticCamberRad: 0, staticToeRad: 0 },
   },
 });
 
 export const parseProject = (input: unknown): Project => projectSchema.parse(input);
+
+export const solverDiagnosticsSchema = z.object({
+  converged: z.boolean(),
+  residualNormM: z.number().finite().nullable(),
+  maxAbsResidualM: z.number().finite().nullable(),
+  jacobianRank: z.number().int().min(0),
+  jacobianCondition: z.number().finite().nullable(),
+  functionEvaluations: z.number().int().min(0),
+  message: z.string(),
+});
+
+export const kinematicMetricsSchema = z.object({
+  camberRad: z.number().finite(),
+  camberChangeRad: z.number().finite(),
+  camberGainRadPerM: z.number().finite().nullable(),
+  toeRad: z.number().finite(),
+  bumpSteerRad: z.number().finite(),
+  bumpSteerGradientRadPerM: z.number().finite().nullable(),
+  casterRad: z.number().finite(),
+  kpiRad: z.number().finite(),
+  trackChangeM: z.number().finite(),
+  rollCenterHeightM: z.number().finite().nullable(),
+  instantCenterYM: z.number().finite().nullable(),
+  instantCenterZM: z.number().finite().nullable(),
+});
+
+export const kinematicPoseSchema = z.object({
+  hardpoints: z.record(z.string(), vec3Schema),
+  wheelAxis: vec3Schema,
+  translation: vec3Schema,
+  rotationVector: vec3Schema,
+});
+
+export const kinematicStateSchema = z.object({
+  travelM: z.number().finite(),
+  pose: kinematicPoseSchema.nullable(),
+  metrics: kinematicMetricsSchema.nullable(),
+  diagnostics: solverDiagnosticsSchema,
+  warnings: z.array(z.string()),
+});
+
+export const kinematicsSweepResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  modelStatus: z.literal("unvalidated"),
+  units: z.object({
+    length: z.literal("m"),
+    angle: z.literal("rad"),
+    camberGain: z.literal("rad/m"),
+    bumpSteerGradient: z.literal("rad/m"),
+  }),
+  allConverged: z.boolean(),
+  residualToleranceM: z.number().finite().positive(),
+  states: z.array(kinematicStateSchema).min(1),
+});
+
+export type SolverDiagnostics = z.infer<typeof solverDiagnosticsSchema>;
+export type KinematicMetrics = z.infer<typeof kinematicMetricsSchema>;
+export type KinematicPose = z.infer<typeof kinematicPoseSchema>;
+export type KinematicState = z.infer<typeof kinematicStateSchema>;
+export type KinematicsSweepResponse = z.infer<typeof kinematicsSweepResponseSchema>;
 

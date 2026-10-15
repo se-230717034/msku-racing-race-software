@@ -37,7 +37,7 @@
       "required": ["type", "corner", "hardpoints", "wheel"],
       "properties": {
         "type": { "const": "double_wishbone" },
-        "corner": { "const": "front_left" },
+        "corner": { "enum": ["front_left", "front_right"] },
         "hardpoints": {
           "type": "array",
           "minItems": 9,
@@ -69,7 +69,9 @@
           "required": ["radius", "width"],
           "properties": {
             "radius": { "type": "number", "exclusiveMinimum": 0 },
-            "width": { "type": "number", "exclusiveMinimum": 0 }
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "staticCamberRad": { "type": "number", "minimum": -0.35, "maximum": 0.35, "default": 0 },
+            "staticToeRad": { "type": "number", "minimum": -0.35, "maximum": 0.35, "default": 0 }
           }
         }
       }

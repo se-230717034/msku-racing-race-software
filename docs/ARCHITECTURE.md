@@ -42,7 +42,8 @@ JSON/local storage -> structural validation -> geometry diagnostics -> editor/vi
                                                            |
                                                            +-> persistence allowed only if valid
 
-future analysis request -> FastAPI -> engineering solver -> diagnostics + units + status
+kinematics request -> FastAPI -> engineering solver -> diagnostics + units + status
+future force/dynamics request -> FastAPI -> engineering solver -> diagnostics + units + status
 ```
 
 ## Failure boundaries
@@ -51,5 +52,5 @@ future analysis request -> FastAPI -> engineering solver -> diagnostics + units 
 - Contract errors identify the invalid field and reject the whole import.
 - Geometry errors identify affected hardpoints and block persistence.
 - API errors use structured HTTP responses.
-- Future nonlinear solvers must return non-convergence rather than a plausible-looking pose.
+- The kinematics solver returns non-convergence rather than a plausible-looking pose; future solvers must preserve this behavior.
 

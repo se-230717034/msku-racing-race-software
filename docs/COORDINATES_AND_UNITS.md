@@ -18,7 +18,13 @@ Three.js uses its Y axis as screen-up. Rendering maps vehicle coordinates to `(X
 
 ## Wheel frame
 
-At the static demo pose, the wheel spin axis is parallel to vehicle `Y`. Camber and toe are not yet calculated. Phase 2 must define an upright/wheel orientation basis from non-collinear reference points before those quantities are displayed.
+The wheel stores explicit static camber and toe reference angles; the demonstration values are zero. At zero alignment, the outward wheel spin axis is `+Y` on the left and `-Y` on the right. The solved rigid-upright rotation carries that configured axis through wheel travel.
+
+- positive camber: wheel top outward
+- positive toe: toe-in on either side
+- positive wheel travel: bump (`+Z` wheel-centre displacement in the chassis-fixed frame)
+
+Caster is positive when the upper kingpin point is rearward of the lower point. KPI/SAI is positive when the upper kingpin point is inboard of the lower point. These definitions are applied consistently under left/right mirroring.
 
 ## Units
 

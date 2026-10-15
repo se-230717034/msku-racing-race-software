@@ -10,7 +10,7 @@ Current: double-wishbone points/links, wheel envelope, precise editing, mirror, 
 
 ## Phase 2 — Validated kinematics
 
-Add nonlinear bump and steering solvers only after constraint equations and independent fixtures are documented. Deliver CSV, plots, per-point residuals, and continuity diagnostics. Do not promote beyond `unvalidated` without benchmark evidence.
+Implemented: nonlinear bump/rebound solver, solved 3D poses, alignment metrics, roll-centre construction, interactive plots, CSV, per-point residuals, continuation diagnostics, symmetry tests, and a closed-form analytical fixture. Remaining validation work is comparison against MSKU Racing CAD/measurement. Steering-rack sweep, motion ratio, and actuation geometry remain follow-up work and are not silently approximated.
 
 ## Phase 3 — Quasi-static loads
 

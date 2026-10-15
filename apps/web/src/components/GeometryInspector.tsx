@@ -44,6 +44,46 @@ function MillimetreField({
   );
 }
 
+function DegreeField({
+  id,
+  label,
+  valueRadians,
+  onCommit,
+}: {
+  id: string;
+  label: string;
+  valueRadians: number;
+  onCommit: (radians: number) => void;
+}) {
+  const degrees = valueRadians * 180 / Math.PI;
+  const [text, setText] = useState(degrees.toFixed(3));
+  const commit = () => {
+    const nextDegrees = Number(text);
+    if (Number.isFinite(nextDegrees)) onCommit(nextDegrees * Math.PI / 180);
+    else setText(degrees.toFixed(3));
+  };
+  return (
+    <label className="numeric-field" htmlFor={id}>
+      <span>{label}</span>
+      <input
+        id={id}
+        type="number"
+        step="0.05"
+        min="-20"
+        max="20"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") setText(degrees.toFixed(3));
+        }}
+      />
+      <em>deg</em>
+    </label>
+  );
+}
+
 export function GeometryInspector() {
   const project = useWorkspace((state) => state.project);
   const selectedId = useWorkspace((state) => state.selectedHardpointId);
@@ -95,7 +135,11 @@ export function GeometryInspector() {
           <MillimetreField key={`radius-${project.suspension.wheel.radius}`} id="wheel-radius" label="Radius" valueMetres={project.suspension.wheel.radius} onCommit={(value) => updateWheel("radius", value)} />
           <MillimetreField key={`width-${project.suspension.wheel.width}`} id="wheel-width" label="Width" valueMetres={project.suspension.wheel.width} onCommit={(value) => updateWheel("width", value)} />
         </div>
-        <p className="field-note">Visual envelope only — no tire/contact model.</p>
+        <div className="coordinate-grid two alignment-inputs">
+          <DegreeField key={`camber-${project.suspension.wheel.staticCamberRad}`} id="static-camber" label="Static camber" valueRadians={project.suspension.wheel.staticCamberRad} onCommit={(value) => updateWheel("staticCamberRad", value)} />
+          <DegreeField key={`toe-${project.suspension.wheel.staticToeRad}`} id="static-toe" label="Static toe-in" valueRadians={project.suspension.wheel.staticToeRad} onCommit={(value) => updateWheel("staticToeRad", value)} />
+        </div>
+        <p className="field-note">Alignment defines the wheel reference orientation. Positive toe is toe-in; positive camber tilts the wheel top outward.</p>
       </section>
 
       <section className="inspector-section grow">

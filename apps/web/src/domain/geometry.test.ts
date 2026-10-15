@@ -1,7 +1,7 @@
 import { createDemoProject } from "@msku/contracts";
 import { describe, expect, it } from "vitest";
 
-import { linkLengths, mirrorAcrossVehicleCentreline, toThreePosition, validateProjectGeometry } from "./geometry";
+import { linkLengths, mirrorAcrossVehicleCentreline, staticWheelAxis, toThreePosition, validateProjectGeometry } from "./geometry";
 
 describe("static geometry", () => {
   it("accepts the labeled demonstration fixture", () => {
@@ -40,6 +40,14 @@ describe("static geometry", () => {
     const codes = validateProjectGeometry(project).map((item) => item.code);
     expect(codes).toContain("DUPLICATE_HARDPOINT");
     expect(codes).toContain("MISSING_HARDPOINT");
+  });
+
+  it("defines mirrored wheel axes with consistent toe and camber signs", () => {
+    const left = staticWheelAxis("front_left", 0.05, 0.03);
+    const right = staticWheelAxis("front_right", 0.05, 0.03);
+    expect(left.x).toBeCloseTo(right.x, 12);
+    expect(left.y).toBeCloseTo(-right.y, 12);
+    expect(left.z).toBeCloseTo(right.z, 12);
   });
 });
 

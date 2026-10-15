@@ -32,9 +32,24 @@ Updated: 2026-10-15
 - [ ] Pushrod/rocker editor — no sample geometry is fabricated; requires actual topology or a separately labeled demo model
 - [ ] Spring/damper mounts — requires geometrically specified points
 
+## Phase 2 — Validated suspension kinematics
+
+- [x] Six-unknown 3D rigid-upright nonlinear constraint solver
+- [x] Five fixed suspension-link constraints plus prescribed wheel-centre travel
+- [x] Static-centred continuation through bump and rebound
+- [x] Interactive travel slider synchronized to solved Three.js positions and wheel orientation
+- [x] Camber, camber change, and finite-difference camber gain
+- [x] Toe, bump steer, and finite-difference bump-steer gradient
+- [x] Caster and KPI/SAI from the current kingpin axis
+- [x] Front-view instant centre and symmetric-axle roll-centre height where geometry is non-singular
+- [x] Interactive alignment and migration graphs
+- [x] Per-point residual, Jacobian rank/condition, evaluation count, warnings, and failure messages
+- [x] CSV export with units, solver diagnostics, and warnings
+- [x] Zero-motion, length preservation, left/right symmetry, failure, API, and closed-form analytical benchmark tests
+- [ ] MSKU Racing CAD motion-study or physical-measurement comparison — required before changing model status from `unvalidated`
+
 ## Later phases
 
-- [ ] Phase 2 validated kinematics
 - [ ] Phase 3 quasi-static loads and forces
 - [ ] Phase 4 road and vehicle dynamics
 - [ ] Phase 5 optimization

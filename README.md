@@ -1,8 +1,10 @@
 # MSKU Racing Dynamics Studio
 
-An original, browser-based suspension engineering application for MSKU Racing. The current release implements the project foundation and the first working vertical slice of a double-wishbone 3D geometry editor. It does **not** yet calculate suspension kinematics or dynamics.
+An original, browser-based suspension engineering application for MSKU Racing. The current release implements the project foundation, a double-wishbone 3D geometry editor, and a constrained rigid-link suspension-kinematics sweep. It does **not** calculate loads, compliance, tire forces, or transient vehicle dynamics.
 
 Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specification. The visible model status is `demonstration / unvalidated`.
+
+The numerical solver is checked against a closed-form parallel-arm fixture, but the demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
 
 ## Implemented
 
@@ -11,7 +13,10 @@ Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specif
 - Immediate structural and geometry diagnostics. Invalid models cannot be saved or exported.
 - Versioned JSON project import/export and browser-local save/load.
 - FastAPI health and project-validation endpoints backed by a separate Python engineering package.
-- Automated contract, geometry, storage, API, and numerical-core tests.
+- Nonlinear 3D bump/rebound solver using five fixed link lengths, a rigid upright transform, continuation, residual tolerances, Jacobian rank/conditioning, and explicit non-convergence states.
+- Synchronized solved 3D poses, interactive wheel-travel control, camber, toe/bump steer, caster, KPI, track change, and symmetric-axle roll-centre results.
+- Interactive travel graphs, per-point numerical diagnostics, and traceable CSV export.
+- Automated contract, analytical benchmark, symmetry, geometry, storage, API, and numerical-core tests.
 
 See [PROGRESS.md](./PROGRESS.md) for the live checklist and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
@@ -40,6 +45,8 @@ npm run dev
 ```
 
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
+
+The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Inputs and outputs use SI units; the interface converts lengths to millimetres and angles to degrees.
 
 ## Quality checks
 
@@ -71,11 +78,11 @@ The web container is exposed on `http://localhost:4173`; the API remains on port
 apps/web              React/TypeScript engineering workspace
 services/api          FastAPI boundary and versioned endpoints
 packages/contracts    Shared TypeScript schemas and demo project
-packages/engineering  Pure Python geometry validation core
+packages/engineering  Pure Python geometry and numerical kinematics core
 docs                  Architecture, model, validation, and deployment records
 ```
 
 ## Data responsibility
 
-Do not treat the demo coordinates as vehicle data. Before Phase 2 validation or any engineering decision, replace them with measured/CAD-derived hardpoints and complete the checklist in [docs/TEAM_DATA_CHECKLIST.md](./docs/TEAM_DATA_CHECKLIST.md).
+Do not treat the demo coordinates as vehicle data. Before any engineering decision, replace them with measured/CAD-derived hardpoints, compare the sweep against an independent reference, and complete the checklist in [docs/TEAM_DATA_CHECKLIST.md](./docs/TEAM_DATA_CHECKLIST.md).
 
