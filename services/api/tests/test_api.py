@@ -142,8 +142,7 @@ async def test_kinematics_sweep_returns_converged_states_and_diagnostics() -> No
         assert "PHYSICAL_VALIDATION_EVIDENCE_NOT_ATTACHED" in payload["warnings"]
         assert len(payload["states"]) == 13
         assert all(
-            state["calculationStatus"] == "VERIFIED_NUMERICALLY"
-            for state in payload["states"]
+            state["calculationStatus"] == "VERIFIED_NUMERICALLY" for state in payload["states"]
         )
         assert all(state["diagnostics"]["converged"] for state in payload["states"])
         assert all(state["diagnostics"]["residualsAccepted"] for state in payload["states"])
@@ -228,3 +227,132 @@ async def test_declared_project_status_cannot_promote_physical_validation() -> N
         assert payload["inputProvenance"]["declaredModelStatus"] == "experimentally_validated"
         assert payload["validationStatus"]["physical"] == "UNVALIDATED_PHYSICALLY"
         assert payload["validationStatus"]["engineeringApproval"] == "NOT_APPROVED"
+
+
+@pytest.mark.anyio
+async def test_zero_wrench_upright_equilibrium_is_verified_with_five_members() -> None:
+    request = {
+        "project": demo_project(),
+        "travelM": 0.0,
+        "externalWrench": {
+            "forceN": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "momentNm": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "applicationPointM": {"x": 0.0, "y": 0.72, "z": 0.285},
+        },
+    }
+    async with api_client() as client:
+        response = await client.post("/api/v1/quasi-static/upright-equilibrium", json=request)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+        assert payload["validationStatus"]["physical"] == "UNVALIDATED_PHYSICALLY"
+        assert payload["validationStatus"]["engineeringApproval"] == "NOT_APPROVED"
+        assert payload["diagnostics"]["matrixColumns"] == 5
+        assert payload["diagnostics"]["matrixRank"] == 5
+        assert len(payload["memberForces"]) == 5
+        assert all(abs(item["axialForceN"]) < 1.0e-9 for item in payload["memberForces"])
+
+
+@pytest.mark.anyio
+async def test_missing_actuation_path_suppresses_incompatible_vertical_wrench() -> None:
+    request = {
+        "project": demo_project(),
+        "travelM": 0.0,
+        "externalWrench": {
+            "forceN": {"x": 0.0, "y": 0.0, "z": -1000.0},
+            "momentNm": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "applicationPointM": {"x": 0.0, "y": 0.72, "z": 0.285},
+        },
+    }
+    async with api_client() as client:
+        response = await client.post("/api/v1/quasi-static/upright-equilibrium", json=request)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["calculationStatus"] == "NOT_COMPUTABLE"
+        assert payload["memberForces"] == []
+        assert "ACTUATION_FORCE_PATH_MAY_BE_MISSING" in payload["warnings"]
+
+
+@pytest.mark.anyio
+async def test_explicit_sixth_force_path_balances_vertical_wrench() -> None:
+    request = {
+        "project": demo_project(),
+        "travelM": 0.0,
+        "externalWrench": {
+            "forceN": {"x": 0.0, "y": 0.0, "z": -1000.0},
+            "momentNm": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "applicationPointM": {"x": 0.0, "y": 0.72, "z": 0.285},
+        },
+        "additionalMember": {
+            "id": "explicit_actuation_link",
+            "chassisPointM": {"x": 0.0, "y": 0.72, "z": 1.285},
+            "uprightPointM": {"x": 0.0, "y": 0.72, "z": 0.285},
+        },
+    }
+    async with api_client() as client:
+        response = await client.post("/api/v1/quasi-static/upright-equilibrium", json=request)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+        by_id = {item["id"]: item for item in payload["memberForces"]}
+        assert by_id["explicit_actuation_link"]["axialForceN"] == pytest.approx(1000.0)
+        assert payload["diagnostics"]["forceResidualNormN"] < 1.0e-6
+        assert payload["diagnostics"]["momentResidualNormNm"] < 1.0e-6
+
+
+@pytest.mark.anyio
+async def test_load_transfer_api_reference_case_and_missing_lateral_split() -> None:
+    base = {
+        "massKg": 300.0,
+        "wheelbaseM": 2.0,
+        "cgFromFrontAxleM": 0.8,
+        "cgHeightM": 0.3,
+        "frontTrackM": 1.2,
+        "rearTrackM": 1.2,
+        "longitudinalAccelerationMps2": 2.0,
+    }
+    async with api_client() as client:
+        reference = await client.post("/api/v1/quasi-static/load-transfer", json=base)
+        assert reference.status_code == 200
+        payload = reference.json()
+        assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+        assert payload["longitudinalTransferN"] == pytest.approx(90.0)
+        assert payload["wheelLoads"] is not None
+
+        unsupported = await client.post(
+            "/api/v1/quasi-static/load-transfer",
+            json={**base, "lateralAccelerationMps2": 5.0},
+        )
+        assert unsupported.status_code == 200
+        unsupported_payload = unsupported.json()
+        assert unsupported_payload["calculationStatus"] == "NOT_COMPUTABLE"
+        assert unsupported_payload["wheelLoads"] is None
+
+
+@pytest.mark.anyio
+async def test_actuation_series_and_velocity_explicit_damper_api() -> None:
+    async with api_client() as client:
+        actuation = await client.post(
+            "/api/v1/quasi-static/actuation-series",
+            json={
+                "wheelTravelM": [-0.01, 0.0, 0.01],
+                "springLengthM": [0.205, 0.2, 0.195],
+                "referenceSpringLengthM": 0.2,
+                "springRateNPerM": 10000.0,
+                "preloadN": 100.0,
+            },
+        )
+        assert actuation.status_code == 200
+        actuation_payload = actuation.json()
+        assert actuation_payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+        assert [item["motionRatio"] for item in actuation_payload["samples"]] == pytest.approx(
+            [0.5, 0.5, 0.5]
+        )
+
+        missing = await client.post(
+            "/api/v1/quasi-static/damper-force",
+            json={"compressionCoefficientNsPerM": 1000.0, "reboundCoefficientNsPerM": 1500.0},
+        )
+        assert missing.status_code == 200
+        assert missing.json()["calculationStatus"] == "NOT_COMPUTABLE"
+        assert missing.json()["forceN"] is None

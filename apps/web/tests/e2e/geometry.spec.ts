@@ -27,3 +27,24 @@ test("edits geometry and runs the constrained kinematics workflow", async ({ pag
   await expect(page.getByText("25.0 mm", { exact: true })).toBeVisible();
 });
 
+test("runs guarded quasi-static force, load-transfer, and actuation calculations", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Loads" }).click();
+
+  await expect(page.getByText("UPRIGHT CONTACT WRENCH", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approved export disabled" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Synthetic preset" }).click();
+  await page.getByRole("button", { name: "Solve", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "explicit_actuation_link" })).toBeVisible();
+  await expect(page.getByText("REFERENCE_BENCHMARKED", { exact: true })).toBeVisible();
+  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Calculate load transfer" }).click();
+  await expect(page.getByText("FL", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Calculate motion ratio" }).click();
+  await expect(page.getByText("Motion ratio", { exact: true })).toBeVisible();
+  await expect(page.getByText("Wheel rate", { exact: true })).toBeVisible();
+});
+

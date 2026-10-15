@@ -59,7 +59,20 @@ Quality has three independent dimensions: an accepted sweep is `VERIFIED_NUMERIC
 
 The software implementation has analytical benchmark evidence, but the demonstration vehicle geometry remains `unvalidated` because no MSKU Racing CAD motion study or physical measurement was provided.
 
+## Phase 3 model: quasi-static loads and actuation
+
+The Phase 3 force solver assembles current-geometry two-force-member wrench columns and enforces all
+three force and three moment equations. It qualifies the dimensionless matrix by SVD, rejects
+nonunique or ill-conditioned paths, and independently checks N and N·m residuals. A five-link corner
+only accepts compatible wrenches; no missing actuation reaction is invented.
+
+Separate models provide steady rigid-body static/longitudinal load transfer, stiffness-distributed
+lateral transfer, and sampled-geometry spring motion ratio/energy/wheel rate. Damper force requires
+explicit velocity. See `PHASE_3_ENGINEERING_MODELS.md` for equations, signs, and boundaries.
+
 ## Not yet implemented
 
-There is no steering-rack sweep, motion ratio, pushrod/rocker actuation, compliance, force equilibrium, tire model, or transient dynamics. The interface does not display placeholder values for these quantities.
+There is no steering-rack sweep, integrated rocker kinematic closure, compliance, structural stress,
+tyre constitutive model, road response, or transient dynamics. Unsupported quantities return no
+placeholder value.
 

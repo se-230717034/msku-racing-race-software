@@ -15,6 +15,25 @@ export const hardpointSchema = z.object({
   position: vec3Schema,
 });
 
+export const actuationGeometrySchema = z.object({
+  type: z.enum(["pushrod", "pullrod"]),
+  uprightPickup: vec3Schema,
+  rockerPushrodPickup: vec3Schema,
+  rockerSpringPickup: vec3Schema,
+  rockerAxisStart: vec3Schema,
+  rockerAxisEnd: vec3Schema,
+  springChassisPickup: vec3Schema,
+  springFreeLengthM: z.number().finite().positive(),
+  springRateNPerM: z.number().finite().positive(),
+  springPreloadN: z.number().finite().nonnegative().default(0),
+  damper: z.object({
+    rockerPickup: vec3Schema,
+    chassisPickup: vec3Schema,
+    compressionCoefficientNsPerM: z.number().finite().nonnegative(),
+    reboundCoefficientNsPerM: z.number().finite().nonnegative(),
+  }).optional(),
+});
+
 export const projectSchema = z.object({
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
   projectId: z.string().min(1),
@@ -44,11 +63,13 @@ export const projectSchema = z.object({
       staticCamberRad: z.number().finite().min(-0.35).max(0.35).default(0),
       staticToeRad: z.number().finite().min(-0.35).max(0.35).default(0),
     }),
+    actuation: actuationGeometrySchema.optional(),
   }),
 });
 
 export type Vec3 = z.infer<typeof vec3Schema>;
 export type Hardpoint = z.infer<typeof hardpointSchema>;
+export type ActuationGeometry = z.infer<typeof actuationGeometrySchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type ModelStatus = Project["modelStatus"];
 
@@ -152,19 +173,6 @@ export const validationStatusSchema = z.object({
   engineeringApproval: z.literal("NOT_APPROVED"),
 });
 
-export const solverMetadataSchema = z.object({
-  name: z.literal("rigid_upright_double_wishbone"),
-  version: z.string().min(1),
-  residualToleranceM: z.number().finite().positive(),
-  rankRelativeTolerance: z.number().finite().positive(),
-  conditionLimit: z.number().finite().positive(),
-  continuityPositionLimitM: z.number().finite().positive(),
-  continuityRotationLimitRad: z.number().finite().positive(),
-  maximumTravelStepM: z.number().finite().positive(),
-  maxFunctionEvaluations: z.number().int().positive(),
-  gradientMethod: z.literal("second_order_nonuniform_finite_difference"),
-});
-
 export const inputProvenanceSchema = z.object({
   projectId: z.string().min(1),
   projectName: z.string().min(1),
@@ -176,6 +184,112 @@ export const inputProvenanceSchema = z.object({
     "experimentally_validated",
   ]),
   projectInputSha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
+export const phase3CalculationStatusSchema = z.enum([
+  "VERIFIED_NUMERICALLY",
+  "NOT_COMPUTABLE",
+  "FAILED",
+]);
+
+export const phase3ValidationStatusSchema = z.object({
+  numerical: phase3CalculationStatusSchema,
+  reference: z.literal("REFERENCE_BENCHMARKED"),
+  physical: z.literal("UNVALIDATED_PHYSICALLY"),
+  engineeringApproval: z.literal("NOT_APPROVED"),
+});
+
+export const memberForceSchema = z.object({
+  id: z.string(),
+  axialForceN: z.number().finite(),
+  state: z.enum(["TENSION", "COMPRESSION", "ZERO"]),
+  forceOnUprightN: vec3Schema,
+  chassisReactionN: vec3Schema,
+  uprightPointM: vec3Schema,
+});
+
+export const uprightEquilibriumResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  calculationStatus: phase3CalculationStatusSchema,
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string(),
+  units: z.object({ force: z.literal("N"), moment: z.literal("N*m"), length: z.literal("m") }),
+  inputProvenance: inputProvenanceSchema,
+  pose: kinematicPoseSchema,
+  memberForces: z.array(memberForceSchema),
+  diagnostics: z.object({
+    matrixRows: z.number().int(),
+    matrixColumns: z.number().int(),
+    matrixRank: z.number().int(),
+    conditionNumber: z.number().finite().nullable(),
+    forceResidualN: vec3Schema,
+    momentResidualNm: vec3Schema,
+    forceResidualNormN: z.number().finite(),
+    momentResidualNormNm: z.number().finite(),
+    characteristicLengthM: z.number().finite(),
+    message: z.string(),
+  }),
+  warnings: z.array(z.string()),
+});
+
+export const vehicleLoadTransferResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  calculationStatus: phase3CalculationStatusSchema,
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string(),
+  modelName: z.literal("rigid_body_with_elastic_roll_stiffness_distribution"),
+  units: z.object({ mass: z.literal("kg"), length: z.literal("m"), acceleration: z.literal("m/s^2"), force: z.literal("N") }),
+  axleLoads: z.object({ frontN: z.number().finite(), rearN: z.number().finite() }).nullable(),
+  wheelLoads: z.object({
+    frontLeftN: z.number().finite(),
+    frontRightN: z.number().finite(),
+    rearLeftN: z.number().finite(),
+    rearRightN: z.number().finite(),
+  }).nullable(),
+  longitudinalTransferN: z.number().finite().nullable(),
+  frontLateralTransferN: z.number().finite().nullable(),
+  rearLateralTransferN: z.number().finite().nullable(),
+  totalWeightN: z.number().finite().nullable(),
+  forceResidualN: z.number().finite().nullable(),
+  warnings: z.array(z.string()),
+});
+
+export const actuationSeriesResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  calculationStatus: phase3CalculationStatusSchema,
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string(),
+  units: z.object({
+    length: z.literal("m"),
+    force: z.literal("N"),
+    springRate: z.literal("N/m"),
+    energy: z.literal("J"),
+    motionRatio: z.literal("m/m"),
+  }),
+  samples: z.array(z.object({
+    wheelTravelM: z.number().finite(),
+    springLengthM: z.number().finite(),
+    springCompressionM: z.number().finite(),
+    motionRatio: z.number().finite(),
+    springForceN: z.number().finite(),
+    storedEnergyJ: z.number().finite(),
+    wheelForceN: z.number().finite(),
+    wheelRateNPerM: z.number().finite(),
+  })),
+  warnings: z.array(z.string()),
+});
+
+export const solverMetadataSchema = z.object({
+  name: z.literal("rigid_upright_double_wishbone"),
+  version: z.string().min(1),
+  residualToleranceM: z.number().finite().positive(),
+  rankRelativeTolerance: z.number().finite().positive(),
+  conditionLimit: z.number().finite().positive(),
+  continuityPositionLimitM: z.number().finite().positive(),
+  continuityRotationLimitRad: z.number().finite().positive(),
+  maximumTravelStepM: z.number().finite().positive(),
+  maxFunctionEvaluations: z.number().int().positive(),
+  gradientMethod: z.literal("second_order_nonuniform_finite_difference"),
 });
 
 export const kinematicsSweepResponseSchema = z.object({
@@ -204,4 +318,10 @@ export type ValidationStatus = z.infer<typeof validationStatusSchema>;
 export type SolverMetadata = z.infer<typeof solverMetadataSchema>;
 export type InputProvenance = z.infer<typeof inputProvenanceSchema>;
 export type KinematicsSweepResponse = z.infer<typeof kinematicsSweepResponseSchema>;
+export type Phase3CalculationStatus = z.infer<typeof phase3CalculationStatusSchema>;
+export type Phase3ValidationStatus = z.infer<typeof phase3ValidationStatusSchema>;
+export type MemberForce = z.infer<typeof memberForceSchema>;
+export type UprightEquilibriumResponse = z.infer<typeof uprightEquilibriumResponseSchema>;
+export type VehicleLoadTransferResponse = z.infer<typeof vehicleLoadTransferResponseSchema>;
+export type ActuationSeriesResponse = z.infer<typeof actuationSeriesResponseSchema>;
 

@@ -123,12 +123,22 @@ function SuspensionModel({ mirrored = false, pose }: ModelProps) {
 export function SuspensionViewport({
   pose,
   mode = "geometry",
+  forceVectors = [],
 }: {
   pose?: KinematicPose;
-  mode?: "geometry" | "kinematics";
+  mode?: "geometry" | "kinematics" | "loads";
+  forceVectors?: Array<{
+    id: string;
+    origin: { x: number; y: number; z: number };
+    force: { x: number; y: number; z: number };
+  }>;
 }) {
   const cameraPreset = useWorkspace((state) => state.cameraPreset);
   const mirror = useWorkspace((state) => state.visibility.mirror);
+  const maximumForce = Math.max(
+    ...forceVectors.map(({ force }) => Math.hypot(force.x, force.y, force.z)),
+    0,
+  );
 
   return (
     <div className={`viewport ${mode}`} data-testid="suspension-viewport">
@@ -139,6 +149,19 @@ export function SuspensionViewport({
         <directionalLight position={[-1, 0.8, -1]} intensity={0.8} color="#ef233c" />
         <gridHelper args={[2, 20, "#29303d", "#171b23"]} position={[0, 0, 0]} />
         <SuspensionModel pose={pose} />
+        {maximumForce > 0 && forceVectors.map(({ id, origin, force }) => {
+          const magnitude = Math.hypot(force.x, force.y, force.z);
+          if (magnitude <= 1e-12) return null;
+          const direction = new Vector3(force.x, force.z, -force.y).normalize();
+          const arrowOrigin = new Vector3(origin.x, origin.z, -origin.y);
+          const length = 0.08 + 0.24 * magnitude / maximumForce;
+          return (
+            <arrowHelper
+              key={id}
+              args={[direction, arrowOrigin, length, "#f59e0b", Math.min(0.055, length * 0.28), 0.028]}
+            />
+          );
+        })}
         {mirror && <SuspensionModel mirrored pose={pose} />}
         <CameraRig preset={cameraPreset} />
         <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
@@ -150,6 +173,7 @@ export function SuspensionViewport({
         <span><i className="axis y" />Y left</span>
         <span><i className="axis z" />Z up</span>
         <span>Internal: m · Editor: mm</span>
+        {mode === "loads" && <span>Force arrows: relative scale · values in table</span>}
       </div>
     </div>
   );

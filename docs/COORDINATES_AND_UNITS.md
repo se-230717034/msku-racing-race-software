@@ -33,8 +33,12 @@ Caster is positive when the upper kingpin point is rearward of the lower point. 
 | position, length, radius, width | metre (`m`) | millimetre (`mm`) |
 | angle | radian (`rad`) | degree (`deg`) where labeled |
 | angle gradient vs travel | radian per metre (`rad/m`) | degree per 10 mm (`deg/10mm`) |
-| force (future) | newton (`N`) | newton (`N`) |
-| mass (future) | kilogram (`kg`) | kilogram (`kg`) |
+| force | newton (`N`) | newton (`N`) |
+| moment | newton metre (`N*m`) | newton metre (`N·m`) |
+| spring/wheel rate | newton per metre (`N/m`) | newton per millimetre (`N/mm`) where labeled |
+| velocity | metre per second (`m/s`) | metre per second (`m/s`) |
+| acceleration | metre per second squared (`m/s²`) | metre per second squared (`m/s²`) |
+| mass | kilogram (`kg`) | kilogram (`kg`) |
 | time (future) | second (`s`) | second (`s`) |
 
 Conversions occur at input/output boundaries. No unitless engineering result may be added to the interface.

@@ -1,10 +1,10 @@
 # MSKU Racing Dynamics Studio
 
-An original, browser-based suspension engineering application for MSKU Racing. The current release implements the project foundation, a double-wishbone 3D geometry editor, and a constrained rigid-link suspension-kinematics sweep. It does **not** calculate loads, compliance, tire forces, or transient vehicle dynamics.
+An original, browser-based suspension engineering application for MSKU Racing. The current release implements the project foundation, a double-wishbone 3D geometry editor, a constrained rigid-link suspension-kinematics sweep, and guarded quasi-static suspension-force/load-transfer models. It does **not** calculate component stress, compliance, tyre constitutive forces, or transient vehicle dynamics.
 
 Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specification. The visible model status is `demonstration / unvalidated`.
 
-Solver version `2.5.0` is checked against closed-form geometry, an independently parameterized unequal-length 3D reference solve, step-size convergence, mirroring, perturbation, singularity, and failure-path tests. The demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
+Kinematics solver `2.5.0` and quasi-static solver `3.0.0` are checked against analytical and independent reference cases, conservation, scaling, symmetry, perturbation, singularity, and failure-path tests. The demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
 
 ## Implemented
 
@@ -18,8 +18,12 @@ Solver version `2.5.0` is checked against closed-form geometry, an independently
 - Interactive travel graphs, per-point numerical diagnostics, and provenance-bearing CSV export that is blocked for failed sweeps.
 - Separate `VERIFIED_NUMERICALLY`, `REFERENCE_BENCHMARKED`, `UNVALIDATED_PHYSICALLY`, and `FAILED` quality states; engineering approval remains `NOT_APPROVED`.
 - Automated contract, analytical and alternative-formulation benchmark, step-convergence, perturbation, symmetry, geometry, storage, API, and numerical-core tests.
+- Rank-aware 3D rigid-upright force/moment equilibrium using current Phase 2 geometry, ideal two-force UCA/LCA/tie-rod members, optional explicit actuation force path, chassis reactions, physical-unit residuals, and rejected incompatible/indeterminate systems.
+- Explicit sampled-geometry motion ratio, linear spring/preload/energy/wheel-rate calculations, and velocity-gated linear damper force.
+- Simplified static, longitudinal, and roll-stiffness-distributed lateral load transfer with wheel-unloading and negative-load rejection.
+- Loads workspace with editable inputs, labeled synthetic presets, calculated Three.js force arrows, axial-force tables, diagnostics, load bars, actuation plots, provenance, and disabled approved export.
 
-See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), the [Phase 3 models](./docs/PHASE_3_ENGINEERING_MODELS.md), the [Phase 3 verification report](./docs/PHASE_3_VERIFICATION_REPORT.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 
@@ -47,7 +51,7 @@ npm run dev
 
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
 
-The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Inputs and outputs use SI units; the interface converts lengths to millimetres and angles to degrees.
+The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*` for upright equilibrium, load transfer, actuation series, and damper force. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions.
 
 ## Quality checks
 

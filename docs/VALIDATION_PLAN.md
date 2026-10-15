@@ -14,6 +14,10 @@ Runtime Phase 2 responses use more explicit orthogonal states:
 - `UNVALIDATED_PHYSICALLY`: no approved CAD/measurement evidence is attached;
 - `FAILED`: at least one state is rejected or unattempted.
 
+Phase 3 adds `NOT_COMPUTABLE`: the declared model lacks an independent force path or required
+physical input, or a unique result would require an unimplemented stiffness/compliance model. It is
+not treated as a small-error success.
+
 The included project is `demonstration`; its model is `unvalidated`.
 
 ## Phase 0/1 evidence
@@ -42,9 +46,24 @@ Still required before the MSKU Racing vehicle model may be called benchmarked or
 2. Compare static and swept alignment against physical measurement with stated uncertainty.
 3. Record the input-file hash and reference-tool configuration in a validation report.
 
+## Phase 3 evidence and remaining gate
+
+- Hand-constructed three- and six-member wrench bases test force/moment conservation and sign.
+- Scaling, rank deficiency, incompatible wrench, more-than-six-unknown, and geometric perturbation
+  cases exercise matrix-quality and sensitivity paths.
+- Static, longitudinal, lateral-mirror, missing-stiffness, unloading, and negative-load cases verify
+  the simplified vehicle model.
+- Linear and nonuniform sampled actuation cases verify motion ratio, spring force, energy, and wheel
+  rate. Damper tests require explicit velocity.
+- API and TypeScript contract tests verify units, versions, hashes/statuses, and suppression of
+  unsupported results. Chromium acceptance exercises the actual Loads workspace.
+
+Still required: independent CAD/static-force comparison, actuation motion-study comparison, corner
+weight/load-cell evidence, and uncertainty review. These are prerequisites to any physical
+validation or approval change. See `PHASE_3_VERIFICATION_REPORT.md`.
+
 ## Later gates
 
-- Quasi-static forces: force/moment residuals, energy consistency, dimensions, missing-parameter failures.
 - Dynamics: analytical quarter-car cases, step-size convergence, energy/passivity, contact-loss handling.
 - Optimization: deterministic seeds, infeasibility cases, known objective functions, and full candidate revalidation.
 

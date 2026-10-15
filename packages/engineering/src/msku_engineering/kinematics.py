@@ -239,9 +239,7 @@ def _scaled_constraint_jacobian(
     jacobian = np.empty((6, 6), dtype=np.float64)
     for column in range(6):
         physical_step = (
-            dimensionless_step * characteristic_length_m
-            if column < 3
-            else dimensionless_step
+            dimensionless_step * characteristic_length_m if column < 3 else dimensionless_step
         )
         forward = parameters.copy()
         backward = parameters.copy()
@@ -333,9 +331,7 @@ def _roll_center(
     if instant_center is None:
         return None, None, None, "ROLL_CENTER_UNSUPPORTED_PARALLEL_OR_DEGENERATE_ARMS"
 
-    contact_patch = _rigid_wheel_contact_patch(
-        points["wheel_center"], wheel_axis, wheel_radius_m
-    )
+    contact_patch = _rigid_wheel_contact_patch(points["wheel_center"], wheel_axis, wheel_radius_m)
     if contact_patch is None:
         return None, instant_center[0], instant_center[1], "ROLL_CENTER_CONTACT_PATCH_UNDEFINED"
     instant_y, instant_z = instant_center
@@ -461,9 +457,7 @@ def solve_pose(
             ftol=1.0e-13,
             gtol=1.0e-13,
             max_nfev=settings.max_function_evaluations,
-            x_scale=np.asarray(
-                [characteristic_length] * 3 + [1.0, 1.0, 1.0], dtype=np.float64
-            ),
+            x_scale=np.asarray([characteristic_length] * 3 + [1.0, 1.0, 1.0], dtype=np.float64),
         )
     except (ValueError, FloatingPointError) as exc:
         diagnostics = SolverDiagnostics(
@@ -476,9 +470,7 @@ def solve_pose(
         np.all(np.isfinite(result.x)) and np.all(np.isfinite(independently_evaluated))
     )
     residual_norm = float(np.linalg.norm(independently_evaluated)) if finite_solution else None
-    max_residual = (
-        float(np.max(np.abs(independently_evaluated))) if finite_solution else None
-    )
+    max_residual = float(np.max(np.abs(independently_evaluated))) if finite_solution else None
     residuals_accepted = bool(
         max_residual is not None and max_residual <= settings.residual_tolerance_m
     )
@@ -670,11 +662,10 @@ def _apply_gradients(states: list[KinematicState]) -> None:
                 if offset in (0, len(block_indices) - 1):
                     warnings.append("ONE_SIDED_GRADIENT")
                 if (
-                    (result_index > 0 and states[result_index - 1].calculation_status == "FAILED")
-                    or (
-                        result_index + 1 < len(states)
-                        and states[result_index + 1].calculation_status == "FAILED"
-                    )
+                    result_index > 0 and states[result_index - 1].calculation_status == "FAILED"
+                ) or (
+                    result_index + 1 < len(states)
+                    and states[result_index + 1].calculation_status == "FAILED"
                 ):
                     warnings.append("GRADIENT_ADJACENT_TO_FAILED_STATE")
                 states[result_index] = replace(
@@ -778,9 +769,7 @@ def solve_sweep(
 
     ordered = [solved[index] for index in range(len(travels))]
     _apply_gradients(ordered)
-    all_converged = all(
-        state.calculation_status == "VERIFIED_NUMERICALLY" for state in ordered
-    )
+    all_converged = all(state.calculation_status == "VERIFIED_NUMERICALLY" for state in ordered)
     return SweepResult(
         states=tuple(ordered),
         all_converged=all_converged,

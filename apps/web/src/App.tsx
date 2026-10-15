@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Box, CheckCircle2, Database, Gauge, GitCompareArrows, Menu, Route, TestTubeDiagonal, Waypoints } from "lucide-react";
+import { Activity, AlertTriangle, Box, CheckCircle2, Database, Gauge, GitCompareArrows, Menu, Route, Scale, TestTubeDiagonal, Waypoints } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { GeometryInspector } from "./components/GeometryInspector";
@@ -11,11 +11,15 @@ import { useWorkspace, type ModuleId } from "./store/workspace";
 const KinematicsWorkspace = lazy(() =>
   import("./components/KinematicsWorkspace").then((module) => ({ default: module.KinematicsWorkspace })),
 );
+const QuasiStaticWorkspace = lazy(() =>
+  import("./components/QuasiStaticWorkspace").then((module) => ({ default: module.QuasiStaticWorkspace })),
+);
 
 const modules: Array<{ id: ModuleId; label: string; icon: typeof Box; implemented: boolean }> = [
   { id: "workspace", label: "Workspace", icon: Database, implemented: true },
   { id: "geometry", label: "Geometry", icon: Box, implemented: true },
   { id: "kinematics", label: "Kinematics", icon: Waypoints, implemented: true },
+  { id: "loads", label: "Loads", icon: Scale, implemented: true },
   { id: "dynamics", label: "Dynamics", icon: Activity, implemented: false },
   { id: "road", label: "Road", icon: Route, implemented: false },
   { id: "optimization", label: "Optimization", icon: Gauge, implemented: false },
@@ -81,8 +85,8 @@ function WorkspaceOverview() {
         </section>
         <section className="overview-card span-two">
           <span className="eyebrow">IMPLEMENTATION GATE</span>
-          <h2>Phase 0–2 engineering foundation</h2>
-          <p>The geometry workflow and rigid-link kinematics solver are operational. Loads, dynamics, road simulation, optimization, and reporting remain deliberately unavailable until their models and validation tests exist.</p>
+          <h2>Phase 0–3 engineering foundation</h2>
+          <p>The geometry, rigid-link kinematics, and guarded quasi-static loads workflows are operational. Transient dynamics, road simulation, optimization, and reporting remain deliberately unavailable until their models and validation tests exist.</p>
         </section>
       </div>
     </main>
@@ -147,6 +151,10 @@ export function App() {
       ) : activeModule === "kinematics" ? (
         <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING NUMERICAL WORKSPACE</span></main>}>
           <KinematicsWorkspace />
+        </Suspense>
+      ) : activeModule === "loads" ? (
+        <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING QUASI-STATIC WORKSPACE</span></main>}>
+          <QuasiStaticWorkspace />
         </Suspense>
       ) : activeModule === "workspace" ? (
         <WorkspaceOverview />

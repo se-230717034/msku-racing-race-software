@@ -57,9 +57,28 @@ Updated: 2026-10-15
 - [x] Phase 2 verification report with quantitative discrepancies and remaining risks
 - [ ] MSKU Racing CAD motion-study or physical-measurement comparison — required before changing model status from `unvalidated`
 
+## Phase 3 — Verified quasi-static loads and forces
+
+- [x] Separate versioned Python quasi-static engineering module
+- [x] Rank-aware 3D upright force/moment equilibrium from accepted Phase 2 poses
+- [x] UCA/LCA/tie-rod axial loads, optional explicit sixth force path, and chassis reactions
+- [x] Independent force/moment residual, matrix-rank, condition, and failure diagnostics
+- [x] Explicit rejection of incompatible, singular, ill-conditioned, and statically indeterminate systems
+- [x] Optional project schema for pushrod/pullrod, rocker, spring, and damper coordinates/properties
+- [x] Sampled geometric motion ratio, spring preload/force/energy, and wheel-rate model
+- [x] Damper-force model gated by explicitly supplied velocity
+- [x] Static and longitudinal load transfer and stiffness-distributed lateral load transfer
+- [x] Missing-stiffness, wheel-unloading, and negative-normal-load safety paths
+- [x] Quasi-static UI with editable inputs, labeled synthetic preset, calculated force arrows, tables, diagnostics, plots, and provenance
+- [x] Approved engineering export disabled for physically unvalidated results
+- [x] Analytical 3D equilibrium, conservation, scaling, symmetry, sensitivity, spring-energy, failure, API, contract, and browser tests
+- [x] Phase 3 model and verification documentation
+- [x] Final gates: 59 Python tests, 16 Vitest tests, 2 Chromium tests, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Integrated rocker/pushrod kinematic closure from stored coordinates
+- [ ] Independent CAD/static-load and physical rig validation for MSKU Racing vehicle data
+
 ## Later phases
 
-- [ ] Phase 3 quasi-static loads and forces
 - [ ] Phase 4 road and vehicle dynamics
 - [ ] Phase 5 optimization
 - [ ] Phase 6 professional workflows

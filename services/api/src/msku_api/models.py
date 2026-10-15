@@ -30,11 +30,33 @@ class Wheel(StrictModel):
     staticToeRad: float = Field(default=0.0, ge=-0.35, le=0.35)
 
 
+class DamperDefinition(StrictModel):
+    rockerPickup: Vec3
+    chassisPickup: Vec3
+    compressionCoefficientNsPerM: float = Field(ge=0)
+    reboundCoefficientNsPerM: float = Field(ge=0)
+
+
+class ActuationGeometry(StrictModel):
+    type: Literal["pushrod", "pullrod"]
+    uprightPickup: Vec3
+    rockerPushrodPickup: Vec3
+    rockerSpringPickup: Vec3
+    rockerAxisStart: Vec3
+    rockerAxisEnd: Vec3
+    springChassisPickup: Vec3
+    springFreeLengthM: float = Field(gt=0)
+    springRateNPerM: float = Field(gt=0)
+    springPreloadN: float = Field(default=0.0, ge=0)
+    damper: DamperDefinition | None = None
+
+
 class Suspension(StrictModel):
     type: Literal["double_wishbone"]
     corner: Literal["front_left", "front_right"]
     hardpoints: list[Hardpoint] = Field(min_length=9, max_length=9)
     wheel: Wheel
+    actuation: ActuationGeometry | None = None
 
     @model_validator(mode="after")
     def hardpoint_ids_are_unique(self) -> Suspension:
@@ -193,3 +215,168 @@ class KinematicsSweepResponse(StrictModel):
     warnings: list[str]
     residualToleranceM: float
     states: list[KinematicStateResponse]
+
+
+Phase3CalculationStatus = Literal["VERIFIED_NUMERICALLY", "NOT_COMPUTABLE", "FAILED"]
+
+
+class Phase3ValidationStatusResponse(StrictModel):
+    numerical: Phase3CalculationStatus
+    reference: Literal["REFERENCE_BENCHMARKED"] = "REFERENCE_BENCHMARKED"
+    physical: Literal["UNVALIDATED_PHYSICALLY"] = "UNVALIDATED_PHYSICALLY"
+    engineeringApproval: Literal["NOT_APPROVED"] = "NOT_APPROVED"
+
+
+class ExternalWrenchInput(StrictModel):
+    forceN: Vec3
+    momentNm: Vec3
+    applicationPointM: Vec3
+
+
+class AdditionalMemberInput(StrictModel):
+    id: str = Field(min_length=1)
+    chassisPointM: Vec3
+    uprightPointM: Vec3
+
+
+class EquilibriumSolverConfiguration(StrictModel):
+    forceToleranceN: float = Field(default=1.0e-6, gt=0, le=1.0)
+    momentToleranceNm: float = Field(default=1.0e-6, gt=0, le=1.0)
+    rankRelativeTolerance: float = Field(default=1.0e-10, gt=0, le=1.0e-3)
+    conditionLimit: float = Field(default=1.0e10, gt=1.0, le=1.0e14)
+
+
+class UprightEquilibriumRequest(StrictModel):
+    project: Project
+    travelM: float = Field(default=0.0, ge=-0.25, le=0.25)
+    externalWrench: ExternalWrenchInput
+    additionalMember: AdditionalMemberInput | None = None
+    solver: EquilibriumSolverConfiguration = Field(default_factory=EquilibriumSolverConfiguration)
+
+
+class MemberForceResponse(StrictModel):
+    id: str
+    axialForceN: float
+    state: Literal["TENSION", "COMPRESSION", "ZERO"]
+    forceOnUprightN: Vec3
+    chassisReactionN: Vec3
+    uprightPointM: Vec3
+
+
+class EquilibriumDiagnosticsResponse(StrictModel):
+    matrixRows: int
+    matrixColumns: int
+    matrixRank: int
+    conditionNumber: float | None
+    forceResidualN: Vec3
+    momentResidualNm: Vec3
+    forceResidualNormN: float
+    momentResidualNormNm: float
+    characteristicLengthM: float
+    message: str
+
+
+class UprightEquilibriumResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    calculationStatus: Phase3CalculationStatus
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    units: dict[str, str]
+    inputProvenance: InputProvenanceResponse
+    pose: KinematicPoseResponse
+    memberForces: list[MemberForceResponse]
+    diagnostics: EquilibriumDiagnosticsResponse
+    warnings: list[str]
+
+
+class VehicleLoadTransferRequest(StrictModel):
+    massKg: float
+    wheelbaseM: float
+    cgFromFrontAxleM: float
+    cgHeightM: float
+    frontTrackM: float
+    rearTrackM: float
+    longitudinalAccelerationMps2: float = 0.0
+    lateralAccelerationMps2: float = 0.0
+    gravityMps2: float = 9.80665
+    frontRollStiffnessNmPerRad: float | None = None
+    rearRollStiffnessNmPerRad: float | None = None
+
+
+class AxleLoadsResponse(StrictModel):
+    frontN: float
+    rearN: float
+
+
+class WheelLoadsResponse(StrictModel):
+    frontLeftN: float
+    frontRightN: float
+    rearLeftN: float
+    rearRightN: float
+
+
+class VehicleLoadTransferResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    calculationStatus: Phase3CalculationStatus
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    modelName: Literal["rigid_body_with_elastic_roll_stiffness_distribution"]
+    units: dict[str, str]
+    axleLoads: AxleLoadsResponse | None
+    wheelLoads: WheelLoadsResponse | None
+    longitudinalTransferN: float | None
+    frontLateralTransferN: float | None
+    rearLateralTransferN: float | None
+    totalWeightN: float | None
+    forceResidualN: float | None
+    warnings: list[str]
+
+
+class ActuationSeriesRequest(StrictModel):
+    wheelTravelM: list[float] = Field(min_length=3)
+    springLengthM: list[float] = Field(min_length=3)
+    referenceSpringLengthM: float
+    springRateNPerM: float
+    preloadN: float = 0.0
+    compressionOnly: bool = True
+
+    @model_validator(mode="after")
+    def arrays_have_equal_length(self) -> ActuationSeriesRequest:
+        if len(self.wheelTravelM) != len(self.springLengthM):
+            raise ValueError("wheelTravelM and springLengthM must have equal length")
+        return self
+
+
+class SpringSampleResponse(StrictModel):
+    wheelTravelM: float
+    springLengthM: float
+    springCompressionM: float
+    motionRatio: float
+    springForceN: float
+    storedEnergyJ: float
+    wheelForceN: float
+    wheelRateNPerM: float
+
+
+class ActuationSeriesResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    calculationStatus: Phase3CalculationStatus
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    units: dict[str, str]
+    samples: list[SpringSampleResponse]
+    warnings: list[str]
+
+
+class DamperForceRequest(StrictModel):
+    velocityMps: float | None = None
+    compressionCoefficientNsPerM: float
+    reboundCoefficientNsPerM: float
+
+
+class DamperForceResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    calculationStatus: Phase3CalculationStatus
+    forceN: float | None
+    warning: str | None
+    physicalStatus: Literal["UNVALIDATED_PHYSICALLY"] = "UNVALIDATED_PHYSICALLY"

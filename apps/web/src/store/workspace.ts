@@ -2,7 +2,7 @@ import type { Project, Vec3 } from "@msku/contracts";
 import { createDemoProject } from "@msku/contracts";
 import { create } from "zustand";
 
-export type ModuleId = "workspace" | "geometry" | "kinematics" | "dynamics" | "road" | "optimization" | "reports" | "validation";
+export type ModuleId = "workspace" | "geometry" | "kinematics" | "loads" | "dynamics" | "road" | "optimization" | "reports" | "validation";
 export type CameraPreset = "perspective" | "front" | "side" | "top";
 
 interface VisibilityState {

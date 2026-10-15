@@ -73,7 +73,47 @@
             "staticCamberRad": { "type": "number", "minimum": -0.35, "maximum": 0.35, "default": 0 },
             "staticToeRad": { "type": "number", "minimum": -0.35, "maximum": 0.35, "default": 0 }
           }
+        },
+        "actuation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "uprightPickup", "rockerPushrodPickup", "rockerSpringPickup", "rockerAxisStart", "rockerAxisEnd", "springChassisPickup", "springFreeLengthM", "springRateNPerM"],
+          "properties": {
+            "type": { "enum": ["pushrod", "pullrod"] },
+            "uprightPickup": { "$ref": "#/$defs/vec3" },
+            "rockerPushrodPickup": { "$ref": "#/$defs/vec3" },
+            "rockerSpringPickup": { "$ref": "#/$defs/vec3" },
+            "rockerAxisStart": { "$ref": "#/$defs/vec3" },
+            "rockerAxisEnd": { "$ref": "#/$defs/vec3" },
+            "springChassisPickup": { "$ref": "#/$defs/vec3" },
+            "springFreeLengthM": { "type": "number", "exclusiveMinimum": 0 },
+            "springRateNPerM": { "type": "number", "exclusiveMinimum": 0 },
+            "springPreloadN": { "type": "number", "minimum": 0, "default": 0 },
+            "damper": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rockerPickup", "chassisPickup", "compressionCoefficientNsPerM", "reboundCoefficientNsPerM"],
+              "properties": {
+                "rockerPickup": { "$ref": "#/$defs/vec3" },
+                "chassisPickup": { "$ref": "#/$defs/vec3" },
+                "compressionCoefficientNsPerM": { "type": "number", "minimum": 0 },
+                "reboundCoefficientNsPerM": { "type": "number", "minimum": 0 }
+              }
+            }
+          }
         }
+      }
+    }
+  },
+  "$defs": {
+    "vec3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
       }
     }
   }
