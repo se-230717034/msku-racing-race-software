@@ -1,6 +1,6 @@
 # Limitations
 
-The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigid-link kinematics, and the reliable Phase 3 quasi-static subset.
+The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigid-link kinematics, the reliable Phase 3 quasi-static subset, and the Phase 4 linear 2DOF quarter-car subset.
 
 - All included hardpoints are synthetic demonstration values. They are not MSKU Racing vehicle data.
 - The solver is numerically verified and reference benchmarked as documented in `PHASE_2_VERIFICATION_REPORT.md`; the demonstration vehicle model remains physically unvalidated because no MSKU Racing CAD or physical comparison has been supplied.
@@ -18,10 +18,27 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
 - The vehicle load-transfer model is steady-state rigid-body theory on flat ground. It excludes aero, unsprung mass, compliance, geometric jacking, tyre behaviour, and transient effects. Lateral axle distribution requires both roll stiffnesses.
 - Damper force requires explicit velocity and declared coefficients. Static displacement never implies damper force.
 - Negative normal loads fail rather than being clipped; contact-loss dynamics are outside Phase 3.
+- Phase 4 coordinates are small perturbations from static equilibrium. Gravity, preload, and static
+  deflection are not reapplied in the transient equations.
+- The quarter-car model is linear and vertical. It excludes pitch, roll, left/right and front/rear
+  coupling, suspension kinematic variation, bump stops, compliance, aero, tire enveloping, and
+  nonlinear or temperature-dependent spring/damper/tire behavior.
+- Suspension stiffness and damping are effective wheel values. Phase 3 sampled motion ratio is not
+  automatically coupled into the Phase 4 transient model.
+- Tire contact is bilateral during integration. A supplied static tire load permits post-solve
+  contact checking; predicted loss of contact fails and suppresses the samples. Flight, impact, and
+  re-contact are not modeled.
+- An ideal road step has undefined velocity. It is allowed only with zero tire damping, and its
+  energy balance is not reported. Half-sine and sampled profiles have declared velocity changes at
+  boundaries/knots where integration is restarted.
+- Energy balance uses trapezoidal quadrature on requested output samples. It can expose inadequate
+  output resolution but is not a proof of physical fidelity.
+- Full-car vertical dynamics and planar bicycle handling are `NOT_COMPUTABLE`. The repository does
+  not contain the required vehicle inertia/corner/tire data or independent validation references.
 - Mirroring is a view operation, not a saved second-corner model.
 - Browser local storage is device-local and has no revision history, access control, or collaboration.
 - No official MSKU Racing logo is bundled. The UI uses a text-only wordmark.
 - Hosted deployment is not configured because provider accounts and credentials were not provided.
 
-No structural stress, detailed tyre force, road response, or transient dynamics are calculated. Phase 3 is numerically benchmarked but physically unvalidated. Do not use this release for design sign-off or safety decisions.
+No structural stress, detailed nonlinear tyre force, full-car transient response, or handling response is calculated. Phases 2–4 are numerically benchmarked within their stated model scopes but physically unvalidated. Do not use this release for design sign-off or safety decisions.
 

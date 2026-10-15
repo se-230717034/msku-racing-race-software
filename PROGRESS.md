@@ -77,9 +77,29 @@ Updated: 2026-10-15
 - [ ] Integrated rocker/pushrod kinematic closure from stored coordinates
 - [ ] Independent CAD/static-load and physical rig validation for MSKU Racing vehicle data
 
+## Phase 4 — Verified road and vehicle dynamics
+
+- [x] Separate versioned Python dynamics module and typed API/browser contracts
+- [x] Linear 2DOF quarter car in static-equilibrium perturbation coordinates
+- [x] Sprung/unsprung states, suspension/tire forces, tire damping option, and contact diagnostics
+- [x] Step, smooth raised-cosine, half-sine, continuous sine, and sampled road inputs
+- [x] DOP853, Radau, and BDF integration with configurable tolerances and maximum step
+- [x] Known-discontinuity/sample-knot interval splitting and accepted internal-step diagnostics
+- [x] Natural-mode, energy/passivity, road-work, dissipation, and output-quadrature diagnostics
+- [x] Explicit tire-contact-loss failure with all engineering samples suppressed
+- [x] Dynamics workspace with input editor, solver controls, real plots, calculated playback, and limitations
+- [x] Provenance-bearing unvalidated CSV export gated on numerical acceptance
+- [x] Analytical eigenvalue and modal-response benchmarks
+- [x] Step/tolerance refinement and DOP853/Radau/BDF cross-integrator comparison
+- [x] Road interpolation, force-sign, equilibrium, passivity, invalid-input, contact, API, contract, and browser tests
+- [x] Phase 4 engineering-model and verification documentation
+- [x] Final gates: 77 Python tests, 19 Vitest tests, 3 Chromium tests, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Full-car heave/pitch/roll model — `NOT_COMPUTABLE`; required parameter set and reference evidence not supplied
+- [ ] Planar bicycle handling model — `NOT_COMPUTABLE`; tire cornering data and reference evidence not supplied
+- [ ] MSKU Racing parameter provenance and independent rig/track validation
+
 ## Later phases
 
-- [ ] Phase 4 road and vehicle dynamics
 - [ ] Phase 5 optimization
 - [ ] Phase 6 professional workflows
 

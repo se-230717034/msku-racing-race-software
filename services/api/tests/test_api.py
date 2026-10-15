@@ -356,3 +356,127 @@ async def test_actuation_series_and_velocity_explicit_damper_api() -> None:
         assert missing.status_code == 200
         assert missing.json()["calculationStatus"] == "NOT_COMPUTABLE"
         assert missing.json()["forceN"] is None
+
+
+def quarter_car_request() -> dict[str, object]:
+    return {
+        "dataClassification": "demonstration",
+        "sourceLabel": "Synthetic Phase 4 API regression fixture",
+        "parameters": {
+            "sprungMassKg": 75.0,
+            "unsprungMassKg": 12.0,
+            "suspensionStiffnessNPerM": 30000.0,
+            "suspensionDampingNsPerM": 1800.0,
+            "tireStiffnessNPerM": 180000.0,
+            "tireDampingNsPerM": 0.0,
+            "staticTireLoadN": 1000.0,
+        },
+        "road": {
+            "kind": "smooth_bump",
+            "amplitudeM": 0.01,
+            "startTimeS": 0.2,
+            "durationS": 0.15,
+            "frequencyHz": 1.0,
+            "sampleTimesS": [],
+            "sampleDisplacementsM": [],
+        },
+        "initialState": {
+            "sprungDisplacementM": 0.0,
+            "sprungVelocityMps": 0.0,
+            "unsprungDisplacementM": 0.0,
+            "unsprungVelocityMps": 0.0,
+        },
+        "settings": {
+            "durationS": 1.5,
+            "outputSamples": 301,
+            "relativeTolerance": 1.0e-8,
+            "absoluteTolerance": 1.0e-10,
+            "maximumStepS": 0.002,
+            "method": "DOP853",
+        },
+    }
+
+
+@pytest.mark.anyio
+async def test_quarter_car_api_returns_calculated_samples_and_provenance() -> None:
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/dynamics/quarter-car/simulate", json=quarter_car_request()
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+    assert payload["validationStatus"] == {
+        "numerical": "VERIFIED_NUMERICALLY",
+        "reference": "REFERENCE_BENCHMARKED",
+        "physical": "UNVALIDATED_PHYSICALLY",
+        "engineeringApproval": "NOT_APPROVED",
+    }
+    assert payload["solverVersion"] == "4.0.0"
+    assert len(payload["inputProvenance"]["inputSha256"]) == 64
+    assert len(payload["naturalFrequenciesHz"]) == 2
+    assert len(payload["samples"]) == 301
+    assert payload["samples"][0]["timeS"] == 0.0
+    assert payload["samples"][-1]["timeS"] == pytest.approx(1.5)
+    assert max(item["roadDisplacementM"] for item in payload["samples"]) == pytest.approx(
+        0.01, abs=2.0e-5
+    )
+    assert payload["diagnostics"]["solverSuccess"] is True
+    assert payload["diagnostics"]["contactAccepted"] is True
+
+
+@pytest.mark.anyio
+async def test_quarter_car_api_suppresses_samples_after_contact_loss() -> None:
+    request = quarter_car_request()
+    request["parameters"] = {
+        **request["parameters"],  # type: ignore[dict-item]
+        "staticTireLoadN": 100.0,
+    }
+    request["road"] = {
+        "kind": "sine",
+        "amplitudeM": 0.0,
+        "startTimeS": 0.0,
+        "durationS": 0.1,
+        "frequencyHz": 1.0,
+        "sampleTimesS": [],
+        "sampleDisplacementsM": [],
+    }
+    request["initialState"] = {
+        "sprungDisplacementM": 0.0,
+        "sprungVelocityMps": 0.0,
+        "unsprungDisplacementM": 0.01,
+        "unsprungVelocityMps": 0.0,
+    }
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/dynamics/quarter-car/simulate", json=request
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "FAILED"
+    assert payload["samples"] == []
+    assert payload["diagnostics"]["contactAccepted"] is False
+    assert "TIRE_CONTACT_LOSS_UNSUPPORTED" in payload["warnings"]
+
+
+@pytest.mark.anyio
+async def test_quarter_car_api_rejects_invalid_sampled_road_as_failed_result() -> None:
+    request = quarter_car_request()
+    request["road"] = {
+        "kind": "sampled",
+        "amplitudeM": 0.0,
+        "startTimeS": 0.0,
+        "durationS": 0.1,
+        "frequencyHz": 1.0,
+        "sampleTimesS": [0.0, 0.2, 0.1],
+        "sampleDisplacementsM": [0.0, 0.01, 0.0],
+    }
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/dynamics/quarter-car/simulate", json=request
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calculationStatus"] == "FAILED"
+    assert payload["samples"] == []
+    assert payload["warnings"] == ["INVALID_DYNAMICS_INPUT"]

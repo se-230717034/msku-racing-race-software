@@ -279,6 +279,116 @@ export const actuationSeriesResponseSchema = z.object({
   warnings: z.array(z.string()),
 });
 
+export const quarterCarParametersSchema = z.object({
+  sprungMassKg: z.number().finite().positive(),
+  unsprungMassKg: z.number().finite().positive(),
+  suspensionStiffnessNPerM: z.number().finite().positive(),
+  suspensionDampingNsPerM: z.number().finite().nonnegative(),
+  tireStiffnessNPerM: z.number().finite().positive(),
+  tireDampingNsPerM: z.number().finite().nonnegative().default(0),
+  staticTireLoadN: z.number().finite().nonnegative().nullable().default(null),
+});
+
+export const roadProfileSchema = z.object({
+  kind: z.enum(["step", "smooth_bump", "half_sine", "sine", "sampled"]),
+  amplitudeM: z.number().finite().default(0),
+  startTimeS: z.number().finite().nonnegative().default(0),
+  durationS: z.number().finite().default(0.1),
+  frequencyHz: z.number().finite().default(1),
+  sampleTimesS: z.array(z.number().finite()).default([]),
+  sampleDisplacementsM: z.array(z.number().finite()).default([]),
+});
+
+export const quarterCarSimulationRequestSchema = z.object({
+  dataClassification: z.enum(["demonstration", "team_private"]),
+  sourceLabel: z.string().min(1).max(160),
+  parameters: quarterCarParametersSchema,
+  road: roadProfileSchema,
+  initialState: z.object({
+    sprungDisplacementM: z.number().finite().default(0),
+    sprungVelocityMps: z.number().finite().default(0),
+    unsprungDisplacementM: z.number().finite().default(0),
+    unsprungVelocityMps: z.number().finite().default(0),
+  }),
+  settings: z.object({
+    durationS: z.number().finite().positive(),
+    outputSamples: z.number().int().min(2).max(20001),
+    relativeTolerance: z.number().finite().min(1e-12).max(1e-2),
+    absoluteTolerance: z.number().finite().min(1e-14).max(1e-3),
+    maximumStepS: z.number().finite().positive(),
+    method: z.enum(["DOP853", "Radau", "BDF"]),
+  }),
+});
+
+export const quarterCarSampleSchema = z.object({
+  timeS: z.number().finite(),
+  roadDisplacementM: z.number().finite(),
+  roadVelocityMps: z.number().finite(),
+  sprungDisplacementM: z.number().finite(),
+  sprungVelocityMps: z.number().finite(),
+  sprungAccelerationMps2: z.number().finite(),
+  unsprungDisplacementM: z.number().finite(),
+  unsprungVelocityMps: z.number().finite(),
+  unsprungAccelerationMps2: z.number().finite(),
+  suspensionTravelM: z.number().finite(),
+  tireCompressionM: z.number().finite(),
+  suspensionForceOnSprungN: z.number().finite(),
+  tireForceIncrementN: z.number().finite(),
+  totalTireContactForceN: z.number().finite().nullable(),
+  mechanicalEnergyJ: z.number().finite(),
+  dissipatedPowerW: z.number().finite(),
+  roadInputPowerW: z.number().finite(),
+});
+
+export const quarterCarSimulationResponseSchema = z.object({
+  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  modelName: z.literal("linear_quarter_car_2dof"),
+  calculationStatus: phase3CalculationStatusSchema,
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string().min(1),
+  units: z.object({
+    time: z.literal("s"),
+    displacement: z.literal("m"),
+    velocity: z.literal("m/s"),
+    acceleration: z.literal("m/s^2"),
+    force: z.literal("N"),
+    energy: z.literal("J"),
+    power: z.literal("W"),
+  }),
+  inputProvenance: z.object({
+    dataClassification: z.enum(["demonstration", "team_private"]),
+    sourceLabel: z.string().min(1),
+    inputSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  }),
+  naturalFrequenciesHz: z.array(z.number().finite().positive()).length(2).nullable(),
+  diagnostics: z.object({
+    solverSuccess: z.boolean(),
+    finiteStates: z.boolean(),
+    contactAccepted: z.boolean().nullable(),
+    functionEvaluations: z.number().int().nonnegative(),
+    jacobianEvaluations: z.number().int().nonnegative(),
+    luDecompositions: z.number().int().nonnegative(),
+    integrationMethod: z.enum(["DOP853", "Radau", "BDF"]),
+    relativeTolerance: z.number().finite().positive(),
+    absoluteTolerance: z.number().finite().positive(),
+    maximumStepS: z.number().finite().positive(),
+    acceptedSteps: z.number().int().nonnegative(),
+    minimumAcceptedStepS: z.number().finite().positive().nullable(),
+    maximumAcceptedStepS: z.number().finite().positive().nullable(),
+    initialEnergyJ: z.number().finite().nullable(),
+    finalEnergyJ: z.number().finite().nullable(),
+    roadInputWorkJ: z.number().finite().nullable(),
+    dissipatedEnergyJ: z.number().finite().nullable(),
+    energyBalanceResidualJ: z.number().finite().nullable(),
+    relativeEnergyBalanceError: z.number().finite().nullable(),
+    minimumTotalContactForceN: z.number().finite().nullable(),
+    message: z.string(),
+  }),
+  assumptions: z.array(z.string()),
+  warnings: z.array(z.string()),
+  samples: z.array(quarterCarSampleSchema),
+});
+
 export const solverMetadataSchema = z.object({
   name: z.literal("rigid_upright_double_wishbone"),
   version: z.string().min(1),
@@ -324,4 +434,9 @@ export type MemberForce = z.infer<typeof memberForceSchema>;
 export type UprightEquilibriumResponse = z.infer<typeof uprightEquilibriumResponseSchema>;
 export type VehicleLoadTransferResponse = z.infer<typeof vehicleLoadTransferResponseSchema>;
 export type ActuationSeriesResponse = z.infer<typeof actuationSeriesResponseSchema>;
+export type QuarterCarParameters = z.infer<typeof quarterCarParametersSchema>;
+export type RoadProfile = z.infer<typeof roadProfileSchema>;
+export type QuarterCarSimulationRequest = z.infer<typeof quarterCarSimulationRequestSchema>;
+export type QuarterCarSample = z.infer<typeof quarterCarSampleSchema>;
+export type QuarterCarSimulationResponse = z.infer<typeof quarterCarSimulationResponseSchema>;
 

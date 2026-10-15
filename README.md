@@ -1,10 +1,10 @@
 # MSKU Racing Dynamics Studio
 
-An original, browser-based suspension engineering application for MSKU Racing. The current release implements the project foundation, a double-wishbone 3D geometry editor, a constrained rigid-link suspension-kinematics sweep, and guarded quasi-static suspension-force/load-transfer models. It does **not** calculate component stress, compliance, tyre constitutive forces, or transient vehicle dynamics.
+An original, browser-based suspension engineering application for MSKU Racing. The current release implements the project foundation, a double-wishbone 3D geometry editor, a constrained rigid-link suspension-kinematics sweep, guarded quasi-static suspension-force/load-transfer models, and a benchmarked linear 2DOF quarter-car road-response model. It does **not** calculate component stress, compliance, nonlinear tyre behavior, full-car dynamics, or handling response.
 
 Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specification. The visible model status is `demonstration / unvalidated`.
 
-Kinematics solver `2.5.0` and quasi-static solver `3.0.0` are checked against analytical and independent reference cases, conservation, scaling, symmetry, perturbation, singularity, and failure-path tests. The demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
+Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, and dynamics solver `4.0.0` are checked against analytical and independent reference cases, conservation/passivity, convergence, cross-algorithm agreement, scaling, symmetry, perturbation, singularity, and failure-path tests as applicable. The demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
 
 ## Implemented
 
@@ -22,8 +22,13 @@ Kinematics solver `2.5.0` and quasi-static solver `3.0.0` are checked against an
 - Explicit sampled-geometry motion ratio, linear spring/preload/energy/wheel-rate calculations, and velocity-gated linear damper force.
 - Simplified static, longitudinal, and roll-stiffness-distributed lateral load transfer with wheel-unloading and negative-load rejection.
 - Loads workspace with editable inputs, labeled synthetic presets, calculated Three.js force arrows, axial-force tables, diagnostics, load bars, actuation plots, provenance, and disabled approved export.
+- Separate Python 2DOF quarter-car module with static-equilibrium perturbation coordinates, explicit force signs, optional tire damping and static contact load, and all state/force histories.
+- Step, smooth raised-cosine bump, half-sine bump, continuous sine, and piecewise-linear sampled road inputs with explicit discontinuity boundaries.
+- Configurable DOP853, Radau, and BDF integration, analytical Jacobian for implicit methods, actual accepted-step diagnostics, natural modes, energy/passivity diagnostics, and guarded contact-loss failure.
+- Dynamics workspace with editable parameters, road data, solver controls, calculated response plots, sample-synchronized Three.js playback, provenance, limitations, and unvalidated CSV export.
+- Independent eigenvalue/modal-decay tests, step and tolerance convergence, DOP853/Radau/BDF comparison, road interpolation, energy, contact, API, contract, and browser regression tests.
 
-See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), the [Phase 3 models](./docs/PHASE_3_ENGINEERING_MODELS.md), the [Phase 3 verification report](./docs/PHASE_3_VERIFICATION_REPORT.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), the [Phase 3 models](./docs/PHASE_3_ENGINEERING_MODELS.md), the [Phase 3 verification report](./docs/PHASE_3_VERIFICATION_REPORT.md), the [Phase 4 models](./docs/PHASE_4_ENGINEERING_MODELS.md), the [Phase 4 verification report](./docs/PHASE_4_VERIFICATION_REPORT.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 
@@ -51,7 +56,7 @@ npm run dev
 
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
 
-The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*` for upright equilibrium, load transfer, actuation series, and damper force. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions.
+The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*` for upright equilibrium, load transfer, actuation series, and damper force. The Phase 4 endpoint is `POST /api/v1/dynamics/quarter-car/simulate`. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions.
 
 ## Quality checks
 

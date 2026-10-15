@@ -40,6 +40,19 @@ from .quasi_static import (
 from .quasi_static import (
     REFERENCE_STATUS as QUASI_STATIC_REFERENCE_STATUS,
 )
+from .vehicle_dynamics import (
+    DYNAMICS_SOLVER_VERSION,
+    DynamicsDiagnostics,
+    DynamicsSettings,
+    QuarterCarInitialState,
+    QuarterCarParameters,
+    QuarterCarResult,
+    QuarterCarSample,
+    RoadProfile,
+    quarter_car_natural_frequencies,
+    road_state,
+    simulate_quarter_car,
+)
 
 __all__ = [
     "Diagnostic",
@@ -78,4 +91,15 @@ __all__ = [
     "calculate_damper_force",
     "calculate_vehicle_load_transfer",
     "solve_upright_equilibrium",
+    "DYNAMICS_SOLVER_VERSION",
+    "DynamicsDiagnostics",
+    "DynamicsSettings",
+    "QuarterCarInitialState",
+    "QuarterCarParameters",
+    "QuarterCarResult",
+    "QuarterCarSample",
+    "RoadProfile",
+    "quarter_car_natural_frequencies",
+    "road_state",
+    "simulate_quarter_car",
 ]

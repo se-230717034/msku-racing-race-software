@@ -48,3 +48,24 @@ test("runs guarded quasi-static force, load-transfer, and actuation calculations
   await expect(page.getByText("Wheel rate", { exact: true })).toBeVisible();
 });
 
+test("runs a traceable quarter-car simulation and animates calculated samples", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Dynamics" }).click();
+
+  await expect(page.getByText("MODEL SELECTION", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export unvalidated CSV" })).toBeDisabled();
+  await page.getByRole("button", { name: "Run simulation" }).click();
+
+  await expect(page.getByText("VERIFIED_NUMERICALLY", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("REFERENCE_BENCHMARKED", { exact: true })).toBeVisible();
+  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
+  await expect(page.getByText("NOT_APPROVED", { exact: true })).toBeVisible();
+  await expect(page.getByText("DISPLACEMENT RESPONSE", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("quarter-car-animation")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export unvalidated CSV" })).toBeEnabled();
+
+  const timeSlider = page.getByLabel("Simulation time");
+  await timeSlider.fill("100");
+  await expect(page.getByText("0.500 s", { exact: true })).toBeVisible();
+});
+

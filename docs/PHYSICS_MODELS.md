@@ -70,9 +70,21 @@ Separate models provide steady rigid-body static/longitudinal load transfer, sti
 lateral transfer, and sampled-geometry spring motion ratio/energy/wheel rate. Damper force requires
 explicit velocity. See `PHASE_3_ENGINEERING_MODELS.md` for equations, signs, and boundaries.
 
+## Phase 4 model: linear quarter-car dynamics
+
+The transient model integrates sprung and unsprung vertical displacement/velocity perturbations
+about static equilibrium. Linear suspension and tire forces connect the masses and imposed road
+base. DOP853, Radau, and BDF are supported with explicit tolerances, accepted-step diagnostics,
+known road-discontinuity boundaries, natural modes, energy balance, and static-load-based contact
+checking. Failed contact suppresses all samples; flight and re-contact are not inferred.
+
+The road input may be a step, raised-cosine bump, half-sine bump, continuous sine, or piecewise
+linear sampled history. See `PHASE_4_ENGINEERING_MODELS.md` for equations, signs, energy terms, and
+model boundaries and `PHASE_4_VERIFICATION_REPORT.md` for quantitative reference results.
+
 ## Not yet implemented
 
 There is no steering-rack sweep, integrated rocker kinematic closure, compliance, structural stress,
-tyre constitutive model, road response, or transient dynamics. Unsupported quantities return no
-placeholder value.
+nonlinear tyre constitutive model, full-car transient model, or bicycle handling model. Unsupported
+quantities return no placeholder value.
 

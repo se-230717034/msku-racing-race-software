@@ -14,11 +14,16 @@ Implemented and Phase 2.5 audited: nonlinear bump/rebound solver, solved 3D pose
 
 ## Phase 3 — Quasi-static loads
 
-Add corner weights, spring and damper characterization, motion leverage, equilibrium, and documented load-transfer approximations. Keep equilibrium separate from transient dynamics and compliance.
+Implemented reliable subset: rank-aware upright equilibrium, sampled motion ratio, linear spring and
+velocity-gated damper models, and documented load-transfer approximations. Integrated rocker closure
+and physical validation remain open.
 
 ## Phase 4 — Road and vehicle dynamics
 
-Begin with a benchmarked linear quarter-car and configurable road profiles. Advance to half/full-car only with adequate mass/inertia/tire inputs and numerical convergence evidence.
+Implemented reliable subset: benchmarked linear 2DOF quarter car, five configurable road profiles,
+three integration algorithms, energy/contact diagnostics, calculated playback, and guarded export.
+Advance to half/full-car and handling only with adequate mass/inertia/tire inputs and independent
+numerical and physical evidence.
 
 ## Phase 5 — Optimization
 

@@ -7,7 +7,8 @@ The application uses a monorepo with four explicit boundaries:
 1. `apps/web` owns interaction, browser persistence, and 3D rendering.
 2. `packages/contracts` owns the current TypeScript project schema and demonstration data.
 3. `services/api` owns HTTP validation/versioning and will expose analysis jobs in later phases.
-4. `packages/engineering` owns pure numerical and geometry functions independently of HTTP and UI.
+4. `packages/engineering` owns pure numerical, geometry, quasi-static, and transient-dynamics
+   functions independently of HTTP and UI.
 
 This separation prevents rendering code from becoming the source of physical results. Future solvers must live in the engineering package and expose typed diagnostics through the API.
 
@@ -43,7 +44,7 @@ JSON/local storage -> structural validation -> geometry diagnostics -> editor/vi
                                                            +-> persistence allowed only if valid
 
 kinematics request -> FastAPI -> engineering solver -> diagnostics + units + quality + provenance
-future force/dynamics request -> FastAPI -> engineering solver -> diagnostics + units + status
+force/dynamics request -> FastAPI -> engineering solver -> diagnostics + units + quality + provenance
 ```
 
 ## Failure boundaries
@@ -55,4 +56,6 @@ future force/dynamics request -> FastAPI -> engineering solver -> diagnostics + 
 - The kinematics solver returns no pose or metrics after constraint, rank, conditioning, derived-geometry, or continuity failure.
 - Runtime quality separates numerical verification, reference benchmarking, and physical validation. A project-declared status cannot promote calculated physical status.
 - Kinematics exports require a wholly accepted sweep and remain explicitly `NOT_APPROVED` while physical evidence is absent.
+- Quarter-car contact failure returns no sample series. Dynamics export requires an accepted run and
+  is labeled `UNVALIDATED_PHYSICALLY` and `NOT_APPROVED`.
 

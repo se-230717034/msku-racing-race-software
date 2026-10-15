@@ -233,6 +233,36 @@ button { color: inherit; }
 .wheel-load-chart i { width: 58%; min-height: 2px; justify-self: center; background: linear-gradient(#f43f5e, #7f1729); box-shadow: 0 0 9px #f43f5e22; }
 .model-assumption { margin: 6px 0 0; color: #707989; font-size: 8px; line-height: 1.5; }
 
+.dynamics-workspace { min-height: 0; display: grid; grid-template-rows: 52px minmax(0, 1fr); }
+.dynamics-toolbar { display: flex; align-items: center; gap: 22px; padding: 0 14px; border-bottom: 1px solid var(--line); background: #0d1016; }
+.dynamics-toolbar > div { display: grid; gap: 4px; }
+.dynamics-toolbar strong { font-size: 13px; }
+.dynamics-toolbar > span { flex: 1; color: #6f7888; font: 8px/1 ui-monospace, monospace; }
+.dynamics-toolbar button { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #3c4450; border-radius: 3px; color: #c7ccd4; background: #181c24; font: 650 9px/1 ui-monospace, monospace; cursor: pointer; }
+.dynamics-toolbar button:disabled { opacity: 0.35; cursor: not-allowed; }
+.dynamics-content { min-height: 0; display: grid; grid-template-columns: 360px minmax(0, 1fr); }
+.dynamics-inputs { min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); background: var(--panel); }
+.dynamics-inputs .numeric-field { margin-top: 8px; }
+.input-subheading { margin: 16px 0 3px; padding-top: 12px; border-top: 1px solid #252b35; color: #8992a1; font: 700 8px/1 ui-monospace, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+.provenance-classification { margin-top: 14px; }
+.dynamics-results { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(260px, 42%) minmax(230px, 34%) minmax(190px, 24%); overflow-y: auto; }
+.dynamics-visual { min-height: 260px; display: grid; grid-template-columns: minmax(320px, 1.25fr) minmax(260px, 0.75fr); border-bottom: 1px solid var(--line); }
+.dynamics-scene { position: relative; min-height: 0; border-right: 1px solid var(--line); }
+.dynamics-scene canvas { display: block; }
+.dynamics-scene > span { position: absolute; top: 12px; left: 12px; padding: 5px 7px; border: 1px solid #3c2630; color: #d57c8b; background: #170d12cc; font: 600 8px/1 ui-monospace, monospace; letter-spacing: 0.1em; pointer-events: none; }
+.playback-panel { min-width: 0; padding: 16px; background: #0d1016; }
+.playback-controls { display: grid; grid-template-columns: 32px 32px minmax(90px, 1fr); gap: 7px; align-items: center; }
+.playback-controls button { height: 31px; display: grid; place-items: center; border: 1px solid #363d49; border-radius: 3px; color: #d0d5dc; background: #181c24; cursor: pointer; }
+.playback-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+.playback-controls input { width: 100%; accent-color: var(--red); }
+.instant-values { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 16px 0 0; background: #292f39; }
+.instant-values div { padding: 10px; background: #12161d; }
+.instant-values dt { color: #6f7988; font-size: 8px; }
+.instant-values dd { margin: 6px 0 0; color: #ecf0f5; font: 700 11px/1 ui-monospace, monospace; }
+.dynamics-charts { min-height: 230px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border-bottom: 1px solid var(--line); background: var(--line); }
+.dynamics-diagnostics { min-height: 190px; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 1px; background: var(--line); }
+.dynamics-diagnostics .engineering-card { min-height: 190px; }
+
 .statusbar { display: flex; align-items: center; gap: 20px; padding: 0 14px; border-top: 1px solid var(--line); color: #667080; background: #090b0f; font: 8px/1 ui-monospace, monospace; letter-spacing: 0.06em; }
 .statusbar span { display: flex; align-items: center; gap: 5px; }.status-spacer { flex: 1; }
 .dot { width: 5px; height: 5px; border-radius: 50%; }.dot.red { background: var(--red); box-shadow: 0 0 7px #ef233c80; }
@@ -255,5 +285,6 @@ button { color: inherit; }
   .statusbar { gap: 10px; overflow: hidden; }.statusbar span:nth-child(2), .statusbar span:nth-child(3) { display: none; }
   .kinematics-workspace { overflow-y: auto; grid-template-rows: 38px auto auto; }.travel-toolbar { grid-template-columns: auto minmax(120px, 1fr) auto; padding: 8px 10px; }.travel-readout { grid-column: 1 / -1; }.travel-toolbar button { grid-column: 1 / -1; justify-self: start; }.kinematics-content { grid-template-columns: 1fr; }.kinematics-main { grid-template-rows: 420px 500px; }.kinematics-charts { grid-template-columns: 1fr; }.kinematics-panel { border-left: 0; border-top: 1px solid var(--line); }
   .loads-workspace { overflow-y: auto; grid-template-rows: auto auto; }.loads-toolbar { min-height: 58px; flex-wrap: wrap; padding: 8px 10px; }.loads-toolbar > span { display: none; }.loads-content { grid-template-columns: 1fr; }.loads-input-panel { overflow: visible; border-right: 0; }.loads-results { grid-template-rows: 420px auto; }.loads-dashboard { grid-template-columns: 1fr; overflow: visible; }.engineering-card { min-height: 260px; }
+  .dynamics-workspace { overflow-y: auto; grid-template-rows: auto auto; }.dynamics-toolbar { min-height: 58px; flex-wrap: wrap; padding: 8px 10px; }.dynamics-toolbar > span { display: none; }.dynamics-content { grid-template-columns: 1fr; }.dynamics-inputs { overflow: visible; border-right: 0; }.dynamics-results { grid-template-rows: auto auto auto; overflow: visible; }.dynamics-visual { grid-template-columns: 1fr; }.dynamics-scene { min-height: 360px; border-right: 0; border-bottom: 1px solid var(--line); }.dynamics-charts, .dynamics-diagnostics { grid-template-columns: 1fr; }.dynamics-charts .chart-card { min-height: 260px; }
 }
 

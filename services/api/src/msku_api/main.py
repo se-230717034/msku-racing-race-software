@@ -8,16 +8,22 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from msku_engineering import (
+    DYNAMICS_SOLVER_VERSION,
     KINEMATICS_SOLVER_VERSION,
     QUASI_STATIC_SOLVER_VERSION,
+    DynamicsSettings,
     EquilibriumSettings,
     ExternalWrench,
+    QuarterCarInitialState,
+    QuarterCarParameters,
+    RoadProfile,
     SolverSettings,
     TwoForceMember,
     VehicleLoadTransferInput,
     calculate_actuation_series,
     calculate_damper_force,
     calculate_vehicle_load_transfer,
+    simulate_quarter_car,
     solve_pose,
     solve_sweep,
     solve_upright_equilibrium,
@@ -31,6 +37,8 @@ from .models import (
     DamperForceRequest,
     DamperForceResponse,
     DiagnosticResponse,
+    DynamicsDiagnosticsResponse,
+    DynamicsInputProvenanceResponse,
     EquilibriumDiagnosticsResponse,
     InputProvenanceResponse,
     KinematicMetricsResponse,
@@ -42,6 +50,9 @@ from .models import (
     Phase3ValidationStatusResponse,
     Project,
     ProjectValidationResponse,
+    QuarterCarSampleResponse,
+    QuarterCarSimulationRequest,
+    QuarterCarSimulationResponse,
     SolverDiagnosticsResponse,
     SolverMetadataResponse,
     SpringSampleResponse,
@@ -118,6 +129,13 @@ def _vec3(values: tuple[float, float, float]) -> Vec3:
 def _project_input_sha256(project: Project) -> str:
     canonical = json.dumps(
         project.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _request_input_sha256(request: QuarterCarSimulationRequest) -> str:
+    canonical = json.dumps(
+        request.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -509,6 +527,134 @@ async def damper_force(request: DamperForceRequest) -> DamperForceResponse:
     )
 
 
+@app.post(
+    "/api/v1/dynamics/quarter-car/simulate",
+    response_model=QuarterCarSimulationResponse,
+)
+async def quarter_car_simulation(
+    request: QuarterCarSimulationRequest,
+) -> QuarterCarSimulationResponse:
+    parameters = request.parameters
+    road = request.road
+    initial = request.initialState
+    settings = request.settings
+    result = simulate_quarter_car(
+        QuarterCarParameters(
+            sprung_mass_kg=parameters.sprungMassKg,
+            unsprung_mass_kg=parameters.unsprungMassKg,
+            suspension_stiffness_n_per_m=parameters.suspensionStiffnessNPerM,
+            suspension_damping_ns_per_m=parameters.suspensionDampingNsPerM,
+            tire_stiffness_n_per_m=parameters.tireStiffnessNPerM,
+            tire_damping_ns_per_m=parameters.tireDampingNsPerM,
+            static_tire_load_n=parameters.staticTireLoadN,
+        ),
+        RoadProfile(
+            kind=road.kind,
+            amplitude_m=road.amplitudeM,
+            start_time_s=road.startTimeS,
+            duration_s=road.durationS,
+            frequency_hz=road.frequencyHz,
+            sample_times_s=tuple(road.sampleTimesS),
+            sample_displacements_m=tuple(road.sampleDisplacementsM),
+        ),
+        QuarterCarInitialState(
+            sprung_displacement_m=initial.sprungDisplacementM,
+            sprung_velocity_mps=initial.sprungVelocityMps,
+            unsprung_displacement_m=initial.unsprungDisplacementM,
+            unsprung_velocity_mps=initial.unsprungVelocityMps,
+        ),
+        DynamicsSettings(
+            duration_s=settings.durationS,
+            output_samples=settings.outputSamples,
+            relative_tolerance=settings.relativeTolerance,
+            absolute_tolerance=settings.absoluteTolerance,
+            maximum_step_s=settings.maximumStepS,
+            method=settings.method,
+        ),
+    )
+    diagnostics = result.diagnostics
+    return QuarterCarSimulationResponse(
+        schemaVersion="1.0.0",
+        modelName="linear_quarter_car_2dof",
+        calculationStatus=result.calculation_status,
+        validationStatus=_phase3_validation(result.calculation_status),
+        solverVersion=result.solver_version,
+        units={
+            "time": "s",
+            "displacement": "m",
+            "velocity": "m/s",
+            "acceleration": "m/s^2",
+            "force": "N",
+            "energy": "J",
+            "power": "W",
+        },
+        inputProvenance=DynamicsInputProvenanceResponse(
+            dataClassification=request.dataClassification,
+            sourceLabel=request.sourceLabel,
+            inputSha256=_request_input_sha256(request),
+        ),
+        naturalFrequenciesHz=(
+            list(result.natural_frequencies_hz)
+            if result.natural_frequencies_hz is not None
+            else None
+        ),
+        diagnostics=DynamicsDiagnosticsResponse(
+            solverSuccess=diagnostics.solver_success,
+            finiteStates=diagnostics.finite_states,
+            contactAccepted=diagnostics.contact_accepted,
+            functionEvaluations=diagnostics.function_evaluations,
+            jacobianEvaluations=diagnostics.jacobian_evaluations,
+            luDecompositions=diagnostics.lu_decompositions,
+            integrationMethod=diagnostics.integration_method,
+            relativeTolerance=diagnostics.relative_tolerance,
+            absoluteTolerance=diagnostics.absolute_tolerance,
+            maximumStepS=diagnostics.maximum_step_s,
+            acceptedSteps=diagnostics.accepted_steps,
+            minimumAcceptedStepS=diagnostics.minimum_accepted_step_s,
+            maximumAcceptedStepS=diagnostics.maximum_accepted_step_s,
+            initialEnergyJ=diagnostics.initial_energy_j,
+            finalEnergyJ=diagnostics.final_energy_j,
+            roadInputWorkJ=diagnostics.road_input_work_j,
+            dissipatedEnergyJ=diagnostics.dissipated_energy_j,
+            energyBalanceResidualJ=diagnostics.energy_balance_residual_j,
+            relativeEnergyBalanceError=diagnostics.relative_energy_balance_error,
+            minimumTotalContactForceN=diagnostics.minimum_total_contact_force_n,
+            message=diagnostics.message,
+        ),
+        assumptions=[
+            "TWO_DOF_LINEAR_QUARTER_CAR",
+            "VERTICAL_COORDINATES_RELATIVE_TO_STATIC_EQUILIBRIUM",
+            "POSITIVE_VERTICAL_DISPLACEMENT_IS_UPWARD",
+            "LINEAR_BILATERAL_TIRE_CONTACT",
+            "NO_GRAVITY_OR_PRELOAD_REAPPLIED",
+            "NO_SUSPENSION_GEOMETRY_COMPLIANCE_OR_TIRE_ENVELOPING",
+        ],
+        warnings=list(result.warnings),
+        samples=[
+            QuarterCarSampleResponse(
+                timeS=item.time_s,
+                roadDisplacementM=item.road_displacement_m,
+                roadVelocityMps=item.road_velocity_mps,
+                sprungDisplacementM=item.sprung_displacement_m,
+                sprungVelocityMps=item.sprung_velocity_mps,
+                sprungAccelerationMps2=item.sprung_acceleration_mps2,
+                unsprungDisplacementM=item.unsprung_displacement_m,
+                unsprungVelocityMps=item.unsprung_velocity_mps,
+                unsprungAccelerationMps2=item.unsprung_acceleration_mps2,
+                suspensionTravelM=item.suspension_travel_m,
+                tireCompressionM=item.tire_compression_m,
+                suspensionForceOnSprungN=item.suspension_force_on_sprung_n,
+                tireForceIncrementN=item.tire_force_increment_n,
+                totalTireContactForceN=item.total_tire_contact_force_n,
+                mechanicalEnergyJ=item.mechanical_energy_j,
+                dissipatedPowerW=item.dissipated_power_w,
+                roadInputPowerW=item.road_input_power_w,
+            )
+            for item in result.samples
+        ],
+    )
+
+
 @app.get("/api/v1/capabilities")
 async def capabilities() -> dict[str, Any]:
     return {
@@ -520,18 +666,21 @@ async def capabilities() -> dict[str, Any]:
             "vehicle_load_transfer",
             "actuation_motion_ratio_and_linear_spring",
             "velocity_explicit_linear_damper",
+            "linear_quarter_car_2dof_dynamics",
+            "step_smooth_bump_half_sine_sine_and_sampled_road_inputs",
         ],
         "notImplemented": [
-            "transient_dynamics",
+            "full_car_vertical_dynamics",
+            "planar_bicycle_handling",
             "rocker_kinematic_closure",
             "structural_stress_and_fatigue",
-            "road_simulation",
             "optimization",
             "reports",
         ],
         "modelStatus": "unvalidated",
         "solverVersion": KINEMATICS_SOLVER_VERSION,
         "quasiStaticSolverVersion": QUASI_STATIC_SOLVER_VERSION,
+        "dynamicsSolverVersion": DYNAMICS_SOLVER_VERSION,
         "qualityStates": [
             "VERIFIED_NUMERICALLY",
             "REFERENCE_BENCHMARKED",

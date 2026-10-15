@@ -62,8 +62,26 @@ Still required: independent CAD/static-force comparison, actuation motion-study 
 weight/load-cell evidence, and uncertainty review. These are prerequisites to any physical
 validation or approval change. See `PHASE_3_VERIFICATION_REPORT.md`.
 
+## Phase 4 evidence and remaining gate
+
+- The undamped frequency polynomial is solved independently and compared with both returned modes.
+- An independently constructed modal eigenvector and closed-form cosine response verify the coupled
+  state equations; a proportional-damping case verifies the closed-form modal decay.
+- Smooth-bump maximum-step and sine-input tolerance studies quantify convergence.
+- DOP853, Radau, and BDF must agree on a nontrivial damped response within stated displacement
+  tolerances; accepted internal step ranges are recorded.
+- Zero equilibrium, static step limit, road displacement/velocity functions, sampled interpolation,
+  monotonic passive energy decay, force signs, and finite states are regression tested.
+- Missing static contact load is explicit. Predicted negative total contact force returns `FAILED`
+  and suppresses all samples rather than clipping the result.
+- API, TypeScript, and Chromium tests verify provenance, quality states, plots, calculated playback,
+  and export gating. See `PHASE_4_VERIFICATION_REPORT.md` for quantitative results.
+
+Still required: traceable MSKU Racing corner masses, wheel rates, tire vertical properties, damper
+dyno curves, corner weights, and independent rig/track response with uncertainty. Full-car and
+bicycle models remain `NOT_COMPUTABLE` until their inputs and independent references exist.
+
 ## Later gates
 
-- Dynamics: analytical quarter-car cases, step-size convergence, energy/passivity, contact-loss handling.
 - Optimization: deterministic seeds, infeasibility cases, known objective functions, and full candidate revalidation.
 

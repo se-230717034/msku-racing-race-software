@@ -380,3 +380,113 @@ class DamperForceResponse(StrictModel):
     forceN: float | None
     warning: str | None
     physicalStatus: Literal["UNVALIDATED_PHYSICALLY"] = "UNVALIDATED_PHYSICALLY"
+
+
+class QuarterCarParametersInput(StrictModel):
+    sprungMassKg: float
+    unsprungMassKg: float
+    suspensionStiffnessNPerM: float
+    suspensionDampingNsPerM: float
+    tireStiffnessNPerM: float
+    tireDampingNsPerM: float = 0.0
+    staticTireLoadN: float | None = None
+
+
+class RoadProfileInput(StrictModel):
+    kind: Literal["step", "smooth_bump", "half_sine", "sine", "sampled"]
+    amplitudeM: float = 0.0
+    startTimeS: float = 0.0
+    durationS: float = 0.1
+    frequencyHz: float = 1.0
+    sampleTimesS: list[float] = Field(default_factory=list)
+    sampleDisplacementsM: list[float] = Field(default_factory=list)
+
+
+class QuarterCarInitialStateInput(StrictModel):
+    sprungDisplacementM: float = 0.0
+    sprungVelocityMps: float = 0.0
+    unsprungDisplacementM: float = 0.0
+    unsprungVelocityMps: float = 0.0
+
+
+class DynamicsSettingsInput(StrictModel):
+    durationS: float = 2.0
+    outputSamples: int = 501
+    relativeTolerance: float = 1.0e-8
+    absoluteTolerance: float = 1.0e-10
+    maximumStepS: float = 0.005
+    method: Literal["DOP853", "Radau", "BDF"] = "DOP853"
+
+
+class QuarterCarSimulationRequest(StrictModel):
+    dataClassification: Literal["demonstration", "team_private"]
+    sourceLabel: str = Field(min_length=1, max_length=160)
+    parameters: QuarterCarParametersInput
+    road: RoadProfileInput
+    initialState: QuarterCarInitialStateInput = Field(default_factory=QuarterCarInitialStateInput)
+    settings: DynamicsSettingsInput = Field(default_factory=DynamicsSettingsInput)
+
+
+class DynamicsInputProvenanceResponse(StrictModel):
+    dataClassification: Literal["demonstration", "team_private"]
+    sourceLabel: str
+    inputSha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class QuarterCarSampleResponse(StrictModel):
+    timeS: float
+    roadDisplacementM: float
+    roadVelocityMps: float
+    sprungDisplacementM: float
+    sprungVelocityMps: float
+    sprungAccelerationMps2: float
+    unsprungDisplacementM: float
+    unsprungVelocityMps: float
+    unsprungAccelerationMps2: float
+    suspensionTravelM: float
+    tireCompressionM: float
+    suspensionForceOnSprungN: float
+    tireForceIncrementN: float
+    totalTireContactForceN: float | None
+    mechanicalEnergyJ: float
+    dissipatedPowerW: float
+    roadInputPowerW: float
+
+
+class DynamicsDiagnosticsResponse(StrictModel):
+    solverSuccess: bool
+    finiteStates: bool
+    contactAccepted: bool | None
+    functionEvaluations: int
+    jacobianEvaluations: int
+    luDecompositions: int
+    integrationMethod: Literal["DOP853", "Radau", "BDF"]
+    relativeTolerance: float
+    absoluteTolerance: float
+    maximumStepS: float
+    acceptedSteps: int
+    minimumAcceptedStepS: float | None
+    maximumAcceptedStepS: float | None
+    initialEnergyJ: float | None
+    finalEnergyJ: float | None
+    roadInputWorkJ: float | None
+    dissipatedEnergyJ: float | None
+    energyBalanceResidualJ: float | None
+    relativeEnergyBalanceError: float | None
+    minimumTotalContactForceN: float | None
+    message: str
+
+
+class QuarterCarSimulationResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    modelName: Literal["linear_quarter_car_2dof"]
+    calculationStatus: Phase3CalculationStatus
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    units: dict[str, str]
+    inputProvenance: DynamicsInputProvenanceResponse
+    naturalFrequenciesHz: list[float] | None
+    diagnostics: DynamicsDiagnosticsResponse
+    assumptions: list[str]
+    warnings: list[str]
+    samples: list[QuarterCarSampleResponse]
