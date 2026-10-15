@@ -1,0 +1,25 @@
+{
+  "name": "msku-racing-dynamics-studio",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/contracts"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @msku/web",
+    "build": "npm run build --workspace @msku/web",
+    "lint": "npm run lint --workspace @msku/web",
+    "typecheck": "npm run typecheck --workspace @msku/web",
+    "test": "npm run test --workspace @msku/web",
+    "test:e2e": "npm run test:e2e --workspace @msku/web",
+    "quality": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "api:dev": "uv run --package msku-api uvicorn msku_api.main:app --reload --port 8000",
+    "test:python": "uv run --package msku-api pytest"
+  },
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  }
+}
+

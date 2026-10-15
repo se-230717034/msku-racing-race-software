@@ -1,0 +1,42 @@
+# Implementation progress
+
+Updated: 2026-10-15
+
+## Phase 0 — Foundation
+
+- [x] Monorepo structure for web, API, engineering core, and contracts
+- [x] Reproducible Node and Python dependency manifests
+- [x] CI definitions for lint, types, tests, and build
+- [x] Architecture, physics, coordinate, validation, limitation, roadmap, deployment, and team-data docs
+- [x] Versioned project schema with structural validation
+- [x] Labeled demonstration project
+- [x] Local project save/load and JSON import/export
+- [x] FastAPI health and project-validation endpoints
+- [x] React error boundary and explicit unsupported-section states
+- [x] Distinct text-only MSKU Racing engineering interface
+- [ ] Official logo integration — waiting for a rights-cleared asset
+- [ ] Hosted deployment — credentials/provider selection not supplied
+
+## Phase 1 — First vertical slice
+
+- [x] Double-wishbone corner hardpoints and link topology
+- [x] Interactive orbit/pan/zoom 3D viewport
+- [x] Hardpoint selection and precise XYZ editing in millimetres
+- [x] Camera presets, mirror view, and visibility toggles
+- [x] Editable wheel radius and width
+- [x] Deterministic geometry updates and JSON round-trip
+- [x] Constraint diagnostics for degeneracy, point ordering, and invalid wheel dimensions
+- [x] Save/export guard when geometry contains errors
+- [x] TypeScript and Python geometry validation tests
+- [ ] Direct manipulation of points in the 3D viewport
+- [ ] Pushrod/rocker editor — no sample geometry is fabricated; requires actual topology or a separately labeled demo model
+- [ ] Spring/damper mounts — requires geometrically specified points
+
+## Later phases
+
+- [ ] Phase 2 validated kinematics
+- [ ] Phase 3 quasi-static loads and forces
+- [ ] Phase 4 road and vehicle dynamics
+- [ ] Phase 5 optimization
+- [ ] Phase 6 professional workflows
+

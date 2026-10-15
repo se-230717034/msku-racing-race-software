@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mskuracing.example/schemas/project-1.0.0.json",
+  "title": "MSKU Racing Dynamics Studio project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projectId", "name", "description", "createdAt", "updatedAt", "dataClassification", "modelStatus", "units", "coordinateSystem", "suspension"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "projectId": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "maxLength": 500 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "dataClassification": { "enum": ["demonstration", "team_private"] },
+    "modelStatus": { "enum": ["demonstration", "unvalidated", "benchmarked", "experimentally_validated"] },
+    "units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["length", "angle"],
+      "properties": { "length": { "const": "m" }, "angle": { "const": "rad" } }
+    },
+    "coordinateSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handedness", "xAxis", "yAxis", "zAxis"],
+      "properties": {
+        "handedness": { "const": "right" },
+        "xAxis": { "const": "forward" },
+        "yAxis": { "const": "left" },
+        "zAxis": { "const": "up" }
+      }
+    },
+    "suspension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "corner", "hardpoints", "wheel"],
+      "properties": {
+        "type": { "const": "double_wishbone" },
+        "corner": { "const": "front_left" },
+        "hardpoints": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label", "group", "position"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "label": { "type": "string", "minLength": 1 },
+              "group": { "enum": ["upper_wishbone", "lower_wishbone", "steering", "upright", "wheel"] },
+              "position": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["x", "y", "z"],
+                "properties": {
+                  "x": { "type": "number" },
+                  "y": { "type": "number" },
+                  "z": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "wheel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["radius", "width"],
+          "properties": {
+            "radius": { "type": "number", "exclusiveMinimum": 0 },
+            "width": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}
+

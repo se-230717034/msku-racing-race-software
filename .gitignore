@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.vite/
+.venv/
+.python/
+.uv-cache/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+*.pyo
+.env
+playwright-report/
+test-results/
+
