@@ -20,6 +20,9 @@ export interface VisibilityState {
   steering: boolean;
   upright: boolean;
   wheel: boolean;
+  tire: boolean;
+  rim: boolean;
+  brake: boolean;
   hardpoints: boolean;
   mirror: boolean;
   chassis: boolean;
@@ -91,10 +94,13 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     steering: true,
     upright: true,
     wheel: true,
+    tire: true,
+    rim: true,
+    brake: true,
     hardpoints: true,
     mirror: false,
-    chassis: true,
-    referencePlanes: true,
+    chassis: false,
+    referencePlanes: false,
     labels: true,
     representativeActuation: false,
   },

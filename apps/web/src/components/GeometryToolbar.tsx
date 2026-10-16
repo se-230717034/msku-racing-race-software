@@ -16,9 +16,13 @@ const visibilityLabels = {
   lower: "alt kol",
   steering: "direksiyon",
   upright: "taşıyıcı",
-  wheel: "tekerlek",
+  wheel: "tekerlek montajı",
+  tire: "lastik",
+  rim: "jant",
+  brake: "fren grubu",
   hardpoints: "bağlantı noktaları",
   chassis: "şasi referansı",
+  referencePlanes: "referans düzlemi",
   representativeActuation: "temsili çalıştırma",
 };
 
@@ -35,6 +39,17 @@ export function GeometryToolbar() {
   const toggle = useWorkspace((state) => state.toggleVisibility);
   const cadMode = useWorkspace((state) => state.cadViewMode);
   const setCadMode = useWorkspace((state) => state.setCadViewMode);
+  const inspectionOpen = !visibility.tire && !visibility.rim;
+
+  const toggleAssemblyInspection = () => {
+    if (inspectionOpen) {
+      toggle("tire");
+      toggle("rim");
+      return;
+    }
+    if (visibility.tire) toggle("tire");
+    if (visibility.rim) toggle("rim");
+  };
 
   return (
     <div className="geometry-toolbar">
@@ -64,11 +79,19 @@ export function GeometryToolbar() {
       </div>
       <div className="toolbar-divider" />
       <div className="toolbar-group" aria-label="Görünürlük kontrolleri">
-        {(["upper", "lower", "steering", "upright", "wheel", "hardpoints", "chassis", "representativeActuation"] as const).map((key) => (
+        {(["upper", "lower", "steering", "upright", "wheel", "tire", "rim", "brake", "hardpoints", "chassis", "referencePlanes", "representativeActuation"] as const).map((key) => (
           <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggle(key)}>
             {visibility[key] ? <Eye size={13} /> : <EyeOff size={13} />}{visibilityLabels[key]}
           </button>
         ))}
+        <button
+          type="button"
+          className={inspectionOpen ? "active" : ""}
+          aria-label={inspectionOpen ? "Lastik ve jantı göster" : "Lastik ve jantı gizle"}
+          onClick={toggleAssemblyInspection}
+        >
+          {inspectionOpen ? <Eye size={13} /> : <EyeOff size={13} />}montaj inceleme
+        </button>
         <button type="button" className={visibility.mirror ? "active" : ""} onClick={() => toggle("mirror") }>
           <FlipHorizontal2 size={13} /> ayna
         </button>

@@ -170,6 +170,9 @@ Updated: 2026-10-16
 - [x] Unsolved dynamic link closure remains suppressed; no heuristic suspension motion was introduced
 - [x] Optional default-off pushrod/rocker/spring-damper reference layer is visibly marked unsupported, static, and non-engineering
 - [x] Reference-derived upright clevis plates, fasteners, bearing housing, low-occlusion pickup panels, and close CAD camera treatment
+- [x] Single-corner open-web upright carrier, bearing seat, hub flange, rotor hardware, caliper hardware, and rod-end/fastener detailing wired into the active Geometry render path
+- [x] Independent tire, rim, and brake visibility layers plus one-click assembly inspection; reference grid and pickup panel now default to hidden
+- [x] Upright-focused three-quarter starting camera and explicit procedural/non-dimensionally-validated visual disclaimer
 - [x] View-mode regression coverage confirms visual state changes do not mutate project engineering data
-- [x] Quality gates: ESLint, TypeScript, production build, 37 Vitest tests, and 10 Chromium flows
+- [x] Quality gates: ESLint, TypeScript, production build, 37 Vitest tests, and 11 Chromium flows
 

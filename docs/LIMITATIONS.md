@@ -54,6 +54,9 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
 - Procedural tires, rims, brakes, hubs, calipers, uprights, tubes, and joints are inspection visuals
   derived from wheel dimensions, hardpoints, and accepted poses. They are not manufacturing CAD,
   do not establish packaging clearance, and carry no stress, mass-property, or fabrication evidence.
+- Upright webs, mounting lugs, rod ends, hub/bearing features, rotor holes, and caliper hardware are
+  procedural visual details without supplied production drawings. Their placement follows the active
+  render pose, but their local dimensions and clearances are not physically validated vehicle data.
 - The 7DOF playback moves the body and four wheels from solver histories but hides suspension links
   because that model does not solve link closure. Bicycle display is limited to supplied steering and
   yaw rate integrated for heading.

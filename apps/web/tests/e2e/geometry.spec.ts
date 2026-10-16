@@ -68,6 +68,27 @@ test("switches the shared Turkish CAD view modes without changing engineering da
   await expect(suspensionViewport).toHaveAttribute("data-cad-mode", "hybrid");
 });
 
+test("separates the single-corner tire, rim, brake, and reference-plane layers", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Geometri" }).click();
+  const viewport = page.getByTestId("suspension-viewport");
+
+  await expect(viewport).toHaveAttribute("data-tire-visible", "true");
+  await expect(viewport).toHaveAttribute("data-rim-visible", "true");
+  await expect(viewport).toHaveAttribute("data-brake-visible", "true");
+  await expect(viewport).toHaveAttribute("data-reference-plane-visible", "false");
+  await expect(page.getByText("PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Lastik ve jantı gizle", exact: true }).click();
+  await expect(viewport).toHaveAttribute("data-tire-visible", "false");
+  await expect(viewport).toHaveAttribute("data-rim-visible", "false");
+  await expect(viewport).toHaveAttribute("data-brake-visible", "true");
+  await expect(page.getByRole("button", { name: "Lastik ve jantı göster", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "referans düzlemi", exact: true }).click();
+  await expect(viewport).toHaveAttribute("data-reference-plane-visible", "true");
+});
+
 test("keeps unsupported actuation in an explicit static representative layer", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /temsili çalıştırma/i }).click();

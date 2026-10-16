@@ -108,7 +108,7 @@ function HardpointMarker({
   );
 }
 
-function BallJoint({
+function RodEndJoint({
   position,
   toward,
   scale = 1,
@@ -119,14 +119,35 @@ function BallJoint({
   scale?: number;
   opacity?: number;
 }) {
-  const collarEnd = addScaledDirection(position, toward, 0.024 * scale);
+  const orientation = useMemo(() => {
+    const direction = new Vector3(...toward).sub(new Vector3(...position));
+    if (direction.lengthSq() <= 1e-12) return new Quaternion();
+    return new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), direction.normalize());
+  }, [position, toward]);
+  const eyeRadius = 0.0135 * scale;
+  const shankLength = 0.031 * scale;
   return (
-    <group>
-      <mesh position={position} castShadow receiveShadow>
-        <sphereGeometry args={[0.015 * scale, 18, 12]} />
-        <meshStandardMaterial color="#626b74" metalness={0.48} roughness={0.46} transparent={opacity < 1} opacity={opacity} />
+    <group position={position} quaternion={orientation} name="rod-end-mafsal">
+      <mesh castShadow receiveShadow>
+        <torusGeometry args={[eyeRadius, eyeRadius * 0.36, 10, 28]} />
+        <meshStandardMaterial color="#4d555d" metalness={0.34} roughness={0.58} transparent={opacity < 1} opacity={opacity} />
       </mesh>
-      <TubeBetween start={position} end={collarEnd} radius={0.0105 * scale} color="#414951" metalness={0.38} roughness={0.58} opacity={opacity} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[eyeRadius * 0.62, eyeRadius * 0.62, eyeRadius * 1.55, 20]} />
+        <meshStandardMaterial color="#252a2f" metalness={0.22} roughness={0.72} transparent={opacity < 1} opacity={opacity} />
+      </mesh>
+      <mesh position={[0, 0, eyeRadius * 0.95]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[eyeRadius * 0.84, eyeRadius * 0.84, eyeRadius * 0.28, 6]} />
+        <meshStandardMaterial color="#78818a" metalness={0.5} roughness={0.46} transparent={opacity < 1} opacity={opacity} />
+      </mesh>
+      <mesh position={[0, eyeRadius + shankLength * 0.5, 0]} castShadow>
+        <cylinderGeometry args={[eyeRadius * 0.31, eyeRadius * 0.31, shankLength, 12]} />
+        <meshStandardMaterial color="#3d444b" metalness={0.38} roughness={0.56} transparent={opacity < 1} opacity={opacity} />
+      </mesh>
+      <mesh position={[0, eyeRadius + shankLength * 0.14, 0]} castShadow>
+        <cylinderGeometry args={[eyeRadius * 0.52, eyeRadius * 0.52, eyeRadius * 0.55, 6]} />
+        <meshStandardMaterial color="#69727a" metalness={0.42} roughness={0.5} transparent={opacity < 1} opacity={opacity} />
+      </mesh>
     </group>
   );
 }
@@ -152,44 +173,38 @@ function PivotBushing({
   );
 }
 
-function UprightCasting({
-  upper,
-  lower,
-  tie,
-  wheelCentre,
+function CarrierWeb({
+  points,
   wheelQuaternion,
   opacity,
 }: {
-  upper: ThreePosition;
-  lower: ThreePosition;
-  tie: ThreePosition;
-  wheelCentre: ThreePosition;
+  points: ThreePosition[];
   wheelQuaternion: ThreeQuaternion;
   opacity: number;
 }) {
   const geometry = useMemo(() => {
     const wheelAxis = new Vector3(0, 0, 1).applyQuaternion(new Quaternion(...wheelQuaternion)).normalize();
-    const thickness = 0.012;
-    const anchors = [upper, lower, tie, wheelCentre].map((point) => new Vector3(...point));
+    const thickness = 0.0055;
+    const anchors = points.map((point) => new Vector3(...point));
     const hullPoints = anchors.flatMap((point) => [
       point.clone().addScaledVector(wheelAxis, thickness),
       point.clone().addScaledVector(wheelAxis, -thickness),
     ]);
     return new ConvexGeometry(hullPoints);
-  }, [lower, tie, upper, wheelCentre, wheelQuaternion]);
+  }, [points, wheelQuaternion]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial
-        color="#71343e"
-        metalness={0.26}
-        roughness={0.62}
+        color="#5d646a"
+        metalness={0.22}
+        roughness={0.68}
         transparent
-        opacity={0.78 * opacity}
+        opacity={0.92 * opacity}
       />
-      <Edges color="#351b20" threshold={18} />
+      <Edges color="#272c30" threshold={18} />
     </mesh>
   );
 }
@@ -210,15 +225,21 @@ function MountingClevis({
     <group position={position} quaternion={wheelQuaternion} scale={scale}>
       {[-plateOffset, plateOffset].map((z) => (
         <mesh key={z} position={[0, 0, z]} castShadow receiveShadow>
-          <boxGeometry args={[0.044, 0.058, 0.006]} />
-          <meshStandardMaterial color="#69727a" metalness={0.3} roughness={0.6} transparent opacity={0.88 * opacity} />
+          <capsuleGeometry args={[0.017, 0.027, 8, 18]} />
+          <meshStandardMaterial color="#6b737a" metalness={0.26} roughness={0.64} transparent opacity={0.92 * opacity} />
           <Edges color="#30363c" threshold={20} />
         </mesh>
       ))}
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.009, 0.009, plateOffset * 2.6, 18]} />
+        <cylinderGeometry args={[0.008, 0.008, plateOffset * 2.65, 18]} />
         <meshStandardMaterial color="#252a2f" metalness={0.5} roughness={0.46} transparent opacity={opacity} />
       </mesh>
+      {[-plateOffset * 1.42, plateOffset * 1.42].map((z) => (
+        <mesh key={`fastener-${z}`} position={[0, 0, z]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.012, 0.012, 0.006, 6]} />
+          <meshStandardMaterial color="#889198" metalness={0.48} roughness={0.46} transparent opacity={opacity} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -280,28 +301,37 @@ function MechanicalUpright({
   wheelQuaternion: ThreeQuaternion;
   opacity: number;
 }) {
+  const upperWebInner = addScaledDirection(upper, wheelCentre, 0.026);
+  const lowerWebInner = addScaledDirection(lower, wheelCentre, 0.026);
+  const tieWebInner = addScaledDirection(tie, wheelCentre, 0.02);
   return (
-    <group name="mekanik-upright">
-      <UprightCasting upper={upper} lower={lower} tie={tie} wheelCentre={wheelCentre} wheelQuaternion={wheelQuaternion} opacity={opacity} />
-      <TubeBetween start={lower} end={upper} radius={0.018} color="#743640" metalness={0.24} roughness={0.62} opacity={opacity} />
-      <TubeBetween start={upper} end={wheelCentre} radius={0.011} color="#81404b" metalness={0.24} roughness={0.62} opacity={opacity} />
-      <TubeBetween start={lower} end={wheelCentre} radius={0.013} color="#67313a" metalness={0.24} roughness={0.62} opacity={opacity} />
-      <TubeBetween start={tie} end={wheelCentre} radius={0.009} color="#81404b" metalness={0.24} roughness={0.62} opacity={opacity} />
-      <BallJoint position={upper} toward={lower} opacity={opacity} />
-      <BallJoint position={lower} toward={upper} opacity={opacity} />
-      <BallJoint position={tie} toward={wheelCentre} scale={0.82} opacity={opacity} />
+    <group name="mekanik-upright" userData={{ visualStatus: "PROCEDURAL_NOT_DIMENSIONALLY_VALIDATED" }}>
+      <CarrierWeb points={[upperWebInner, wheelCentre, tieWebInner]} wheelQuaternion={wheelQuaternion} opacity={opacity} />
+      <CarrierWeb points={[lowerWebInner, wheelCentre, tieWebInner]} wheelQuaternion={wheelQuaternion} opacity={opacity} />
+      <TubeBetween start={upperWebInner} end={wheelCentre} radius={0.013} color="#60686f" metalness={0.22} roughness={0.68} opacity={opacity} />
+      <TubeBetween start={lowerWebInner} end={wheelCentre} radius={0.015} color="#555d64" metalness={0.22} roughness={0.68} opacity={opacity} />
+      <TubeBetween start={tieWebInner} end={wheelCentre} radius={0.010} color="#636b72" metalness={0.2} roughness={0.7} opacity={opacity} />
+      <RodEndJoint position={upper} toward={wheelCentre} opacity={opacity} />
+      <RodEndJoint position={lower} toward={wheelCentre} opacity={opacity} />
+      <RodEndJoint position={tie} toward={wheelCentre} scale={0.82} opacity={opacity} />
       <MountingClevis position={upper} wheelQuaternion={wheelQuaternion} opacity={opacity} />
       <MountingClevis position={lower} wheelQuaternion={wheelQuaternion} opacity={opacity} />
       <MountingClevis position={tie} wheelQuaternion={wheelQuaternion} scale={0.72} opacity={opacity} />
-      <group position={wheelCentre} quaternion={wheelQuaternion}>
+      <group position={wheelCentre} quaternion={wheelQuaternion} name="porya-yatagi">
         <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.052, 0.052, 0.054, 28]} />
-          <meshStandardMaterial color="#4b545d" metalness={0.42} roughness={0.5} transparent={opacity < 1} opacity={opacity} />
+          <cylinderGeometry args={[0.061, 0.057, 0.058, 40]} />
+          <meshStandardMaterial color="#596168" metalness={0.26} roughness={0.64} transparent={opacity < 1} opacity={opacity} />
           <Edges color="#20262c" threshold={22} />
         </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <torusGeometry args={[0.054, 0.006, 10, 32]} />
-          <meshStandardMaterial color="#737d86" metalness={0.5} roughness={0.42} transparent={opacity < 1} opacity={opacity} />
+        {[-0.031, 0.031].map((z) => (
+          <mesh key={z} position={[0, 0, z]} castShadow>
+            <torusGeometry args={[0.052, 0.007, 10, 40]} />
+            <meshStandardMaterial color="#7a838a" metalness={0.42} roughness={0.5} transparent={opacity < 1} opacity={opacity} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0, 0.034]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.037, 0.037, 0.012, 32]} />
+          <meshStandardMaterial color="#262c31" metalness={0.18} roughness={0.76} transparent={opacity < 1} opacity={opacity} />
         </mesh>
       </group>
     </group>
@@ -455,6 +485,14 @@ function HubAssembly({ rimRadius, width }: { rimRadius: number; width: number })
         <meshStandardMaterial color="#343b42" metalness={0.42} roughness={0.54} />
         <Edges color="#15191d" threshold={18} />
       </mesh>
+      <mesh position={[0, 0, faceZ + width * 0.075]} castShadow>
+        <torusGeometry args={[flangeRadius * 0.42, flangeRadius * 0.085, 10, 32]} />
+        <meshStandardMaterial color="#171b1f" metalness={0.12} roughness={0.82} />
+      </mesh>
+      <mesh position={[0, 0, faceZ + width * 0.12]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[flangeRadius * 0.2, flangeRadius * 0.2, width * 0.16, 6]} />
+        <meshStandardMaterial color="#8a9299" metalness={0.5} roughness={0.46} />
+      </mesh>
       {Array.from({ length: 5 }, (_, index) => {
         const angle = index * Math.PI * 2 / 5;
         return (
@@ -481,7 +519,7 @@ function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number 
   const faceOffset = discThickness * 0.52;
   return (
     <group name="fren-grubu">
-      <mesh position={[0, 0, discZ]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+      <mesh name="fren-diski" position={[0, 0, discZ]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[discRadius, discRadius, discThickness, 48, 1, true]} />
         <meshStandardMaterial color="#777f87" metalness={0.5} roughness={0.48} side={DoubleSide} />
       </mesh>
@@ -491,7 +529,7 @@ function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number 
           <meshStandardMaterial color="#91989f" metalness={0.46} roughness={0.5} side={DoubleSide} />
         </mesh>
       ))}
-      <mesh position={[0, 0, discZ + faceOffset + 0.0008]}>
+      <mesh name="rotor-sapkasi" position={[0, 0, discZ + faceOffset + 0.0008]}>
         <ringGeometry args={[innerRadius, innerRadius * 1.55, 36]} />
         <meshStandardMaterial color="#4e5861" metalness={0.42} roughness={0.54} side={DoubleSide} />
       </mesh>
@@ -515,6 +553,16 @@ function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number 
           </mesh>
         );
       })}
+      {Array.from({ length: 8 }, (_, index) => {
+        const angle = index * Math.PI * 2 / 8;
+        const boltRadius = innerRadius * 1.28;
+        return (
+          <mesh key={`rotor-bolt-${index}`} position={[Math.cos(angle) * boltRadius, Math.sin(angle) * boltRadius, discZ + faceOffset + 0.0025]}>
+            <circleGeometry args={[discRadius * 0.022, 8]} />
+            <meshStandardMaterial color="#30363b" metalness={0.42} roughness={0.52} />
+          </mesh>
+        );
+      })}
       <group position={[discRadius * 0.83, discRadius * 0.04, discZ]} rotation={[0, 0, -0.12]} name="fren-kaliperi">
         {[-discThickness * 0.82, discThickness * 0.82].map((z) => (
           <mesh key={z} position={[0, 0, z]} castShadow receiveShadow>
@@ -534,17 +582,47 @@ function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number 
             <meshStandardMaterial color="#202327" metalness={0.04} roughness={0.9} />
           </mesh>
         ))}
+        {[-discRadius * 0.09, discRadius * 0.09].map((y) => (
+          <group key={`piston-${y}`} position={[discRadius * 0.1, y, discThickness * 0.9]}>
+            <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <cylinderGeometry args={[discRadius * 0.055, discRadius * 0.055, discThickness * 0.18, 20]} />
+              <meshStandardMaterial color="#4a171f" metalness={0.16} roughness={0.72} />
+            </mesh>
+          </group>
+        ))}
+        {[-discRadius * 0.115, discRadius * 0.115].map((y) => (
+          <mesh key={`caliper-bolt-${y}`} position={[discRadius * 0.12, y, discThickness * 1.12]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[discRadius * 0.026, discRadius * 0.026, discThickness * 0.16, 6]} />
+            <meshStandardMaterial color="#a1a7ac" metalness={0.48} roughness={0.46} />
+          </mesh>
+        ))}
       </group>
     </group>
   );
 }
 
-export function ProceduralWheel({ position, quaternion, radius, width, mode, opacity = 1, name }: {
+export function ProceduralWheel({
+  position,
+  quaternion,
+  radius,
+  width,
+  mode,
+  showTire = true,
+  showRim = true,
+  showBrake = true,
+  showHub = true,
+  opacity = 1,
+  name,
+}: {
   position: ThreePosition;
   quaternion: ThreeQuaternion;
   radius: number;
   width: number;
   mode: CadViewMode;
+  showTire?: boolean;
+  showRim?: boolean;
+  showBrake?: boolean;
+  showHub?: boolean;
   opacity?: number;
   name: string;
 }) {
@@ -557,42 +635,46 @@ export function ProceduralWheel({ position, quaternion, radius, width, mode, opa
 
   return (
     <group name={name} position={position} quaternion={quaternion}>
-      <mesh scale={[1, 1, tireDepthScale]} castShadow={!technical} receiveShadow>
-        <torusGeometry args={[tireMajorRadius, sidewall, 18, 64]} />
-        <meshStandardMaterial
-          color={technical ? "#5d6975" : "#202327"}
-          roughness={technical ? 0.62 : 0.96}
-          metalness={technical ? 0.08 : 0.01}
-          wireframe={technical}
-          transparent={technical || opacity < 1}
-          opacity={technical ? 0.5 * opacity : opacity}
-        />
-      </mesh>
-      {!technical && opacity >= 0.5 && <SlickTireDetails radius={radius} width={width} sidewall={sidewall} />}
-      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow={!technical} receiveShadow>
-        <cylinderGeometry args={[rimRadius, rimRadius, rimWidth, 40, 1, true]} />
-        <meshStandardMaterial
-          color="#555e67"
-          metalness={0.42}
-          roughness={0.5}
-          wireframe={technical}
-          transparent={technical || opacity < 1}
-          opacity={technical ? 0.45 * opacity : opacity}
-          side={DoubleSide}
-        />
-      </mesh>
-      {[-rimWidth / 2, rimWidth / 2].map((z) => (
-        <mesh key={z} position={[0, 0, z]}>
-          <torusGeometry args={[rimRadius * 0.97, rimRadius * 0.036, 10, 48]} />
-          <meshStandardMaterial color="#777f87" metalness={0.46} roughness={0.44} wireframe={technical} transparent={opacity < 1} opacity={opacity} />
+      {showTire && <group name="lastik-katmani">
+        <mesh scale={[1, 1, tireDepthScale]} castShadow={!technical} receiveShadow>
+          <torusGeometry args={[tireMajorRadius, sidewall, 18, 64]} />
+          <meshStandardMaterial
+            color={technical ? "#5d6975" : "#202327"}
+            roughness={technical ? 0.62 : 0.96}
+            metalness={technical ? 0.08 : 0.01}
+            wireframe={technical}
+            transparent={technical || opacity < 1}
+            opacity={technical ? 0.5 * opacity : opacity}
+          />
         </mesh>
-      ))}
+        {!technical && opacity >= 0.5 && <SlickTireDetails radius={radius} width={width} sidewall={sidewall} />}
+      </group>}
+      {showRim && <group name="jant-katmani">
+        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow={!technical} receiveShadow>
+          <cylinderGeometry args={[rimRadius, rimRadius, rimWidth, 40, 1, true]} />
+          <meshStandardMaterial
+            color="#555e67"
+            metalness={0.34}
+            roughness={0.58}
+            wireframe={technical}
+            transparent={technical || opacity < 1}
+            opacity={technical ? 0.45 * opacity : opacity}
+            side={DoubleSide}
+          />
+        </mesh>
+        {[-rimWidth / 2, rimWidth / 2].map((z) => (
+          <mesh key={z} position={[0, 0, z]}>
+            <torusGeometry args={[rimRadius * 0.97, rimRadius * 0.036, 10, 48]} />
+            <meshStandardMaterial color="#777f87" metalness={0.38} roughness={0.52} wireframe={technical} transparent={opacity < 1} opacity={opacity} />
+          </mesh>
+        ))}
+        {!technical && opacity >= 0.5 && <RimStructure rimRadius={rimRadius} width={rimWidth} />}
+      </group>}
       {!technical && opacity >= 0.5 && <>
-        <BrakeAssembly rimRadius={rimRadius} width={rimWidth} />
-        <RimStructure rimRadius={rimRadius} width={rimWidth} />
-        <HubAssembly rimRadius={rimRadius} width={rimWidth} />
+        {showBrake && <BrakeAssembly rimRadius={rimRadius} width={rimWidth} />}
+        {showHub && <HubAssembly rimRadius={rimRadius} width={rimWidth} />}
       </>}
-      {technical && <mesh rotation={[Math.PI / 2, 0, 0]}>
+      {technical && showHub && <mesh rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[rimRadius * 0.22, rimRadius * 0.22, rimWidth * 0.58, 24]} />
         <meshStandardMaterial color="#68727e" metalness={0.22} roughness={0.62} wireframe transparent opacity={0.55 * opacity} />
       </mesh>}
@@ -672,7 +754,7 @@ export function ProceduralCadAssembly({
       })}
       {showMechanism && showDetailed && <>
         {visibility.chassis && <ChassisPickupReference points={chassisPickupPoints} opacity={opacity} />}
-        {(visibility.upright || visibility.wheel) && (
+        {visibility.upright && (
           <MechanicalUpright
             upper={upperOutboard}
             lower={lowerOutboard}
@@ -690,7 +772,7 @@ export function ProceduralCadAssembly({
           <PivotBushing position={positionFor("lca_front_inboard")} axisTarget={positionFor("lca_rear_inboard")} opacity={opacity} />
           <PivotBushing position={positionFor("lca_rear_inboard")} axisTarget={positionFor("lca_front_inboard")} opacity={opacity} />
         </>}
-        {visibility.steering && <BallJoint position={positionFor("tie_rod_inboard")} toward={tieOutboard} scale={0.75} opacity={opacity} />}
+        {visibility.steering && <RodEndJoint position={positionFor("tie_rod_inboard")} toward={tieOutboard} scale={0.75} opacity={opacity} />}
       </>}
       {showMechanism && showRepresentativeActuation && (
         <RepresentativeActuationLayer positionFor={staticPositionFor ?? positionFor} />
@@ -707,7 +789,7 @@ export function ProceduralCadAssembly({
           } : undefined}
         />
       ))}
-      {visibility.wheel && (
+      {(visibility.upright || (visibility.wheel && (visibility.tire || visibility.rim || visibility.brake))) && (
         <ProceduralWheel
           name={`wheel-${assemblyId}`}
           position={wheelPosition}
@@ -715,6 +797,10 @@ export function ProceduralCadAssembly({
           radius={wheelRadius}
           width={wheelWidth}
           mode={mode}
+          showTire={visibility.wheel && visibility.tire}
+          showRim={visibility.wheel && visibility.rim}
+          showBrake={visibility.wheel && visibility.brake}
+          showHub={visibility.upright}
           opacity={opacity}
         />
       )}

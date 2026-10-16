@@ -10,13 +10,15 @@ import { useWorkspace, type CameraPreset } from "../store/workspace";
 import { ProceduralCadAssembly } from "./ProceduralCadAssembly";
 
 const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
-  perspective: [1.02, 0.68, 1.12],
-  isometric: [1.12, 0.82, 1.18],
+  perspective: [0.76, 0.62, 0.18],
+  isometric: [0.96, 0.82, 0.34],
   front: [1.8, 0.35, -0.5],
   rear: [-1.8, 0.35, -0.5],
   side: [0.0, 0.35, 1.8],
   top: [0.0, 2.1, -0.5],
 };
+
+const UPRIGHT_INSPECTION_TARGET: [number, number, number] = [0, 0.29, -0.68];
 
 function CameraRig({ preset }: { preset: CameraPreset }) {
   const { camera } = useThree();
@@ -25,11 +27,11 @@ function CameraRig({ preset }: { preset: CameraPreset }) {
   useEffect(() => {
     camera.position.set(...CAMERA_POSITIONS[preset]);
     camera.up.set(0, 1, 0);
-    controls.current?.target.set(0, 0.28, -0.48);
+    controls.current?.target.set(...UPRIGHT_INSPECTION_TARGET);
     controls.current?.update();
   }, [camera, preset]);
 
-  return <OrbitControls ref={controls} makeDefault target={[0, 0.28, -0.48]} minDistance={0.35} maxDistance={4} />;
+  return <OrbitControls ref={controls} makeDefault target={UPRIGHT_INSPECTION_TARGET} minDistance={0.28} maxDistance={4} />;
 }
 
 interface ModelProps {
@@ -115,6 +117,11 @@ export function SuspensionViewport({
   const cadMode = useWorkspace((state) => state.cadViewMode);
   const mirror = useWorkspace((state) => state.visibility.mirror);
   const chassisVisible = useWorkspace((state) => state.visibility.chassis);
+  const wheelVisible = useWorkspace((state) => state.visibility.wheel);
+  const tireVisible = useWorkspace((state) => state.visibility.tire);
+  const rimVisible = useWorkspace((state) => state.visibility.rim);
+  const brakeVisible = useWorkspace((state) => state.visibility.brake);
+  const referencePlanesVisible = useWorkspace((state) => state.visibility.referencePlanes);
   const representativeVisible = useWorkspace((state) => state.visibility.representativeActuation);
   const sceneSurface = cadMode === "detailed"
     ? { background: "#d9dde0", fog: "#d9dde0", gridMajor: "#737b82", gridMinor: "#b7bdc2" }
@@ -125,7 +132,15 @@ export function SuspensionViewport({
   );
 
   return (
-    <div className={`viewport ${mode}`} data-testid="suspension-viewport" data-cad-mode={cadMode}>
+    <div
+      className={`viewport ${mode}`}
+      data-testid="suspension-viewport"
+      data-cad-mode={cadMode}
+      data-tire-visible={wheelVisible && tireVisible}
+      data-rim-visible={wheelVisible && rimVisible}
+      data-brake-visible={wheelVisible && brakeVisible}
+      data-reference-plane-visible={referencePlanesVisible}
+    >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
         <fog attach="fog" args={[sceneSurface.fog, 2.5, 7]} />
@@ -134,7 +149,7 @@ export function SuspensionViewport({
         <directionalLight castShadow position={[1.8, 2.8, 1.6]} intensity={1.85} color="#f4f6f8" shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
         <directionalLight position={[-1.4, 1.1, -1.6]} intensity={0.48} color="#9aa9b8" />
         <spotLight position={[0.2, 2.8, -2.1]} intensity={0.72} angle={0.55} penumbra={0.82} color="#d7e1eb" />
-        <gridHelper args={[2, 20, sceneSurface.gridMajor, sceneSurface.gridMinor]} position={[0, 0, 0]} />
+        {referencePlanesVisible && <gridHelper args={[2, 20, sceneSurface.gridMajor, sceneSurface.gridMinor]} position={[0, 0, 0]} />}
         <SuspensionModel pose={pose} hardpointOverrides={hardpointOverrides} />
         {maximumForce > 0 && forceVectors.map(({ id, origin, force }) => {
           const magnitude = Math.hypot(force.x, force.y, force.z);
@@ -162,6 +177,7 @@ export function SuspensionViewport({
         <span><i className="axis z" />Z yukarı</span>
         <span>İç birim: m · Düzenleyici: mm</span>
         <span>CAD görünümü: {cadMode === "technical" ? "Teknik" : cadMode === "detailed" ? "Detaylı" : "Karma"}</span>
+        <span>PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
         {representativeVisible && <span>TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}

@@ -13,6 +13,12 @@ describe("Phase 6 four-corner workspace", () => {
       cadViewMode: "hybrid",
       visibility: {
         ...useWorkspace.getState().visibility,
+        wheel: true,
+        tire: true,
+        rim: true,
+        brake: true,
+        chassis: false,
+        referencePlanes: false,
         representativeActuation: false,
       },
     });
@@ -36,10 +42,16 @@ describe("Phase 6 four-corner workspace", () => {
     useWorkspace.getState().setCameraPreset("rear");
     useWorkspace.getState().setCadViewMode("detailed");
     useWorkspace.getState().toggleVisibility("chassis");
+    useWorkspace.getState().toggleVisibility("tire");
+    useWorkspace.getState().toggleVisibility("rim");
+    useWorkspace.getState().toggleVisibility("brake");
     useWorkspace.getState().toggleVisibility("representativeActuation");
     useWorkspace.getState().setVehicleViewMode("rear_axle");
     expect(JSON.stringify(useWorkspace.getState().project)).toBe(before);
     expect(useWorkspace.getState().cadViewMode).toBe("detailed");
+    expect(useWorkspace.getState().visibility.tire).toBe(false);
+    expect(useWorkspace.getState().visibility.rim).toBe(false);
+    expect(useWorkspace.getState().visibility.brake).toBe(false);
     expect(useWorkspace.getState().visibility.representativeActuation).toBe(true);
   });
 });
