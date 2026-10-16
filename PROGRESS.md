@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated: 2026-10-15
+Updated: 2026-10-16
 
 ## Phase 0 — Foundation
 
@@ -124,7 +124,25 @@ Updated: 2026-10-15
 - [x] Final gates: 108 Python tests, 25 Vitest tests, 5 Chromium tests, Ruff, mypy, ESLint, TypeScript, and production build
 - [ ] MSKU Racing parameter provenance and independent rig/track validation
 
-## Later phases
+## Phase 6 — Professional engineering workflows
 
-- [ ] Phase 6 professional workflows
+- [x] Real four-corner FL/FR/RL/RR project representation and reusable scene assemblies
+- [x] Independently configurable front/rear geometry with explicit mirror/synthetic provenance
+- [x] Configurable wheelbase, front/rear track, CG, mass properties, and coordinate references
+- [x] Lossless project `1.0.0` to `2.0.0` migration with legacy storage fallback and no load-time overwrite
+- [x] Full vehicle, axle, corner, chassis/CG, suspension, kinematics, and dynamics view modes
+- [x] Perspective, isometric, front, rear, side, and top cameras plus persistent visibility state
+- [x] Exact per-corner hardpoint/link/alignment comparison without inferred solver results
+- [x] Matching-corner-only kinematics playback with unsupported-state blocking
+- [x] 7DOF body heave/pitch/roll and four distinct unsprung histories driven by accepted solver samples
+- [x] Bicycle steer and trapezoid-integrated yaw-heading visualization within model scope
+- [x] Traceable PDF, CSV, JSON, and printable vector-diagram report packages
+- [x] Evidence register for benchmarks, CAD comparisons, measurements, and provenance
+- [x] Hard `UNVALIDATED_PHYSICALLY` / `NOT_APPROVED` safety boundary without automatic promotion
+- [x] Stable scene-level FL/FR/RL/RR identifiers and Chromium full-vehicle acceptance tests
+- [x] Phase 6 architecture and quantitative verification documentation
+- [x] Final gates: 110 Python tests, 37 Vitest tests, 8 Chromium tests, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Controlled MSKU Racing four-corner CAD/hardpoint/mass-property dataset
+- [ ] Independent CAD motion-study, rig, and track validation evidence
+- [ ] Authenticated multi-user revision/approval workflow and electronic signatures
 

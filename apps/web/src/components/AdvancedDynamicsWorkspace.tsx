@@ -21,6 +21,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { useWorkspace } from "../store/workspace";
+
 export type DynamicsModel = "quarter_car" | "full_car" | "bicycle";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -144,6 +146,8 @@ export function AdvancedDynamicsWorkspace({ model, onModelChange }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [sampleIndex, setSampleIndex] = useState(0);
+  const setLatestFullCarResult = useWorkspace((state) => state.setLatestFullCarResult);
+  const setLatestBicycleResult = useWorkspace((state) => state.setLatestBicycleResult);
 
   const isFullCar = model === "full_car";
   const fullResult = result?.modelName === "linear_full_car_7dof" ? result : undefined;
@@ -203,9 +207,23 @@ export function AdvancedDynamicsWorkspace({ model, onModelChange }: {
         : bicycleSimulationResponseSchema.parse(payload);
       setResult(next);
       setSampleIndex(0);
-      if (next.calculationStatus !== "VERIFIED_NUMERICALLY") setError(next.diagnostics.message);
+      if (next.calculationStatus === "VERIFIED_NUMERICALLY") {
+        if (next.modelName === "linear_full_car_7dof") {
+          setLatestFullCarResult(next);
+          setLatestBicycleResult(null);
+        } else {
+          setLatestBicycleResult(next);
+          setLatestFullCarResult(null);
+        }
+      } else {
+        if (isFullCar) setLatestFullCarResult(null);
+        else setLatestBicycleResult(null);
+        setError(next.diagnostics.message);
+      }
     } catch (reason) {
       setResult(undefined);
+      if (isFullCar) setLatestFullCarResult(null);
+      else setLatestBicycleResult(null);
       setError(reason instanceof Error ? reason.message : "Dynamics simulation failed.");
     } finally {
       setLoading(false);

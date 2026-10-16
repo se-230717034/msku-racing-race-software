@@ -16,10 +16,17 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: "npm run dev -- --host 127.0.0.1",
-    url: "http://127.0.0.1:5173",
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: "npm run dev -- --host 127.0.0.1",
+      url: "http://127.0.0.1:5173",
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: "uv run --package msku-api uvicorn msku_api.main:app --host 127.0.0.1 --port 8000",
+      url: "http://127.0.0.1:8000/api/v1/health",
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 });
 

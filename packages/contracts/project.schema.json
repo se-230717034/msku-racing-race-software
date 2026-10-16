@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mskuracing.example/schemas/project-1.0.0.json",
-  "title": "MSKU Racing Dynamics Studio project",
+  "$id": "https://mskuracing.example/schemas/project-2.0.0.json",
+  "title": "MSKU Racing Dynamics Studio four-corner project",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "projectId", "name", "description", "createdAt", "updatedAt", "dataClassification", "modelStatus", "units", "coordinateSystem", "suspension"],
+  "required": ["schemaVersion", "projectId", "name", "description", "createdAt", "updatedAt", "dataClassification", "modelStatus", "units", "coordinateSystem", "activeCornerId", "suspension", "vehicle", "provenance", "validation"],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
+    "schemaVersion": { "const": "2.0.0" },
     "projectId": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1, "maxLength": 120 },
     "description": { "type": "string", "maxLength": 500 },
@@ -14,108 +14,44 @@
     "updatedAt": { "type": "string", "format": "date-time" },
     "dataClassification": { "enum": ["demonstration", "team_private"] },
     "modelStatus": { "enum": ["demonstration", "unvalidated", "benchmarked", "experimentally_validated"] },
-    "units": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["length", "angle"],
-      "properties": { "length": { "const": "m" }, "angle": { "const": "rad" } }
-    },
-    "coordinateSystem": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["handedness", "xAxis", "yAxis", "zAxis"],
+    "units": { "type": "object", "additionalProperties": false, "required": ["length", "angle"], "properties": { "length": { "const": "m" }, "angle": { "const": "rad" } } },
+    "coordinateSystem": { "type": "object", "additionalProperties": false, "required": ["handedness", "xAxis", "yAxis", "zAxis"], "properties": { "handedness": { "const": "right" }, "xAxis": { "const": "forward" }, "yAxis": { "const": "left" }, "zAxis": { "const": "up" } } },
+    "activeCornerId": { "$ref": "#/$defs/cornerId" },
+    "suspension": { "$ref": "#/$defs/suspension" },
+    "vehicle": {
+      "type": "object", "additionalProperties": false, "required": ["wheelbaseM", "frontTrackM", "rearTrackM", "cgPositionM", "massProperties", "corners"],
       "properties": {
-        "handedness": { "const": "right" },
-        "xAxis": { "const": "forward" },
-        "yAxis": { "const": "left" },
-        "zAxis": { "const": "up" }
+        "wheelbaseM": { "type": "number", "exclusiveMinimum": 0 }, "frontTrackM": { "type": "number", "exclusiveMinimum": 0 }, "rearTrackM": { "type": "number", "exclusiveMinimum": 0 }, "cgPositionM": { "$ref": "#/$defs/vec3" },
+        "massProperties": { "type": "object", "additionalProperties": false, "required": ["totalMassKg", "sprungMassKg", "rollInertiaKgM2", "pitchInertiaKgM2", "yawInertiaKgM2", "provenanceNote"], "properties": { "totalMassKg": { "$ref": "#/$defs/nullablePositive" }, "sprungMassKg": { "$ref": "#/$defs/nullablePositive" }, "rollInertiaKgM2": { "$ref": "#/$defs/nullablePositive" }, "pitchInertiaKgM2": { "$ref": "#/$defs/nullablePositive" }, "yawInertiaKgM2": { "$ref": "#/$defs/nullablePositive" }, "provenanceNote": { "type": "string", "minLength": 1, "maxLength": 500 } } },
+        "corners": { "type": "object", "additionalProperties": false, "required": ["front_left", "front_right", "rear_left", "rear_right"], "properties": { "front_left": { "$ref": "#/$defs/vehicleCorner" }, "front_right": { "$ref": "#/$defs/vehicleCorner" }, "rear_left": { "$ref": "#/$defs/vehicleCorner" }, "rear_right": { "$ref": "#/$defs/vehicleCorner" } } }
       }
     },
-    "suspension": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["type", "corner", "hardpoints", "wheel"],
-      "properties": {
-        "type": { "const": "double_wishbone" },
-        "corner": { "enum": ["front_left", "front_right"] },
-        "hardpoints": {
-          "type": "array",
-          "minItems": 9,
-          "maxItems": 9,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "label", "group", "position"],
-            "properties": {
-              "id": { "type": "string", "minLength": 1 },
-              "label": { "type": "string", "minLength": 1 },
-              "group": { "enum": ["upper_wishbone", "lower_wishbone", "steering", "upright", "wheel"] },
-              "position": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["x", "y", "z"],
-                "properties": {
-                  "x": { "type": "number" },
-                  "y": { "type": "number" },
-                  "z": { "type": "number" }
-                }
-              }
-            }
-          }
-        },
-        "wheel": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["radius", "width"],
-          "properties": {
-            "radius": { "type": "number", "exclusiveMinimum": 0 },
-            "width": { "type": "number", "exclusiveMinimum": 0 },
-            "staticCamberRad": { "type": "number", "minimum": -0.35, "maximum": 0.35, "default": 0 },
-            "staticToeRad": { "type": "number", "minimum": -0.35, "maximum": 0.35, "default": 0 }
-          }
-        },
-        "actuation": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["type", "uprightPickup", "rockerPushrodPickup", "rockerSpringPickup", "rockerAxisStart", "rockerAxisEnd", "springChassisPickup", "springFreeLengthM", "springRateNPerM"],
-          "properties": {
-            "type": { "enum": ["pushrod", "pullrod"] },
-            "uprightPickup": { "$ref": "#/$defs/vec3" },
-            "rockerPushrodPickup": { "$ref": "#/$defs/vec3" },
-            "rockerSpringPickup": { "$ref": "#/$defs/vec3" },
-            "rockerAxisStart": { "$ref": "#/$defs/vec3" },
-            "rockerAxisEnd": { "$ref": "#/$defs/vec3" },
-            "springChassisPickup": { "$ref": "#/$defs/vec3" },
-            "springFreeLengthM": { "type": "number", "exclusiveMinimum": 0 },
-            "springRateNPerM": { "type": "number", "exclusiveMinimum": 0 },
-            "springPreloadN": { "type": "number", "minimum": 0, "default": 0 },
-            "damper": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["rockerPickup", "chassisPickup", "compressionCoefficientNsPerM", "reboundCoefficientNsPerM"],
-              "properties": {
-                "rockerPickup": { "$ref": "#/$defs/vec3" },
-                "chassisPickup": { "$ref": "#/$defs/vec3" },
-                "compressionCoefficientNsPerM": { "type": "number", "minimum": 0 },
-                "reboundCoefficientNsPerM": { "type": "number", "minimum": 0 }
-              }
-            }
-          }
-        }
-      }
-    }
+    "provenance": { "type": "object", "additionalProperties": false, "required": ["sourceLabel"], "properties": { "sourceLabel": { "type": "string", "minLength": 1, "maxLength": 300 }, "migratedFromSchemaVersion": { "type": "string" }, "migrationNote": { "type": "string", "maxLength": 500 } } },
+    "validation": { "type": "object", "additionalProperties": false, "required": ["numerical", "reference", "physical", "engineeringApproval", "evidence"], "properties": { "numerical": { "enum": ["VERIFIED_NUMERICALLY", "PARTIALLY_VERIFIED", "UNVERIFIED"] }, "reference": { "enum": ["REFERENCE_BENCHMARKED", "PARTIALLY_BENCHMARKED", "NOT_BENCHMARKED"] }, "physical": { "const": "UNVALIDATED_PHYSICALLY" }, "engineeringApproval": { "const": "NOT_APPROVED" }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } } } }
   },
   "$defs": {
-    "vec3": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["x", "y", "z"],
+    "cornerId": { "enum": ["front_left", "front_right", "rear_left", "rear_right"] },
+    "nullablePositive": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "vec3": { "type": "object", "additionalProperties": false, "required": ["x", "y", "z"], "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } } },
+    "hardpoint": { "type": "object", "additionalProperties": false, "required": ["id", "label", "group", "position"], "properties": { "id": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "group": { "enum": ["upper_wishbone", "lower_wishbone", "steering", "upright", "wheel"] }, "position": { "$ref": "#/$defs/vec3" } } },
+    "actuation": {
+      "type": "object", "additionalProperties": false, "required": ["type", "uprightPickup", "rockerPushrodPickup", "rockerSpringPickup", "rockerAxisStart", "rockerAxisEnd", "springChassisPickup", "springFreeLengthM", "springRateNPerM"],
+      "properties": { "type": { "enum": ["pushrod", "pullrod"] }, "uprightPickup": { "$ref": "#/$defs/vec3" }, "rockerPushrodPickup": { "$ref": "#/$defs/vec3" }, "rockerSpringPickup": { "$ref": "#/$defs/vec3" }, "rockerAxisStart": { "$ref": "#/$defs/vec3" }, "rockerAxisEnd": { "$ref": "#/$defs/vec3" }, "springChassisPickup": { "$ref": "#/$defs/vec3" }, "springFreeLengthM": { "type": "number", "exclusiveMinimum": 0 }, "springRateNPerM": { "type": "number", "exclusiveMinimum": 0 }, "springPreloadN": { "type": "number", "minimum": 0 }, "damper": { "type": "object", "additionalProperties": false, "required": ["rockerPickup", "chassisPickup", "compressionCoefficientNsPerM", "reboundCoefficientNsPerM"], "properties": { "rockerPickup": { "$ref": "#/$defs/vec3" }, "chassisPickup": { "$ref": "#/$defs/vec3" }, "compressionCoefficientNsPerM": { "type": "number", "minimum": 0 }, "reboundCoefficientNsPerM": { "type": "number", "minimum": 0 } } } }
+    },
+    "suspension": {
+      "type": "object", "additionalProperties": false, "required": ["type", "corner", "hardpoints", "wheel"],
       "properties": {
-        "x": { "type": "number" },
-        "y": { "type": "number" },
-        "z": { "type": "number" }
+        "type": { "const": "double_wishbone" },
+        "corner": { "$ref": "#/$defs/cornerId" },
+        "hardpoints": { "type": "array", "minItems": 9, "maxItems": 9, "items": { "$ref": "#/$defs/hardpoint" } },
+        "wheel": {
+          "type": "object", "additionalProperties": false, "required": ["radius", "width", "staticCamberRad", "staticToeRad"],
+          "properties": { "radius": { "type": "number", "exclusiveMinimum": 0 }, "width": { "type": "number", "exclusiveMinimum": 0 }, "staticCamberRad": { "type": "number", "minimum": -0.35, "maximum": 0.35 }, "staticToeRad": { "type": "number", "minimum": -0.35, "maximum": 0.35 } }
+        },
+        "actuation": { "$ref": "#/$defs/actuation" }
       }
-    }
+    },
+    "vehicleCorner": { "type": "object", "additionalProperties": false, "required": ["id", "label", "geometrySource", "provenanceNote", "suspension"], "properties": { "id": { "$ref": "#/$defs/cornerId" }, "label": { "type": "string", "minLength": 1 }, "geometrySource": { "enum": ["independent", "mirrored_assumption", "synthetic_demo"] }, "derivedFrom": { "$ref": "#/$defs/cornerId" }, "provenanceNote": { "type": "string", "minLength": 1, "maxLength": 500 }, "suspension": { "$ref": "#/$defs/suspension" } } },
+    "evidence": { "type": "object", "additionalProperties": false, "required": ["id", "kind", "title", "source", "recordedAt", "status", "notes"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["numerical_benchmark", "cad_comparison", "physical_measurement", "input_provenance"] }, "title": { "type": "string", "minLength": 1, "maxLength": 160 }, "source": { "type": "string", "minLength": 1, "maxLength": 300 }, "recordedAt": { "type": "string", "format": "date-time" }, "status": { "enum": ["pending_review", "accepted", "rejected"] }, "notes": { "type": "string", "maxLength": 1000 } } }
   }
 }
-

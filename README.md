@@ -1,6 +1,8 @@
 # MSKU Racing Dynamics Studio
 
-An original, browser-based suspension engineering application for MSKU Racing. The current release implements the project foundation, a double-wishbone 3D geometry editor, constrained rigid-link suspension kinematics, guarded quasi-static loads, and benchmarked linear quarter-car, full-car ride, and bicycle-handling models. It does **not** calculate component stress, compliance, nonlinear tyre behavior, or claim physical vehicle correlation.
+Current application release: `0.6.0` · project schema: `2.0.0`.
+
+An original, browser-based suspension and vehicle-dynamics engineering application for MSKU Racing. The current release adds a real four-corner FL/FR/RL/RR vehicle workspace and professional reporting/validation workflow to the double-wishbone geometry editor, constrained rigid-link kinematics, guarded quasi-static loads, benchmarked linear dynamics, and deterministic optimization models. It does **not** calculate component stress, compliance, nonlinear tyre behavior, or claim physical vehicle correlation.
 
 Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specification. The visible model status is `demonstration / unvalidated`.
 
@@ -8,6 +10,13 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 
 ## Implemented
 
+- Project schema `2.0.0` with four independently addressable corners, vehicle dimensions, CG, mass properties, provenance, evidence records, and safe `1.0.0` migration.
+- Full-vehicle Three.js/R3F assembly with distinct FL/FR/RL/RR wheels and suspensions, independent front/rear definitions, configurable wheelbase/tracks/CG, reference chassis/axles/planes, and explicit mirror/synthetic labels.
+- Full vehicle, axle, individual-corner, chassis/CG, suspension, kinematics, and dynamics views with six camera presets and persistent visibility state.
+- Exact stored-input comparison for corner provenance, link lengths, alignment, and hardpoint deltas; calculated cross-corner comparison stays blocked until both corners have independent results.
+- Solver-gated visualization: a kinematic result affects only its solved corner; accepted 7DOF samples drive body heave/pitch/roll and four independent unsprung positions; bicycle steer/yaw visualization uses only returned histories and documented integration.
+- Traceable engineering reports with metadata, inputs, units/frame, vector geometry diagrams, available result plots, solver diagnostics/provenance, warnings, limitations, validation state, and PDF/CSV/JSON output.
+- Validation/evidence register for numerical benchmarks, CAD comparisons, physical measurements, and input provenance; physical validation and engineering approval cannot be granted automatically.
 - Interactive Three.js/R3F corner view with orbit, pan, zoom, presets, selection, mirror view, and visibility controls.
 - Precise hardpoint and wheel-dimension editing using millimetres while storing SI metres.
 - Immediate structural and geometry diagnostics. Invalid models cannot be saved or exported.
@@ -33,7 +42,7 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Verified adapters for hardpoint coordinates, supported quarter/full-car spring-damper parameters, and bicycle cornering stiffness/speed; unsupported metrics are rejected rather than fabricated.
 - Optimization workspace with variable/bound controls, convergence/Pareto plots, candidate diagnostics, non-mutating geometry preview, and explicit apply.
 
-See [PROGRESS.md](./PROGRESS.md), the [Phase 2 verification report](./docs/PHASE_2_VERIFICATION_REPORT.md), the Phase 3 and Phase 4 model/verification reports, the [Phase 5 engineering models](./docs/PHASE_5_ENGINEERING_MODELS.md), the [Phase 5 verification report](./docs/PHASE_5_VERIFICATION_REPORT.md), and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+See [PROGRESS.md](./PROGRESS.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 
@@ -61,7 +70,7 @@ npm run dev
 
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
 
-The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*`. Dynamics endpoints are `POST /api/v1/dynamics/quarter-car/simulate`, `POST /api/v1/dynamics/full-car/simulate`, and `POST /api/v1/dynamics/bicycle/simulate`. Optimization uses `POST /api/v1/optimization/run`. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions.
+The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*`. Dynamics endpoints are `POST /api/v1/dynamics/quarter-car/simulate`, `POST /api/v1/dynamics/full-car/simulate`, and `POST /api/v1/dynamics/bicycle/simulate`. Optimization uses `POST /api/v1/optimization/run`. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions. Playwright starts both web and API test servers automatically.
 
 ## Quality checks
 

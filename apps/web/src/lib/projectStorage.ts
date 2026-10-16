@@ -1,7 +1,8 @@
 import type { Project } from "@msku/contracts";
 import { parseProject } from "@msku/contracts";
 
-export const PROJECT_STORAGE_KEY = "msku-racing:project:active:v1";
+export const PROJECT_STORAGE_KEY = "msku-racing:project:active:v2";
+export const LEGACY_PROJECT_STORAGE_KEY = "msku-racing:project:active:v1";
 
 export const serializeProject = (project: Project): string => JSON.stringify(project, null, 2);
 
@@ -12,7 +13,7 @@ export const saveProjectLocally = (project: Project, storage: Storage = window.l
 };
 
 export const loadProjectLocally = (storage: Storage = window.localStorage): Project | null => {
-  const raw = storage.getItem(PROJECT_STORAGE_KEY);
+  const raw = storage.getItem(PROJECT_STORAGE_KEY) ?? storage.getItem(LEGACY_PROJECT_STORAGE_KEY);
   return raw ? deserializeProject(raw) : null;
 };
 

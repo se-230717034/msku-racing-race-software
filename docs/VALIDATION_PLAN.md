@@ -95,3 +95,22 @@ Still required: independent CAD/rig/track correlation with traceable MSKU Racing
 independent optimization method/budget study for any selected candidate; manufacturing and
 packaging constraints; and engineering review before a candidate is released.
 
+## Phase 6 evidence and remaining gate
+
+- Project contract and API tests require exactly four internally consistent corner definitions and
+  preserve the complete legacy source corner during `1.0.0` migration.
+- Coordinate tests reconstruct the declared 1.6 m wheelbase, 1.44 m front track, and 1.4 m rear track
+  from the four scene assemblies to `1e-10 m` test tolerance for the synthetic fixture.
+- Independent-corner store and Chromium tests verify edit persistence without cross-corner mutation.
+- Playback tests require exact use of four distinct unsprung histories, matching-corner kinematics,
+  trapezoidal yaw integration, and a static/blocked state when supported results are absent.
+- Report tests require provenance, solver/input hashes when results exist, limitations,
+  `UNVALIDATED_PHYSICALLY`, and `NOT_APPROVED` in exported artifacts.
+- Browser acceptance verifies four named scene assemblies, report/diagram controls, evidence entry,
+  and disabled engineering approval.
+
+Still required: controlled MSKU Racing CAD and measurement inputs, independent four-corner motion
+and dynamics comparisons with uncertainty, human review, authenticated revision control, and an
+authorized approval/signature process. Adding an evidence record cannot satisfy those gates by
+itself. See `PHASE_6_VERIFICATION_REPORT.md`.
+

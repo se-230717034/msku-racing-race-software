@@ -3,8 +3,10 @@ import { Camera, Eye, EyeOff, FlipHorizontal2 } from "lucide-react";
 import { useWorkspace, type CameraPreset } from "../store/workspace";
 
 const presets: Array<{ id: CameraPreset; label: string }> = [
-  { id: "perspective", label: "ISO" },
+  { id: "perspective", label: "Perspective" },
+  { id: "isometric", label: "ISO" },
   { id: "front", label: "Front" },
+  { id: "rear", label: "Rear" },
   { id: "side", label: "Side" },
   { id: "top", label: "Top" },
 ];

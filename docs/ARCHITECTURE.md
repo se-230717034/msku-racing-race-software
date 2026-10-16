@@ -28,7 +28,7 @@ All persisted coordinates and dimensions use metres. The initial editor presents
 
 **Status:** accepted.
 
-The current project format uses `schemaVersion: 1.0.0`, Zod validation in the web layer, and Pydantic validation at the API boundary. Browser local storage is a convenience, while JSON remains the portable source. A database is intentionally deferred until multi-user needs exist.
+The current project format uses `schemaVersion: 2.0.0`, Zod validation in the web layer, and Pydantic validation at the API boundary. It stores four corners, vehicle dimensions/CG/mass properties, provenance, and validation evidence. Legacy `1.0.0` projects are migrated without modifying the source record. Browser local storage is a convenience, while JSON remains the portable source. A database is intentionally deferred until multi-user needs exist.
 
 ## ADR-004: Invalid transient edits remain inspectable
 
@@ -45,6 +45,9 @@ JSON/local storage -> structural validation -> geometry diagnostics -> editor/vi
 
 kinematics request -> FastAPI -> engineering solver -> diagnostics + units + quality + provenance
 force/dynamics request -> FastAPI -> engineering solver -> diagnostics + units + quality + provenance
+
+accepted solver sample -> typed result store -> supported full-vehicle transform only
+report snapshot -> metadata + inputs + diagnostics + provenance + limitations + NOT_APPROVED exports
 ```
 
 ## Failure boundaries

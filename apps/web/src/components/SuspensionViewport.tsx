@@ -18,7 +18,9 @@ const LINK_COLORS = {
 
 const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
   perspective: [1.15, 0.8, 1.35],
+  isometric: [1.15, 0.8, 1.35],
   front: [1.8, 0.35, -0.5],
+  rear: [-1.8, 0.35, -0.5],
   side: [0.0, 0.35, 1.8],
   top: [0.0, 2.1, -0.5],
 };
@@ -176,6 +178,7 @@ export function SuspensionViewport({
         <span><i className="axis y" />Y left</span>
         <span><i className="axis z" />Z up</span>
         <span>Internal: m · Editor: mm</span>
+        {mirror && <span>MIRROR ASSUMPTION · visualization only</span>}
         {mode === "loads" && <span>Force arrows: relative scale · values in table</span>}
       </div>
     </div>

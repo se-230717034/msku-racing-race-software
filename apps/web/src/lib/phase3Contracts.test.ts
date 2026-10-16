@@ -30,6 +30,7 @@ describe("Phase 3 versioned contracts", () => {
       springRateNPerM: 10_000,
       springPreloadN: 100,
     };
+    project.vehicle.corners[project.activeCornerId].suspension = project.suspension;
     expect(projectSchema.parse(project).suspension.actuation?.type).toBe("pushrod");
   });
 

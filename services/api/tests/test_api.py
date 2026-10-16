@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from msku_api.main import app
@@ -59,6 +61,61 @@ def demo_project() -> dict[str, object]:
     }
 
 
+def phase_six_project() -> dict[str, object]:
+    project = demo_project()
+    suspension = project["suspension"]
+    assert isinstance(suspension, dict)
+    corners: dict[str, object] = {}
+    for corner_id in ("front_left", "front_right", "rear_left", "rear_right"):
+        corner_suspension = deepcopy(suspension)
+        corner_suspension["corner"] = corner_id
+        if corner_id.endswith("right"):
+            for point in corner_suspension["hardpoints"]:
+                point["position"]["y"] *= -1
+        corners[corner_id] = {
+            "id": corner_id,
+            "label": corner_id.replace("_", " "),
+            "geometrySource": (
+                "independent" if corner_id.endswith("left") else "mirrored_assumption"
+            ),
+            **(
+                {"derivedFrom": corner_id.replace("right", "left")}
+                if corner_id.endswith("right")
+                else {}
+            ),
+            "provenanceNote": "Synthetic API contract fixture; not vehicle data.",
+            "suspension": corner_suspension,
+        }
+    project.update({
+        "schemaVersion": "2.0.0",
+        "activeCornerId": "front_left",
+        "vehicle": {
+            "wheelbaseM": 1.6,
+            "frontTrackM": 1.44,
+            "rearTrackM": 1.4,
+            "cgPositionM": {"x": 0.0, "y": 0.0, "z": 0.29},
+            "massProperties": {
+                "totalMassKg": 324.0,
+                "sprungMassKg": 276.0,
+                "rollInertiaKgM2": 80.0,
+                "pitchInertiaKgM2": 120.0,
+                "yawInertiaKgM2": 150.0,
+                "provenanceNote": "Synthetic API fixture.",
+            },
+            "corners": corners,
+        },
+        "provenance": {"sourceLabel": "Synthetic Phase 6 API fixture"},
+        "validation": {
+            "numerical": "PARTIALLY_VERIFIED",
+            "reference": "PARTIALLY_BENCHMARKED",
+            "physical": "UNVALIDATED_PHYSICALLY",
+            "engineeringApproval": "NOT_APPROVED",
+            "evidence": [],
+        },
+    })
+    return project
+
+
 @pytest.mark.anyio
 async def test_health() -> None:
     async with api_client() as client:
@@ -92,6 +149,23 @@ async def test_valid_demo_project() -> None:
             "units": {"length": "m", "angle": "rad"},
             "diagnostics": [],
         }
+
+
+@pytest.mark.anyio
+async def test_phase_six_four_corner_project_is_accepted() -> None:
+    async with api_client() as client:
+        response = await client.post("/api/v1/projects/validate", json=phase_six_project())
+        assert response.status_code == 200
+        assert response.json()["valid"] is True
+
+
+@pytest.mark.anyio
+async def test_phase_six_project_rejects_missing_or_inconsistent_corner() -> None:
+    project = phase_six_project()
+    del project["vehicle"]["corners"]["rear_right"]
+    async with api_client() as client:
+        response = await client.post("/api/v1/projects/validate", json=project)
+        assert response.status_code == 422
 
 
 @pytest.mark.anyio

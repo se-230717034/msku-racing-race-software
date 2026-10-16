@@ -39,7 +39,7 @@ export function KinematicsWorkspace() {
       return;
     }
     const controller = new AbortController();
-    setLoading();
+    setLoading(project.activeCornerId);
     const timer = window.setTimeout(() => {
       const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
       void fetch(`${baseUrl}/api/v1/kinematics/sweep`, {
@@ -56,7 +56,7 @@ export function KinematicsWorkspace() {
           if (!response.ok) throw new Error(await readError(response));
           return response.json() as Promise<unknown>;
         })
-        .then((payload) => setSweep(kinematicsSweepResponseSchema.parse(payload)))
+        .then((payload) => setSweep(kinematicsSweepResponseSchema.parse(payload), project.activeCornerId))
         .catch((reason: unknown) => {
           if (reason instanceof DOMException && reason.name === "AbortError") return;
           setError(reason instanceof Error ? reason.message : "Kinematics request failed.");

@@ -71,7 +71,7 @@ def validate_corner(
     points: Mapping[str, Sequence[float]],
     wheel_radius_m: float,
     wheel_width_m: float,
-    corner: Literal["front_left", "front_right"] = "front_left",
+    corner: Literal["front_left", "front_right", "rear_left", "rear_right"] = "front_left",
 ) -> list[Diagnostic]:
     """Validate one static corner without claiming mechanism feasibility."""
     diagnostics: list[Diagnostic] = []
@@ -129,7 +129,7 @@ def validate_corner(
         resolved["lca_outboard"][1],
         resolved["tie_rod_outboard"][1],
     )
-    if corner == "front_left":
+    if corner.endswith("left"):
         boundary = min(outboard_y)
         misplaced = tuple(point_id for point_id in inboard_ids if resolved[point_id][1] >= boundary)
     else:
@@ -148,7 +148,7 @@ def validate_corner(
     upright_y = (resolved["uca_outboard"][1], resolved["lca_outboard"][1])
     wheel_is_inboard = (
         resolved["wheel_center"][1] < max(upright_y)
-        if corner == "front_left"
+        if corner.endswith("left")
         else resolved["wheel_center"][1] > min(upright_y)
     )
     if wheel_is_inboard:

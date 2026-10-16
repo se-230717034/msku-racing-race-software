@@ -1,0 +1,285 @@
+import { GizmoHelper, GizmoViewport, Html, Line, OrbitControls } from "@react-three/drei";
+import { Canvas, useThree } from "@react-three/fiber";
+import type { CornerId, FullCarSample, KinematicPose, Project, Suspension, Vec3 } from "@msku/contracts";
+import { useEffect, useMemo, useRef } from "react";
+import { Quaternion, Vector3 } from "three";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+
+import { LINKS, staticWheelAxis, toThreePosition } from "../domain/geometry";
+import {
+  CORNER_IDS,
+  cornerIndex,
+  cornerPointToVehicle,
+  cornerWheelPosition,
+  fullCarVisualState,
+  visibleCornerIds,
+} from "../domain/vehicle";
+import { useKinematics } from "../store/kinematics";
+import { useWorkspace, type CameraPreset, type VisibilityState } from "../store/workspace";
+
+const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
+  perspective: [3.0, 1.65, 2.55],
+  isometric: [3.0, 2.35, 3.0],
+  front: [3.5, 0.65, 0],
+  rear: [-3.5, 0.65, 0],
+  side: [0, 0.75, 3.8],
+  top: [0.01, 4.2, 0],
+};
+
+const LINK_COLORS = {
+  upper: "#dce3ed",
+  lower: "#9da9b8",
+  steering: "#f43f5e",
+  upright: "#f8fafc",
+  wheel: "#fb7185",
+} as const;
+
+const cornerLabel = (cornerId: CornerId): string => ({
+  front_left: "FL",
+  front_right: "FR",
+  rear_left: "RL",
+  rear_right: "RR",
+})[cornerId];
+
+function VehicleCameraRig({ preset }: { preset: CameraPreset }) {
+  const { camera } = useThree();
+  const controls = useRef<OrbitControlsImpl>(null);
+  useEffect(() => {
+    camera.position.set(...CAMERA_POSITIONS[preset]);
+    camera.up.set(0, 1, 0);
+    controls.current?.target.set(0, 0.28, 0);
+    controls.current?.update();
+  }, [camera, preset]);
+  return <OrbitControls ref={controls} makeDefault target={[0, 0.28, 0]} minDistance={0.55} maxDistance={9} />;
+}
+
+const rotateAxisForSteering = (axis: Vec3, steeringRad: number): Vec3 => ({
+  x: Math.cos(steeringRad) * axis.x - Math.sin(steeringRad) * axis.y,
+  y: Math.sin(steeringRad) * axis.x + Math.cos(steeringRad) * axis.y,
+  z: axis.z,
+});
+
+export function VehicleCornerAssembly({
+  project,
+  cornerId,
+  visibility,
+  pose,
+  wheelZOffsetM = 0,
+  steeringRad = 0,
+  showMechanism = true,
+}: {
+  project: Project;
+  cornerId: CornerId;
+  visibility: VisibilityState;
+  pose?: KinematicPose;
+  wheelZOffsetM?: number;
+  steeringRad?: number;
+  showMechanism?: boolean;
+}) {
+  const corner = project.vehicle.corners[cornerId];
+  const suspension: Suspension = corner.suspension;
+  const points = useMemo(
+    () => new Map(suspension.hardpoints.map((point) => [point.id, point.position])),
+    [suspension.hardpoints],
+  );
+
+  const vehiclePoint = (id: string): [number, number, number] => {
+    const source = pose?.hardpoints[id] ?? points.get(id);
+    if (!source) throw new Error(`Corner ${cornerId} is missing ${id}.`);
+    return toThreePosition(cornerPointToVehicle(project, cornerId, source));
+  };
+
+  const wheelCentre = cornerWheelPosition(project, cornerId);
+  const solvedCentre = pose?.hardpoints.wheel_center;
+  const wheelPosition = solvedCentre
+    ? cornerPointToVehicle(project, cornerId, solvedCentre)
+    : { ...wheelCentre, z: wheelCentre.z + wheelZOffsetM };
+  const wheelQuaternion = useMemo((): [number, number, number, number] => {
+    const source = pose?.wheelAxis ?? staticWheelAxis(
+      cornerId,
+      suspension.wheel.staticCamberRad,
+      suspension.wheel.staticToeRad,
+    );
+    const steered = rotateAxisForSteering(source, cornerId.startsWith("front") ? steeringRad : 0);
+    const threeAxis = new Vector3(steered.x, steered.z, -steered.y).normalize();
+    const quaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), threeAxis);
+    return [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
+  }, [cornerId, pose, steeringRad, suspension.wheel.staticCamberRad, suspension.wheel.staticToeRad]);
+
+  return (
+    <group name={`corner-${cornerId}`}>
+      {showMechanism && LINKS.map((link) => visibility[link.group] ? (
+        <Line
+          key={`${cornerId}-${link.id}`}
+          points={[vehiclePoint(link.start), vehiclePoint(link.end)]}
+          color={LINK_COLORS[link.group]}
+          lineWidth={2}
+        />
+      ) : null)}
+      {showMechanism && visibility.hardpoints && suspension.hardpoints.map((point) => (
+        <mesh key={`${cornerId}-${point.id}`} position={vehiclePoint(point.id)}>
+          <sphereGeometry args={[0.011, 14, 14]} />
+          <meshStandardMaterial color="#e7ebf1" />
+        </mesh>
+      ))}
+      {visibility.wheel && (
+        <mesh
+          name={`wheel-${cornerId}`}
+          position={toThreePosition(wheelPosition)}
+          quaternion={wheelQuaternion}
+        >
+          <torusGeometry args={[
+            Math.max(suspension.wheel.radius - suspension.wheel.width / 2, 0.01),
+            Math.max(suspension.wheel.width / 2, 0.005),
+            18,
+            52,
+          ]} />
+          <meshStandardMaterial color="#161b24" roughness={0.78} metalness={0.16} />
+        </mesh>
+      )}
+      {visibility.labels && (
+        <Html position={toThreePosition({ ...wheelPosition, z: wheelPosition.z + suspension.wheel.radius + 0.07 })} center>
+          <span className="scene-label">{cornerLabel(cornerId)} · {corner.geometrySource.replaceAll("_", " ")}</span>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+function ChassisReference({ project, heaveM, pitchRad, rollRad, visible }: {
+  project: Project;
+  heaveM: number;
+  pitchRad: number;
+  rollRad: number;
+  visible: boolean;
+}) {
+  if (!visible) return null;
+  const halfLength = project.vehicle.wheelbaseM * 0.42;
+  const halfWidth = Math.max(project.vehicle.frontTrackM, project.vehicle.rearTrackM) * 0.27;
+  const lowerZ = 0.16;
+  const upperZ = 0.48;
+  const vertices: Vec3[] = [
+    { x: halfLength, y: halfWidth, z: lowerZ }, { x: halfLength, y: -halfWidth, z: lowerZ },
+    { x: -halfLength, y: halfWidth, z: lowerZ }, { x: -halfLength, y: -halfWidth, z: lowerZ },
+    { x: halfLength, y: halfWidth, z: upperZ }, { x: halfLength, y: -halfWidth, z: upperZ },
+    { x: -halfLength, y: halfWidth, z: upperZ }, { x: -halfLength, y: -halfWidth, z: upperZ },
+  ];
+  const edges = [[0, 1], [0, 2], [1, 3], [2, 3], [4, 5], [4, 6], [5, 7], [6, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+  return (
+    <group position={[0, heaveM, 0]} rotation={[rollRad, 0, -pitchRad]} name="reference-chassis-envelope">
+      {edges.map(([start, end]) => (
+        <Line key={`${start}-${end}`} points={[toThreePosition(vertices[start]), toThreePosition(vertices[end])]} color="#7d8999" lineWidth={2} />
+      ))}
+      <mesh position={toThreePosition(project.vehicle.cgPositionM)} name="configured-cg">
+        <sphereGeometry args={[0.045, 20, 20]} />
+        <meshStandardMaterial color="#f59e0b" emissive="#5f3500" />
+      </mesh>
+      <Html position={toThreePosition({ ...project.vehicle.cgPositionM, z: project.vehicle.cgPositionM.z + 0.09 })} center>
+        <span className="scene-label cg">CG · configured</span>
+      </Html>
+    </group>
+  );
+}
+
+function AxleReferences({ project }: { project: Project }) {
+  return <>
+    {(["front", "rear"] as const).map((axle) => {
+      const x = (axle === "front" ? 1 : -1) * project.vehicle.wheelbaseM / 2;
+      const track = axle === "front" ? project.vehicle.frontTrackM : project.vehicle.rearTrackM;
+      return <Line key={axle} points={[toThreePosition({ x, y: -track / 2, z: 0.02 }), toThreePosition({ x, y: track / 2, z: 0.02 })]} color={axle === "front" ? "#ef233c" : "#60a5fa"} lineWidth={1} dashed dashSize={0.04} gapSize={0.025} />;
+    })}
+    <Line points={[toThreePosition({ x: -project.vehicle.wheelbaseM / 2, y: 0, z: 0.015 }), toThreePosition({ x: project.vehicle.wheelbaseM / 2, y: 0, z: 0.015 })]} color="#6ee7b7" lineWidth={1} dashed dashSize={0.05} gapSize={0.03} />
+  </>;
+}
+
+export function FullVehicleViewport({
+  fullCarSample,
+  bicycleYawRad = 0,
+  steeringRad = 0,
+  bicycleResultAvailable = false,
+}: {
+  fullCarSample?: FullCarSample;
+  bicycleYawRad?: number;
+  steeringRad?: number;
+  bicycleResultAvailable?: boolean;
+}) {
+  const project = useWorkspace((state) => state.project);
+  const preset = useWorkspace((state) => state.cameraPreset);
+  const mode = useWorkspace((state) => state.vehicleViewMode);
+  const visibility = useWorkspace((state) => state.visibility);
+  const sweep = useKinematics((state) => state.sweep);
+  const selectedIndex = useKinematics((state) => state.selectedIndex);
+  const solvedCornerId = useKinematics((state) => state.solvedCornerId);
+  const kinematicState = sweep?.states[selectedIndex];
+  const kinematicPose = mode === "kinematics"
+    && solvedCornerId === project.activeCornerId
+    && kinematicState?.calculationStatus === "VERIFIED_NUMERICALLY"
+    ? kinematicState.pose ?? undefined
+    : undefined;
+  const dynamics = fullCarVisualState(mode === "dynamics" ? fullCarSample : undefined);
+  const corners = visibleCornerIds(mode, project.activeCornerId);
+  const showMechanism = mode !== "dynamics";
+  const bodyVisible = visibility.chassis && mode !== "suspension" && mode !== "kinematics";
+  const blockedReason = mode === "kinematics" && !kinematicPose
+    ? `No accepted kinematics pose is available for ${project.activeCornerId.replace("_", " ")}. Run that corner's solver first.`
+    : mode === "dynamics" && !fullCarSample && !bicycleResultAvailable
+      ? "No accepted full-car or bicycle result is available. Run a supported Phase 5 dynamics model first."
+      : null;
+
+  return (
+    <div className="full-vehicle-viewport" data-testid="full-vehicle-viewport">
+      <Canvas camera={{ position: CAMERA_POSITIONS.perspective, fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]}>
+        <color attach="background" args={["#080a0e"]} />
+        <ambientLight intensity={0.78} />
+        <directionalLight position={[3, 4, 2]} intensity={2.3} />
+        <directionalLight position={[-2, 1, -3]} intensity={0.85} color="#ef233c" />
+        {visibility.referencePlanes && <>
+          <gridHelper args={[6, 60, "#303846", "#171c24"]} position={[0, 0, 0]} />
+          <AxleReferences project={project} />
+        </>}
+        <group rotation={[0, bicycleYawRad, 0]}>
+          <ChassisReference
+            project={project}
+            heaveM={dynamics.bodyHeaveM}
+            pitchRad={dynamics.pitchRad}
+            rollRad={dynamics.rollRad}
+            visible={bodyVisible}
+          />
+          {corners.map((cornerId) => (
+            <VehicleCornerAssembly
+              key={cornerId}
+              project={project}
+              cornerId={cornerId}
+              visibility={visibility}
+              pose={cornerId === project.activeCornerId ? kinematicPose : undefined}
+              wheelZOffsetM={dynamics.unsprungDisplacementsM[cornerIndex(cornerId)]}
+              steeringRad={steeringRad}
+              showMechanism={showMechanism}
+            />
+          ))}
+        </group>
+        <VehicleCameraRig preset={preset} />
+        <GizmoHelper alignment="bottom-right" margin={[74, 74]}>
+          <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />
+        </GizmoHelper>
+      </Canvas>
+      <div className="scene-manifest" aria-label="Full vehicle scene assemblies">
+        {CORNER_IDS.map((cornerId) => {
+          const point = cornerWheelPosition(project, cornerId);
+          return <span
+            key={cornerId}
+            data-testid={`wheel-assembly-${cornerId.replace("_", "-")}`}
+            data-x={point.x}
+            data-y={point.y}
+            data-z={point.z + dynamics.unsprungDisplacementsM[cornerIndex(cornerId)]}
+          />;
+        })}
+      </div>
+      <div className="full-vehicle-badge">FOUR-CORNER ASSEMBLY · {mode.replaceAll("_", " ").toUpperCase()}</div>
+      <div className="reference-disclaimer">Chassis envelope and axle lines are references only — no unprovided pickup or actuation geometry is implied.</div>
+      {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7DOF solver sample · chassis heave/pitch/roll + four unsprung histories · suspension links hidden because linkage closure is not in this model.</div>}
+      {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bicycle solver · yaw heading is trapezoid-integrated from calculated yaw rate; front wheel steer uses the supplied steering history.</div>}
+      {blockedReason && <div className="vehicle-blocked">{blockedReason}</div>}
+    </div>
+  );
+}

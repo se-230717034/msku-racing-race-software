@@ -33,5 +33,12 @@ manufacturing/packaging constraints, and physical candidate validation remain op
 
 ## Phase 6 — Professional workflows
 
-Comparison, traceable reports, revision history, validation reports, templates, and optional authenticated persistence.
+Implemented: four-corner vehicle schema and visualization, safe legacy migration, independent corner
+editing, solver-driven kinematics/full-car/bicycle playback, traceable PDF/CSV/JSON reports, and an
+evidence-led validation register. See `PHASE_6_ENGINEERING_ARCHITECTURE.md` and
+`PHASE_6_VERIFICATION_REPORT.md`.
+
+Remaining product work: controlled MSKU Racing data import, CAD/measurement comparison automation,
+authenticated persistence, revision history, roles, electronic signatures, report templates, and a
+human-governed approval workflow. None is represented as complete in the current application.
 

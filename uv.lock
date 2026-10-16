@@ -331,7 +331,7 @@ wheels = [
 
 [[package]]
 name = "msku-api"
-version = "0.1.0"
+version = "0.6.0"
 source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
@@ -368,7 +368,7 @@ dev = [
 
 [[package]]
 name = "msku-engineering"
-version = "0.1.0"
+version = "0.6.0"
 source = { editable = "packages/engineering" }
 dependencies = [
     { name = "numpy" },

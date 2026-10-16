@@ -68,7 +68,7 @@ export const staticWheelAxis = (
   camberRad: number,
   toeRad: number,
 ): Vec3 => {
-  const side = corner === "front_left" ? 1 : -1;
+  const side = corner.endsWith("left") ? 1 : -1;
   const afterCamber = {
     x: 0,
     y: side * Math.cos(camberRad),
@@ -176,7 +176,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     "lca_rear_inboard",
     "tie_rod_inboard",
   ];
-  const isLeft = project.suspension.corner === "front_left";
+  const isLeft = project.suspension.corner.endsWith("left");
   const boundary = isLeft ? Math.min(...outboardY) : Math.max(...outboardY);
   const misplaced = inboardIds.filter((id) =>
     isLeft ? points.get(id)!.position.y >= boundary : points.get(id)!.position.y <= boundary,

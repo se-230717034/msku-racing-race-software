@@ -51,9 +51,12 @@ class ActuationGeometry(StrictModel):
     damper: DamperDefinition | None = None
 
 
+CornerId = Literal["front_left", "front_right", "rear_left", "rear_right"]
+
+
 class Suspension(StrictModel):
     type: Literal["double_wishbone"]
-    corner: Literal["front_left", "front_right"]
+    corner: CornerId
     hardpoints: list[Hardpoint] = Field(min_length=9, max_length=9)
     wheel: Wheel
     actuation: ActuationGeometry | None = None
@@ -78,8 +81,73 @@ class CoordinateSystem(StrictModel):
     zAxis: Literal["up"]
 
 
+class VehicleCorner(StrictModel):
+    id: CornerId
+    label: str = Field(min_length=1)
+    geometrySource: Literal["independent", "mirrored_assumption", "synthetic_demo"]
+    derivedFrom: CornerId | None = None
+    provenanceNote: str = Field(min_length=1, max_length=500)
+    suspension: Suspension
+
+
+class VehicleMassProperties(StrictModel):
+    totalMassKg: float | None = Field(default=None, gt=0)
+    sprungMassKg: float | None = Field(default=None, gt=0)
+    rollInertiaKgM2: float | None = Field(default=None, gt=0)
+    pitchInertiaKgM2: float | None = Field(default=None, gt=0)
+    yawInertiaKgM2: float | None = Field(default=None, gt=0)
+    provenanceNote: str = Field(min_length=1, max_length=500)
+
+
+class VehicleDefinition(StrictModel):
+    wheelbaseM: float = Field(gt=0)
+    frontTrackM: float = Field(gt=0)
+    rearTrackM: float = Field(gt=0)
+    cgPositionM: Vec3
+    massProperties: VehicleMassProperties
+    corners: dict[CornerId, VehicleCorner]
+
+    @model_validator(mode="after")
+    def four_corners_are_consistent(self) -> VehicleDefinition:
+        expected = {"front_left", "front_right", "rear_left", "rear_right"}
+        if set(self.corners) != expected:
+            raise ValueError("vehicle.corners must contain exactly FL, FR, RL, and RR")
+        for corner_id, corner in self.corners.items():
+            if corner.id != corner_id or corner.suspension.corner != corner_id:
+                raise ValueError(f"corner {corner_id} identifiers are inconsistent")
+            if corner.geometrySource == "mirrored_assumption" and corner.derivedFrom is None:
+                raise ValueError(f"mirrored corner {corner_id} must declare derivedFrom")
+        return self
+
+
+class ProjectProvenance(StrictModel):
+    sourceLabel: str = Field(min_length=1, max_length=300)
+    migratedFromSchemaVersion: str | None = None
+    migrationNote: str | None = Field(default=None, max_length=500)
+
+
+class ValidationEvidence(StrictModel):
+    id: str = Field(min_length=1)
+    kind: Literal[
+        "numerical_benchmark", "cad_comparison", "physical_measurement", "input_provenance"
+    ]
+    title: str = Field(min_length=1, max_length=160)
+    source: str = Field(min_length=1, max_length=300)
+    recordedAt: datetime
+    status: Literal["pending_review", "accepted", "rejected"]
+    notes: str = Field(max_length=1000)
+
+
+class ProjectValidation(StrictModel):
+    numerical: Literal["VERIFIED_NUMERICALLY", "PARTIALLY_VERIFIED", "UNVERIFIED"]
+    reference: Literal["REFERENCE_BENCHMARKED", "PARTIALLY_BENCHMARKED", "NOT_BENCHMARKED"]
+    physical: Literal["UNVALIDATED_PHYSICALLY"]
+    engineeringApproval: Literal["NOT_APPROVED"]
+    evidence: list[ValidationEvidence]
+
+
 class Project(StrictModel):
-    schemaVersion: Literal["1.0.0"]
+    schemaVersion: Literal["1.0.0", "2.0.0"]
     projectId: str = Field(min_length=1)
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(max_length=500)
@@ -90,6 +158,26 @@ class Project(StrictModel):
     units: Units
     coordinateSystem: CoordinateSystem
     suspension: Suspension
+    activeCornerId: CornerId | None = None
+    vehicle: VehicleDefinition | None = None
+    provenance: ProjectProvenance | None = None
+    validation: ProjectValidation | None = None
+
+    @model_validator(mode="after")
+    def phase_six_fields_are_consistent(self) -> Project:
+        if self.schemaVersion == "2.0.0":
+            required = (self.activeCornerId, self.vehicle, self.provenance, self.validation)
+            if any(item is None for item in required):
+                raise ValueError(
+                    "schema 2.0.0 requires activeCornerId, vehicle, provenance, and validation"
+                )
+            assert self.activeCornerId is not None and self.vehicle is not None
+            active = self.vehicle.corners[self.activeCornerId]
+            if active.suspension != self.suspension:
+                raise ValueError(
+                    "active suspension snapshot must match the selected vehicle corner"
+                )
+        return self
 
 
 class DiagnosticResponse(StrictModel):

@@ -105,8 +105,9 @@ export function GeometryInspector() {
       <section className="inspector-section">
         <div className="section-heading">
           <span className="eyebrow">GEOMETRY INPUT</span>
-          <span className="unit-chip">mm</span>
+          <span className="unit-chip">{project.activeCornerId.replace("_", " ")} · mm</span>
         </div>
+        <p className="field-note">{project.vehicle.corners[project.activeCornerId].geometrySource.replaceAll("_", " ")} · {project.vehicle.corners[project.activeCornerId].provenanceNote}</p>
         <label className="select-field" htmlFor="hardpoint-select">
           <span>Selected hardpoint</span>
           <select id="hardpoint-select" value={selected.id} onChange={(event) => select(event.target.value)}>

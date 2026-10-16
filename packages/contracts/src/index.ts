@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const PROJECT_SCHEMA_VERSION = "1.0.0" as const;
+export const API_SCHEMA_VERSION = "1.0.0" as const;
+export const PROJECT_SCHEMA_VERSION = "2.0.0" as const;
 
 export const vec3Schema = z.object({
   x: z.number().finite(),
@@ -34,6 +35,51 @@ export const actuationGeometrySchema = z.object({
   }).optional(),
 });
 
+export const cornerIdSchema = z.enum(["front_left", "front_right", "rear_left", "rear_right"]);
+
+export const suspensionSchema = z.object({
+  type: z.literal("double_wishbone"),
+  corner: cornerIdSchema,
+  hardpoints: z.array(hardpointSchema).length(9),
+  wheel: z.object({
+    radius: z.number().finite().positive(),
+    width: z.number().finite().positive(),
+    staticCamberRad: z.number().finite().min(-0.35).max(0.35).default(0),
+    staticToeRad: z.number().finite().min(-0.35).max(0.35).default(0),
+  }),
+  actuation: actuationGeometrySchema.optional(),
+});
+
+export const vehicleCornerSchema = z.object({
+  id: cornerIdSchema,
+  label: z.string().min(1),
+  geometrySource: z.enum(["independent", "mirrored_assumption", "synthetic_demo"]),
+  derivedFrom: cornerIdSchema.optional(),
+  provenanceNote: z.string().min(1).max(500),
+  suspension: suspensionSchema,
+});
+
+export const validationEvidenceSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(["numerical_benchmark", "cad_comparison", "physical_measurement", "input_provenance"]),
+  title: z.string().min(1).max(160),
+  source: z.string().min(1).max(300),
+  recordedAt: z.string().datetime(),
+  status: z.enum(["pending_review", "accepted", "rejected"]),
+  notes: z.string().max(1000),
+});
+
+const canonicalJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([first], [second]) => first.localeCompare(second))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+};
+
 export const projectSchema = z.object({
   schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
   projectId: z.string().min(1),
@@ -53,23 +99,66 @@ export const projectSchema = z.object({
     yAxis: z.literal("left"),
     zAxis: z.literal("up"),
   }),
-  suspension: z.object({
-    type: z.literal("double_wishbone"),
-    corner: z.enum(["front_left", "front_right"]),
-    hardpoints: z.array(hardpointSchema).length(9),
-    wheel: z.object({
-      radius: z.number().finite().positive(),
-      width: z.number().finite().positive(),
-      staticCamberRad: z.number().finite().min(-0.35).max(0.35).default(0),
-      staticToeRad: z.number().finite().min(-0.35).max(0.35).default(0),
+  activeCornerId: cornerIdSchema,
+  suspension: suspensionSchema,
+  vehicle: z.object({
+    wheelbaseM: z.number().finite().positive(),
+    frontTrackM: z.number().finite().positive(),
+    rearTrackM: z.number().finite().positive(),
+    cgPositionM: vec3Schema,
+    massProperties: z.object({
+      totalMassKg: z.number().finite().positive().nullable(),
+      sprungMassKg: z.number().finite().positive().nullable(),
+      rollInertiaKgM2: z.number().finite().positive().nullable(),
+      pitchInertiaKgM2: z.number().finite().positive().nullable(),
+      yawInertiaKgM2: z.number().finite().positive().nullable(),
+      provenanceNote: z.string().min(1).max(500),
     }),
-    actuation: actuationGeometrySchema.optional(),
+    corners: z.object({
+      front_left: vehicleCornerSchema,
+      front_right: vehicleCornerSchema,
+      rear_left: vehicleCornerSchema,
+      rear_right: vehicleCornerSchema,
+    }),
   }),
+  provenance: z.object({
+    sourceLabel: z.string().min(1).max(300),
+    migratedFromSchemaVersion: z.string().optional(),
+    migrationNote: z.string().max(500).optional(),
+  }),
+  validation: z.object({
+    numerical: z.enum(["VERIFIED_NUMERICALLY", "PARTIALLY_VERIFIED", "UNVERIFIED"]),
+    reference: z.enum(["REFERENCE_BENCHMARKED", "PARTIALLY_BENCHMARKED", "NOT_BENCHMARKED"]),
+    physical: z.literal("UNVALIDATED_PHYSICALLY"),
+    engineeringApproval: z.literal("NOT_APPROVED"),
+    evidence: z.array(validationEvidenceSchema),
+  }),
+}).superRefine((project, context) => {
+  const active = project.vehicle.corners[project.activeCornerId];
+  if (active.id !== project.activeCornerId || active.suspension.corner !== project.activeCornerId) {
+    context.addIssue({ code: "custom", message: "Active corner identifiers must be internally consistent." });
+  }
+  if (canonicalJson(active.suspension) !== canonicalJson(project.suspension)) {
+    context.addIssue({ code: "custom", message: "The active suspension snapshot must match vehicle.corners[activeCornerId]." });
+  }
+  for (const cornerId of cornerIdSchema.options) {
+    const corner = project.vehicle.corners[cornerId];
+    if (corner.id !== cornerId || corner.suspension.corner !== cornerId) {
+      context.addIssue({ code: "custom", message: `Corner key ${cornerId} does not match its identifiers.` });
+    }
+    if (corner.geometrySource === "mirrored_assumption" && !corner.derivedFrom) {
+      context.addIssue({ code: "custom", message: `Mirrored corner ${cornerId} must identify its source corner.` });
+    }
+  }
 });
 
 export type Vec3 = z.infer<typeof vec3Schema>;
 export type Hardpoint = z.infer<typeof hardpointSchema>;
 export type ActuationGeometry = z.infer<typeof actuationGeometrySchema>;
+export type CornerId = z.infer<typeof cornerIdSchema>;
+export type Suspension = z.infer<typeof suspensionSchema>;
+export type VehicleCorner = z.infer<typeof vehicleCornerSchema>;
+export type ValidationEvidence = z.infer<typeof validationEvidenceSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type ModelStatus = Project["modelStatus"];
 
@@ -85,11 +174,70 @@ export const REQUIRED_HARDPOINT_IDS = [
   "wheel_center",
 ] as const;
 
-export const createDemoProject = (projectId = "msku-demo-front-left"): Project => ({
+const frontLeftDemoSuspension = (): Suspension => ({
+  type: "double_wishbone",
+  corner: "front_left",
+  hardpoints: [
+    { id: "uca_front_inboard", label: "UCA front inboard", group: "upper_wishbone", position: { x: 0.18, y: 0.31, z: 0.46 } },
+    { id: "uca_rear_inboard", label: "UCA rear inboard", group: "upper_wishbone", position: { x: -0.16, y: 0.30, z: 0.45 } },
+    { id: "uca_outboard", label: "UCA outboard", group: "upper_wishbone", position: { x: 0.01, y: 0.64, z: 0.40 } },
+    { id: "lca_front_inboard", label: "LCA front inboard", group: "lower_wishbone", position: { x: 0.22, y: 0.27, z: 0.19 } },
+    { id: "lca_rear_inboard", label: "LCA rear inboard", group: "lower_wishbone", position: { x: -0.19, y: 0.26, z: 0.18 } },
+    { id: "lca_outboard", label: "LCA outboard", group: "lower_wishbone", position: { x: 0.0, y: 0.68, z: 0.17 } },
+    { id: "tie_rod_inboard", label: "Tie rod inboard", group: "steering", position: { x: -0.12, y: 0.29, z: 0.25 } },
+    { id: "tie_rod_outboard", label: "Tie rod outboard", group: "steering", position: { x: -0.09, y: 0.67, z: 0.26 } },
+    { id: "wheel_center", label: "Wheel centre", group: "wheel", position: { x: 0.0, y: 0.72, z: 0.285 } },
+  ],
+  wheel: { radius: 0.2286, width: 0.18, staticCamberRad: 0, staticToeRad: 0 },
+});
+
+const cloneSuspensionForCorner = (
+  source: Suspension,
+  corner: CornerId,
+  adjustments: Partial<Record<string, Vec3>> = {},
+): Suspension => {
+  const side = corner.endsWith("left") ? 1 : -1;
+  return {
+    ...source,
+    corner,
+    hardpoints: source.hardpoints.map((point) => {
+      const adjusted = adjustments[point.id] ?? point.position;
+      return { ...point, position: { ...adjusted, y: Math.abs(adjusted.y) * side } };
+    }),
+    wheel: { ...source.wheel },
+  };
+};
+
+const demoCorners = (): Project["vehicle"]["corners"] => {
+  const frontLeft = frontLeftDemoSuspension();
+  const rearLeft = cloneSuspensionForCorner(frontLeft, "rear_left", {
+    uca_front_inboard: { x: 0.17, y: 0.30, z: 0.44 },
+    uca_rear_inboard: { x: -0.15, y: 0.29, z: 0.43 },
+    uca_outboard: { x: 0.0, y: 0.62, z: 0.385 },
+    lca_front_inboard: { x: 0.20, y: 0.26, z: 0.185 },
+    lca_rear_inboard: { x: -0.18, y: 0.25, z: 0.175 },
+    lca_outboard: { x: 0.0, y: 0.65, z: 0.165 },
+    tie_rod_inboard: { x: 0.11, y: 0.28, z: 0.245 },
+    tie_rod_outboard: { x: 0.08, y: 0.64, z: 0.25 },
+    wheel_center: { x: 0.0, y: 0.70, z: 0.285 },
+  });
+  const frontRight = cloneSuspensionForCorner(frontLeft, "front_right");
+  const rearRight = cloneSuspensionForCorner(rearLeft, "rear_right");
+  return {
+    front_left: { id: "front_left", label: "Front left", geometrySource: "synthetic_demo", provenanceNote: "Independent synthetic Phase 6 demonstration definition; not vehicle data.", suspension: frontLeft },
+    front_right: { id: "front_right", label: "Front right", geometrySource: "mirrored_assumption", derivedFrom: "front_left", provenanceNote: "Explicit mirror assumption from the synthetic front-left definition.", suspension: frontRight },
+    rear_left: { id: "rear_left", label: "Rear left", geometrySource: "synthetic_demo", provenanceNote: "Independent synthetic rear geometry; not copied from the front axle and not vehicle data.", suspension: rearLeft },
+    rear_right: { id: "rear_right", label: "Rear right", geometrySource: "mirrored_assumption", derivedFrom: "rear_left", provenanceNote: "Explicit mirror assumption from the synthetic rear-left definition.", suspension: rearRight },
+  };
+};
+
+export const createDemoProject = (projectId = "msku-demo-full-vehicle"): Project => {
+  const corners = demoCorners();
+  return ({
   schemaVersion: PROJECT_SCHEMA_VERSION,
   projectId,
-  name: "Front-left demonstration corner",
-  description: "Synthetic geometry for software demonstration only; not MSKU Racing vehicle data.",
+  name: "Full-vehicle demonstration project",
+  description: "Four-corner synthetic geometry for software demonstration only; not MSKU Racing vehicle data.",
   createdAt: "2026-10-15T00:00:00.000Z",
   updatedAt: "2026-10-15T00:00:00.000Z",
   dataClassification: "demonstration",
@@ -101,25 +249,119 @@ export const createDemoProject = (projectId = "msku-demo-front-left"): Project =
     yAxis: "left",
     zAxis: "up",
   },
-  suspension: {
-    type: "double_wishbone",
-    corner: "front_left",
-    hardpoints: [
-      { id: "uca_front_inboard", label: "UCA front inboard", group: "upper_wishbone", position: { x: 0.18, y: 0.31, z: 0.46 } },
-      { id: "uca_rear_inboard", label: "UCA rear inboard", group: "upper_wishbone", position: { x: -0.16, y: 0.30, z: 0.45 } },
-      { id: "uca_outboard", label: "UCA outboard", group: "upper_wishbone", position: { x: 0.01, y: 0.64, z: 0.40 } },
-      { id: "lca_front_inboard", label: "LCA front inboard", group: "lower_wishbone", position: { x: 0.22, y: 0.27, z: 0.19 } },
-      { id: "lca_rear_inboard", label: "LCA rear inboard", group: "lower_wishbone", position: { x: -0.19, y: 0.26, z: 0.18 } },
-      { id: "lca_outboard", label: "LCA outboard", group: "lower_wishbone", position: { x: 0.0, y: 0.68, z: 0.17 } },
-      { id: "tie_rod_inboard", label: "Tie rod inboard", group: "steering", position: { x: -0.12, y: 0.29, z: 0.25 } },
-      { id: "tie_rod_outboard", label: "Tie rod outboard", group: "steering", position: { x: -0.09, y: 0.67, z: 0.26 } },
-      { id: "wheel_center", label: "Wheel centre", group: "wheel", position: { x: 0.0, y: 0.72, z: 0.285 } },
-    ],
-    wheel: { radius: 0.2286, width: 0.18, staticCamberRad: 0, staticToeRad: 0 },
+  activeCornerId: "front_left",
+  suspension: corners.front_left.suspension,
+  vehicle: {
+    wheelbaseM: 1.6,
+    frontTrackM: 1.44,
+    rearTrackM: 1.4,
+    cgPositionM: { x: 0, y: 0, z: 0.29 },
+    massProperties: {
+      totalMassKg: 324,
+      sprungMassKg: 276,
+      rollInertiaKgM2: 80,
+      pitchInertiaKgM2: 120,
+      yawInertiaKgM2: 150,
+      provenanceNote: "Synthetic demonstration values; replace with weighed/measured team data.",
+    },
+    corners,
   },
+  provenance: { sourceLabel: "Bundled synthetic Phase 6 demonstration vehicle" },
+  validation: {
+    numerical: "PARTIALLY_VERIFIED",
+    reference: "PARTIALLY_BENCHMARKED",
+    physical: "UNVALIDATED_PHYSICALLY",
+    engineeringApproval: "NOT_APPROVED",
+    evidence: [],
+  },
+  });
+};
+
+const legacyProjectSchema = z.object({
+  schemaVersion: z.literal("1.0.0"),
+  projectId: z.string().min(1),
+  name: z.string().min(1).max(120),
+  description: z.string().max(500),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  dataClassification: z.enum(["demonstration", "team_private"]),
+  modelStatus: z.enum(["demonstration", "unvalidated", "benchmarked", "experimentally_validated"]),
+  units: z.object({ length: z.literal("m"), angle: z.literal("rad") }),
+  coordinateSystem: z.object({
+    handedness: z.literal("right"),
+    xAxis: z.literal("forward"),
+    yAxis: z.literal("left"),
+    zAxis: z.literal("up"),
+  }),
+  suspension: suspensionSchema.extend({ corner: z.enum(["front_left", "front_right"]) }),
 });
 
-export const parseProject = (input: unknown): Project => projectSchema.parse(input);
+export const migrateLegacyProject = (input: unknown): Project => {
+  const legacy = legacyProjectSchema.parse(input);
+  const migrated = createDemoProject(legacy.projectId);
+  const activeId = legacy.suspension.corner;
+  const oppositeId: CornerId = activeId === "front_right" ? "front_left" : "front_right";
+  const activeSuspension: Suspension = {
+    ...legacy.suspension,
+    hardpoints: legacy.suspension.hardpoints.map((point) => ({
+      ...point,
+      position: { ...point.position },
+    })),
+    wheel: { ...legacy.suspension.wheel },
+  };
+  const oppositeSuspension = cloneSuspensionForCorner(activeSuspension, oppositeId);
+  const corners = {
+    ...migrated.vehicle.corners,
+    [activeId]: {
+      id: activeId,
+      label: activeId.replace("_", " "),
+      geometrySource: "independent" as const,
+      provenanceNote: "Preserved exactly from imported project schema 1.0.0.",
+      suspension: activeSuspension,
+    },
+    [oppositeId]: {
+      id: oppositeId,
+      label: oppositeId.replace("_", " "),
+      geometrySource: "mirrored_assumption" as const,
+      derivedFrom: activeId,
+      provenanceNote: "Generated during migration as an explicit mirror assumption; not measured geometry.",
+      suspension: oppositeSuspension,
+    },
+  };
+  return projectSchema.parse({
+    ...migrated,
+    name: legacy.name,
+    description: legacy.description,
+    createdAt: legacy.createdAt,
+    updatedAt: legacy.updatedAt,
+    dataClassification: legacy.dataClassification,
+    modelStatus: legacy.modelStatus === "experimentally_validated" ? "unvalidated" : legacy.modelStatus,
+    units: legacy.units,
+    coordinateSystem: legacy.coordinateSystem,
+    activeCornerId: activeId,
+    suspension: activeSuspension,
+    vehicle: { ...migrated.vehicle, corners },
+    provenance: {
+      sourceLabel: "Imported legacy project",
+      migratedFromSchemaVersion: "1.0.0",
+      migrationNote: "Original corner preserved; missing corners added as clearly labeled synthetic or mirrored assumptions.",
+    },
+    validation: {
+      numerical: "UNVERIFIED",
+      reference: "NOT_BENCHMARKED",
+      physical: "UNVALIDATED_PHYSICALLY",
+      engineeringApproval: "NOT_APPROVED",
+      evidence: [],
+    },
+  });
+};
+
+export const parseProject = (input: unknown): Project => {
+  const version = typeof input === "object" && input !== null && "schemaVersion" in input
+    ? (input as { schemaVersion?: unknown }).schemaVersion
+    : undefined;
+  return version === "1.0.0" ? migrateLegacyProject(input) : projectSchema.parse(input);
+};
 
 export const solverDiagnosticsSchema = z.object({
   converged: z.boolean(),
@@ -209,7 +451,7 @@ export const memberForceSchema = z.object({
 });
 
 export const uprightEquilibriumResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   calculationStatus: phase3CalculationStatusSchema,
   validationStatus: phase3ValidationStatusSchema,
   solverVersion: z.string(),
@@ -233,7 +475,7 @@ export const uprightEquilibriumResponseSchema = z.object({
 });
 
 export const vehicleLoadTransferResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   calculationStatus: phase3CalculationStatusSchema,
   validationStatus: phase3ValidationStatusSchema,
   solverVersion: z.string(),
@@ -255,7 +497,7 @@ export const vehicleLoadTransferResponseSchema = z.object({
 });
 
 export const actuationSeriesResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   calculationStatus: phase3CalculationStatusSchema,
   validationStatus: phase3ValidationStatusSchema,
   solverVersion: z.string(),
@@ -341,7 +583,7 @@ export const quarterCarSampleSchema = z.object({
 });
 
 export const quarterCarSimulationResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   modelName: z.literal("linear_quarter_car_2dof"),
   calculationStatus: phase3CalculationStatusSchema,
   validationStatus: phase3ValidationStatusSchema,
@@ -459,7 +701,7 @@ export const fullCarSampleSchema = z.object({
 });
 
 export const fullCarSimulationResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   modelName: z.literal("linear_full_car_7dof"),
   calculationStatus: phase3CalculationStatusSchema,
   validationStatus: phase3ValidationStatusSchema,
@@ -553,7 +795,7 @@ export const bicycleSampleSchema = z.object({
 });
 
 export const bicycleSimulationResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   modelName: z.literal("linear_planar_bicycle"),
   calculationStatus: phase3CalculationStatusSchema,
   validationStatus: phase3ValidationStatusSchema,
@@ -671,7 +913,7 @@ export const optimizationCandidateSchema = z.object({
 });
 
 export const engineeringOptimizationResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   model: z.enum(["kinematics", "quarter_car", "full_car", "bicycle"]),
   calculationStatus: z.enum(["VERIFIED_NUMERICALLY", "FAILED"]),
   validationStatus: phase3ValidationStatusSchema,
@@ -725,7 +967,7 @@ export const solverMetadataSchema = z.object({
 });
 
 export const kinematicsSweepResponseSchema = z.object({
-  schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
   modelStatus: z.literal("unvalidated"),
   units: z.object({
     length: z.literal("m"),

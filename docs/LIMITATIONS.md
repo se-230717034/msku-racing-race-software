@@ -1,6 +1,6 @@
 # Limitations
 
-The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigid-link kinematics, the reliable Phase 3 quasi-static subset, Phase 4 quarter-car dynamics, and the Phase 5 linear full-car, bicycle, and optimization models.
+The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigid-link kinematics, the reliable Phase 3 quasi-static subset, Phase 4 quarter-car dynamics, the Phase 5 linear full-car/bicycle/optimization models, and Phase 6 four-corner workflows and reporting.
 
 - All included hardpoints are synthetic demonstration values. They are not MSKU Racing vehicle data.
 - The solver is numerically verified and reference benchmarked as documented in `PHASE_2_VERIFICATION_REPORT.md`; the demonstration vehicle model remains physically unvalidated because no MSKU Racing CAD or physical comparison has been supplied.
@@ -46,10 +46,20 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
 - Reported sensitivities are local finite differences and may be unavailable at a feasibility boundary.
 - Candidate geometry preview is non-mutating; explicit apply changes inputs only and does not grant
   physical validation or engineering approval.
-- Mirroring is a view operation, not a saved second-corner model.
+- All four corners are saved separately. Bundled right-side corners are explicit mirror assumptions,
+  not measured independent geometry; a solved corner is never reused as another corner's solution.
+- The full-vehicle chassis is a non-structural reference envelope. It does not imply tube layout,
+  suspension attachment points, actuation geometry, stiffness, mass distribution, or crash structure.
+- The 7DOF playback moves the body and four wheels from solver histories but hides suspension links
+  because that model does not solve link closure. Bicycle display is limited to supplied steering and
+  yaw rate integrated for heading.
+- Direct PDF export is a traceable textual summary. Use the print/PDF report path when vector geometry
+  diagrams and the plot preview are required in the PDF deliverable.
+- Validation evidence records do not constitute signatures or approval. The project schema remains
+  `UNVALIDATED_PHYSICALLY` and `NOT_APPROVED`.
 - Browser local storage is device-local and has no revision history, access control, or collaboration.
 - No official MSKU Racing logo is bundled. The UI uses a text-only wordmark.
 - Hosted deployment is not configured because provider accounts and credentials were not provided.
 
-No structural stress or detailed nonlinear tyre force is calculated. Phases 2–5 are numerically benchmarked within their stated model scopes but physically unvalidated. Do not use this release for design sign-off or safety decisions.
+No structural stress or detailed nonlinear tyre force is calculated. Phases 2–6 are software-verified within their stated scopes but the vehicle is physically unvalidated. Do not use this release for design sign-off or safety decisions.
 

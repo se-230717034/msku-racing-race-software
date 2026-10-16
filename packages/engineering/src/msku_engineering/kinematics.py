@@ -20,7 +20,7 @@ from scipy.spatial.transform import Rotation
 
 from .geometry import GeometryError
 
-Corner = Literal["front_left", "front_right"]
+Corner = Literal["front_left", "front_right", "rear_left", "rear_right"]
 CalculationStatus = Literal["VERIFIED_NUMERICALLY", "FAILED"]
 
 KINEMATICS_SOLVER_VERSION = "2.5.0"
@@ -153,11 +153,11 @@ def static_wheel_axis(corner: Corner, camber_rad: float, toe_rad: float) -> NDAr
     The resulting closed form is
     ``[sin(toe) cos(camber), side cos(toe) cos(camber), -sin(camber)]``.
     """
-    if corner not in ("front_left", "front_right"):
+    if corner not in ("front_left", "front_right", "rear_left", "rear_right"):
         raise GeometryError(f"Unsupported suspension corner: {corner}")
     if not np.isfinite(camber_rad) or not np.isfinite(toe_rad):
         raise GeometryError("Static camber and toe must be finite")
-    side = 1.0 if corner == "front_left" else -1.0
+    side = 1.0 if corner.endswith("left") else -1.0
     nominal_axis = np.asarray([0.0, side, 0.0], dtype=np.float64)
     axis = _rotation_z(-side * toe_rad) @ _rotation_x(-side * camber_rad) @ nominal_axis
     return axis / np.linalg.norm(axis)
@@ -165,9 +165,9 @@ def static_wheel_axis(corner: Corner, camber_rad: float, toe_rad: float) -> NDAr
 
 def wheel_angles(axis: NDArray[np.float64], corner: Corner) -> tuple[float, float]:
     """Extract signed camber and toe from an outward-pointing wheel axis."""
-    if corner not in ("front_left", "front_right"):
+    if corner not in ("front_left", "front_right", "rear_left", "rear_right"):
         raise GeometryError(f"Unsupported suspension corner: {corner}")
-    side = 1.0 if corner == "front_left" else -1.0
+    side = 1.0 if corner.endswith("left") else -1.0
     norm = float(np.linalg.norm(axis))
     if not np.isfinite(norm) or norm <= 1.0e-12:
         raise GeometryError("Wheel axis must be a finite nonzero vector")
@@ -355,7 +355,7 @@ def _metrics(
     static_toe_rad: float,
     corner: Corner,
 ) -> tuple[KinematicMetrics, tuple[str, ...], NDArray[np.float64]]:
-    side = 1.0 if corner == "front_left" else -1.0
+    side = 1.0 if corner.endswith("left") else -1.0
     wheel_axis = rotation_matrix @ static_wheel_axis(corner, static_camber_rad, static_toe_rad)
     camber, toe = wheel_angles(wheel_axis, corner)
 

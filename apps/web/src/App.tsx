@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Box, CheckCircle2, Database, Gauge, GitCompareArrows, Menu, Route, Scale, TestTubeDiagonal, Waypoints } from "lucide-react";
+import { Activity, AlertTriangle, Box, Car, CheckCircle2, Database, FileText, Gauge, GitCompareArrows, Menu, Route, Scale, TestTubeDiagonal, Waypoints } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { GeometryInspector } from "./components/GeometryInspector";
@@ -11,6 +11,9 @@ import { useWorkspace, type ModuleId } from "./store/workspace";
 const KinematicsWorkspace = lazy(() =>
   import("./components/KinematicsWorkspace").then((module) => ({ default: module.KinematicsWorkspace })),
 );
+const FullVehicleWorkspace = lazy(() =>
+  import("./components/FullVehicleWorkspace").then((module) => ({ default: module.FullVehicleWorkspace })),
+);
 const QuasiStaticWorkspace = lazy(() =>
   import("./components/QuasiStaticWorkspace").then((module) => ({ default: module.QuasiStaticWorkspace })),
 );
@@ -20,17 +23,28 @@ const DynamicsWorkspace = lazy(() =>
 const OptimizationWorkspace = lazy(() =>
   import("./components/OptimizationWorkspace").then((module) => ({ default: module.OptimizationWorkspace })),
 );
+const ReportsWorkspace = lazy(() =>
+  import("./components/ReportsWorkspace").then((module) => ({ default: module.ReportsWorkspace })),
+);
+const ComparisonWorkspace = lazy(() =>
+  import("./components/ComparisonWorkspace").then((module) => ({ default: module.ComparisonWorkspace })),
+);
+const ValidationWorkspace = lazy(() =>
+  import("./components/ValidationWorkspace").then((module) => ({ default: module.ValidationWorkspace })),
+);
 
 const modules: Array<{ id: ModuleId; label: string; icon: typeof Box; implemented: boolean }> = [
   { id: "workspace", label: "Workspace", icon: Database, implemented: true },
+  { id: "vehicle", label: "Vehicle", icon: Car, implemented: true },
   { id: "geometry", label: "Geometry", icon: Box, implemented: true },
   { id: "kinematics", label: "Kinematics", icon: Waypoints, implemented: true },
   { id: "loads", label: "Loads", icon: Scale, implemented: true },
   { id: "dynamics", label: "Dynamics", icon: Activity, implemented: true },
   { id: "road", label: "Road", icon: Route, implemented: false },
   { id: "optimization", label: "Optimization", icon: Gauge, implemented: true },
-  { id: "reports", label: "Reports", icon: GitCompareArrows, implemented: false },
-  { id: "validation", label: "Validation", icon: TestTubeDiagonal, implemented: false },
+  { id: "comparison", label: "Compare", icon: GitCompareArrows, implemented: true },
+  { id: "reports", label: "Reports", icon: FileText, implemented: true },
+  { id: "validation", label: "Validation", icon: TestTubeDiagonal, implemented: true },
 ];
 
 type ApiState = "checking" | "online" | "offline";
@@ -73,7 +87,7 @@ function WorkspaceOverview() {
             <div><dt>Schema</dt><dd>{project.schemaVersion}</dd></div>
             <div><dt>Classification</dt><dd>{project.dataClassification}</dd></div>
             <div><dt>Model status</dt><dd>{project.modelStatus}</dd></div>
-            <div><dt>Corner</dt><dd>front-left</dd></div>
+            <div><dt>Active corner</dt><dd>{project.activeCornerId.replace("_", " ")}</dd></div>
           </dl>
         </section>
         <section className="overview-card">
@@ -91,8 +105,8 @@ function WorkspaceOverview() {
         </section>
         <section className="overview-card span-two">
           <span className="eyebrow">IMPLEMENTATION GATE</span>
-          <h2>Phase 0–5 engineering foundation</h2>
-          <p>The geometry, rigid-link kinematics, guarded quasi-static loads, benchmarked linear dynamics, and deterministic bounded optimization workflows are operational. Reporting remains unavailable until its models and validation tests exist.</p>
+          <h2>Phase 0–6 engineering platform</h2>
+          <p>The four-corner vehicle assembly, geometry, rigid-link kinematics, guarded loads, benchmarked linear dynamics, optimization, reporting, and evidence-led validation workflows are available with explicit model boundaries.</p>
         </section>
       </div>
     </main>
@@ -148,7 +162,11 @@ export function App() {
         <ProjectActions />
       </div>
 
-      {activeModule === "geometry" ? (
+      {activeModule === "vehicle" ? (
+        <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING FOUR-CORNER VEHICLE</span></main>}>
+          <FullVehicleWorkspace />
+        </Suspense>
+      ) : activeModule === "geometry" ? (
         <div className="geometry-workspace">
           <GeometryToolbar />
           <SuspensionViewport />
@@ -170,6 +188,18 @@ export function App() {
         <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING OPTIMIZATION WORKSPACE</span></main>}>
           <OptimizationWorkspace />
         </Suspense>
+      ) : activeModule === "reports" ? (
+        <Suspense fallback={<main className="not-implemented"><span className="eyebrow">BUILDING TRACEABLE REPORT</span></main>}>
+          <ReportsWorkspace />
+        </Suspense>
+      ) : activeModule === "comparison" ? (
+        <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING INPUT COMPARISON</span></main>}>
+          <ComparisonWorkspace />
+        </Suspense>
+      ) : activeModule === "validation" ? (
+        <Suspense fallback={<main className="not-implemented"><span className="eyebrow">LOADING VALIDATION REGISTER</span></main>}>
+          <ValidationWorkspace />
+        </Suspense>
       ) : activeModule === "workspace" ? (
         <WorkspaceOverview />
       ) : (
@@ -180,6 +210,7 @@ export function App() {
         <span><i className="dot red" />MODEL: {project.modelStatus.replaceAll("_", " ").toUpperCase()}</span>
         <span>FRAME: RH · +X FWD · +Y LEFT · +Z UP</span>
         <span>STORAGE: SI</span>
+        <span>APP 0.6.0</span>
         <span className="status-spacer" />
         <span>SCHEMA {project.schemaVersion}</span>
       </footer>
