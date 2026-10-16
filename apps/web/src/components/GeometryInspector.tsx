@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { linkLengths, validateProjectGeometry } from "../domain/geometry";
 import { useWorkspace } from "../store/workspace";
+import { uiCorner, uiStatus } from "../lib/uiText";
 
 function MillimetreField({
   id,
@@ -104,12 +105,12 @@ export function GeometryInspector() {
     <aside className="inspector">
       <section className="inspector-section">
         <div className="section-heading">
-          <span className="eyebrow">GEOMETRY INPUT</span>
-          <span className="unit-chip">{project.activeCornerId.replace("_", " ")} · mm</span>
+          <span className="eyebrow">GEOMETRİ GİRDİSİ</span>
+          <span className="unit-chip">{uiCorner(project.activeCornerId)} · mm</span>
         </div>
-        <p className="field-note">{project.vehicle.corners[project.activeCornerId].geometrySource.replaceAll("_", " ")} · {project.vehicle.corners[project.activeCornerId].provenanceNote}</p>
+        <p className="field-note">{uiStatus(project.vehicle.corners[project.activeCornerId].geometrySource)} · {project.vehicle.corners[project.activeCornerId].provenanceNote}</p>
         <label className="select-field" htmlFor="hardpoint-select">
-          <span>Selected hardpoint</span>
+          <span>Seçili bağlantı noktası</span>
           <select id="hardpoint-select" value={selected.id} onChange={(event) => select(event.target.value)}>
             {project.suspension.hardpoints.map((point) => (
               <option key={point.id} value={point.id}>{point.label}</option>
@@ -131,28 +132,28 @@ export function GeometryInspector() {
       </section>
 
       <section className="inspector-section">
-        <span className="eyebrow">WHEEL ENVELOPE</span>
+        <span className="eyebrow">TEKERLEK ZARFI</span>
         <div className="coordinate-grid two">
-          <MillimetreField key={`radius-${project.suspension.wheel.radius}`} id="wheel-radius" label="Radius" valueMetres={project.suspension.wheel.radius} onCommit={(value) => updateWheel("radius", value)} />
-          <MillimetreField key={`width-${project.suspension.wheel.width}`} id="wheel-width" label="Width" valueMetres={project.suspension.wheel.width} onCommit={(value) => updateWheel("width", value)} />
+          <MillimetreField key={`radius-${project.suspension.wheel.radius}`} id="wheel-radius" label="Yarıçap" valueMetres={project.suspension.wheel.radius} onCommit={(value) => updateWheel("radius", value)} />
+          <MillimetreField key={`width-${project.suspension.wheel.width}`} id="wheel-width" label="Genişlik" valueMetres={project.suspension.wheel.width} onCommit={(value) => updateWheel("width", value)} />
         </div>
         <div className="coordinate-grid two alignment-inputs">
-          <DegreeField key={`camber-${project.suspension.wheel.staticCamberRad}`} id="static-camber" label="Static camber" valueRadians={project.suspension.wheel.staticCamberRad} onCommit={(value) => updateWheel("staticCamberRad", value)} />
-          <DegreeField key={`toe-${project.suspension.wheel.staticToeRad}`} id="static-toe" label="Static toe-in" valueRadians={project.suspension.wheel.staticToeRad} onCommit={(value) => updateWheel("staticToeRad", value)} />
+          <DegreeField key={`camber-${project.suspension.wheel.staticCamberRad}`} id="static-camber" label="Statik kamber" valueRadians={project.suspension.wheel.staticCamberRad} onCommit={(value) => updateWheel("staticCamberRad", value)} />
+          <DegreeField key={`toe-${project.suspension.wheel.staticToeRad}`} id="static-toe" label="Statik toe-in" valueRadians={project.suspension.wheel.staticToeRad} onCommit={(value) => updateWheel("staticToeRad", value)} />
         </div>
-        <p className="field-note">Alignment defines the wheel reference orientation. Positive toe is toe-in; positive camber tilts the wheel top outward.</p>
+        <p className="field-note">Rot ayarı tekerlek referans yönelimini tanımlar. Pozitif toe içe bakışı, pozitif kamber tekerlek üstünün dışa yatmasını ifade eder.</p>
       </section>
 
       <section className="inspector-section grow">
         <div className="section-heading">
-          <span className="eyebrow">MODEL DIAGNOSTICS</span>
+          <span className="eyebrow">MODEL TANILAMA</span>
           <span className={diagnostics.some((item) => item.severity === "error") ? "status-chip error" : "status-chip ok"}>
             {diagnostics.some((item) => item.severity === "error") ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
-            {diagnostics.length === 0 ? "valid" : `${diagnostics.length} issue${diagnostics.length === 1 ? "" : "s"}`}
+            {diagnostics.length === 0 ? "geçerli" : `${diagnostics.length} sorun`}
           </span>
         </div>
         {diagnostics.length === 0 ? (
-          <p className="diagnostic-empty">Static checks pass. This does not validate kinematics.</p>
+          <p className="diagnostic-empty">Statik kontroller geçti. Bu sonuç kinematiği doğrulamaz.</p>
         ) : (
           <ul className="diagnostic-list">
             {diagnostics.map((item) => (
@@ -164,7 +165,7 @@ export function GeometryInspector() {
           </ul>
         )}
         <details className="length-list">
-          <summary>Static link lengths</summary>
+          <summary>Statik bağlantı uzunlukları</summary>
           {Object.entries(lengths).map(([id, length]) => (
             <div key={id}><span>{id.replaceAll("_", " ")}</span><b>{(length * 1000).toFixed(2)} mm</b></div>
           ))}

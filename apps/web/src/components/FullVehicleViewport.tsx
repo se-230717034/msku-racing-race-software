@@ -14,8 +14,9 @@ import {
   fullCarVisualState,
   visibleCornerIds,
 } from "../domain/vehicle";
+import { uiCorner, uiStatus } from "../lib/uiText";
 import { useKinematics } from "../store/kinematics";
-import { useWorkspace, type CameraPreset, type VisibilityState } from "../store/workspace";
+import { useWorkspace, type CameraPreset, type VehicleViewMode, type VisibilityState } from "../store/workspace";
 
 const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
   perspective: [3.0, 1.65, 2.55],
@@ -33,6 +34,17 @@ const LINK_COLORS = {
   upright: "#f8fafc",
   wheel: "#fb7185",
 } as const;
+
+const VIEW_MODE_LABELS: Record<VehicleViewMode, string> = {
+  full_vehicle: "TAM ARAÇ",
+  front_axle: "ÖN AKS",
+  rear_axle: "ARKA AKS",
+  active_corner: "ETKİN KÖŞE",
+  chassis_cg: "ŞASİ VE AĞIRLIK MERKEZİ",
+  suspension: "SÜSPANSİYON",
+  kinematics: "KİNEMATİK",
+  dynamics: "DİNAMİK",
+};
 
 const cornerLabel = (cornerId: CornerId): string => ({
   front_left: "FL",
@@ -139,7 +151,7 @@ export function VehicleCornerAssembly({
       )}
       {visibility.labels && (
         <Html position={toThreePosition({ ...wheelPosition, z: wheelPosition.z + suspension.wheel.radius + 0.07 })} center>
-          <span className="scene-label">{cornerLabel(cornerId)} · {corner.geometrySource.replaceAll("_", " ")}</span>
+          <span className="scene-label">{cornerLabel(cornerId)} · {uiStatus(corner.geometrySource)}</span>
         </Html>
       )}
     </group>
@@ -175,7 +187,7 @@ function ChassisReference({ project, heaveM, pitchRad, rollRad, visible }: {
         <meshStandardMaterial color="#f59e0b" emissive="#5f3500" />
       </mesh>
       <Html position={toThreePosition({ ...project.vehicle.cgPositionM, z: project.vehicle.cgPositionM.z + 0.09 })} center>
-        <span className="scene-label cg">CG · configured</span>
+        <span className="scene-label cg">Ağırlık merkezi · yapılandırıldı</span>
       </Html>
     </group>
   );
@@ -221,9 +233,9 @@ export function FullVehicleViewport({
   const showMechanism = mode !== "dynamics";
   const bodyVisible = visibility.chassis && mode !== "suspension" && mode !== "kinematics";
   const blockedReason = mode === "kinematics" && !kinematicPose
-    ? `No accepted kinematics pose is available for ${project.activeCornerId.replace("_", " ")}. Run that corner's solver first.`
+    ? `${uiCorner(project.activeCornerId)} için kabul edilmiş kinematik konum yok. Önce bu köşenin çözücüsünü çalıştırın.`
     : mode === "dynamics" && !fullCarSample && !bicycleResultAvailable
-      ? "No accepted full-car or bicycle result is available. Run a supported Phase 5 dynamics model first."
+      ? "Kabul edilmiş tam araç veya bisiklet modeli sonucu yok. Önce desteklenen bir Faz 5 dinamik modelini çalıştırın."
       : null;
 
   return (
@@ -263,7 +275,7 @@ export function FullVehicleViewport({
           <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />
         </GizmoHelper>
       </Canvas>
-      <div className="scene-manifest" aria-label="Full vehicle scene assemblies">
+      <div className="scene-manifest" aria-label="Tam araç sahne bileşenleri">
         {CORNER_IDS.map((cornerId) => {
           const point = cornerWheelPosition(project, cornerId);
           return <span
@@ -275,10 +287,10 @@ export function FullVehicleViewport({
           />;
         })}
       </div>
-      <div className="full-vehicle-badge">FOUR-CORNER ASSEMBLY · {mode.replaceAll("_", " ").toUpperCase()}</div>
-      <div className="reference-disclaimer">Chassis envelope and axle lines are references only — no unprovided pickup or actuation geometry is implied.</div>
-      {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7DOF solver sample · chassis heave/pitch/roll + four unsprung histories · suspension links hidden because linkage closure is not in this model.</div>}
-      {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bicycle solver · yaw heading is trapezoid-integrated from calculated yaw rate; front wheel steer uses the supplied steering history.</div>}
+      <div className="full-vehicle-badge">DÖRT KÖŞE MODELİ · {VIEW_MODE_LABELS[mode]}</div>
+      <div className="reference-disclaimer">Şasi zarfı ve aks çizgileri yalnızca referanstır — sağlanmamış bağlantı veya çalıştırma geometrisi varsayılmaz.</div>
+      {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7 serbestlik dereceli çözücü örneği · şasi yükselme/başvurma/yalpa + dört yaylanmayan kütle geçmişi · bağlantı kapanışı bu modelde bulunmadığı için süspansiyon kolları gizlendi.</div>}
+      {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bisiklet modeli çözücüsü · sapma yönelimi hesaplanan sapma hızından trapez yöntemiyle tümleştirilir; ön tekerlek yönlendirmesi sağlanan direksiyon geçmişini kullanır.</div>}
       {blockedReason && <div className="vehicle-blocked">{blockedReason}</div>}
     </div>
   );

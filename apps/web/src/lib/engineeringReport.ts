@@ -6,7 +6,7 @@ import type {
 } from "@msku/contracts";
 
 export const PHASE_6_REPORT_VERSION = "6.0.0";
-export const APPLICATION_VERSION = "0.6.0";
+export const APPLICATION_VERSION = "0.6.1";
 
 export interface EngineeringReport {
   reportVersion: string;
@@ -43,7 +43,7 @@ export const buildEngineeringReport = (
 ): EngineeringReport => {
   const resultInventory: EngineeringReport["resultInventory"] = [];
   if (results.kinematics) resultInventory.push({
-    model: `Rigid-upright kinematics · ${project.activeCornerId}`,
+    model: `Rijit taşıyıcı kinematiği · ${project.activeCornerId}`,
     solverVersion: results.kinematics.solver.version,
     numericalStatus: results.kinematics.validationStatus.numerical,
     physicalStatus: results.kinematics.validationStatus.physical,
@@ -70,22 +70,22 @@ export const buildEngineeringReport = (
     reportVersion: PHASE_6_REPORT_VERSION,
     applicationVersion: APPLICATION_VERSION,
     generatedAt,
-    title: `${project.name} — Engineering report`,
+    title: `${project.name} — Mühendislik raporu`,
     project,
-    coordinateFrame: "Right-handed vehicle frame: +X forward, +Y left, +Z up",
+    coordinateFrame: "Sağ el araç eksen takımı: +X ileri, +Y sol, +Z yukarı",
     units: { length: "m", angle: "rad", force: "N", mass: "kg", time: "s" },
     resultInventory,
     limitations: [
-      "Physical vehicle correlation has not been established; numerical verification is not physical validation.",
-      "The chassis wireframe is a reference envelope, not structural or suspension attachment geometry.",
-      "A solved corner is never inferred for an unsolved corner.",
-      "The linear 7DOF ride model does not solve suspension-link closure; its visualization hides moving links.",
-      "The planar bicycle model excludes nonlinear tires, load sensitivity, combined slip, compliance, and transient tire dynamics.",
-      assumedCorners.length ? `Non-independent corner definitions: ${assumedCorners.join(", ")}.` : "All four corner definitions are declared independent.",
+      "Fiziksel araç korelasyonu kurulmamıştır; sayısal doğrulama fiziksel doğrulama değildir.",
+      "Tel kafes şasi bir referans zarfıdır; yapısal veya süspansiyon bağlantı geometrisi değildir.",
+      "Çözülmüş bir köşe, çözülmemiş bir köşe için varsayılmaz.",
+      "Doğrusal 7SD sürüş modeli süspansiyon bağlantı kapanışını çözmez; görselleştirmesi hareketli bağlantıları gizler.",
+      "Düzlemsel bisiklet modeli doğrusal olmayan lastikleri, yük duyarlılığını, birleşik kaymayı, esnekliği ve geçici lastik dinamiğini içermez.",
+      assumedCorners.length ? `Bağımsız olmayan köşe tanımları: ${assumedCorners.join(", ")}.` : "Dört köşe tanımının tamamı bağımsız olarak beyan edilmiştir.",
     ],
     approval: {
       status: "NOT_APPROVED",
-      reason: "Approval requires reviewed CAD/benchmark evidence and independent physical measurement correlation outside the software.",
+      reason: "Onay; yazılım dışında incelenmiş CAD/referans kanıtı ve bağımsız fiziksel ölçüm korelasyonu gerektirir.",
     },
   };
 };
@@ -135,47 +135,47 @@ const pdfEscape = (value: string): string => ascii(value).replaceAll("\\", "\\\\
 
 export const engineeringReportPdf = (report: EngineeringReport): Uint8Array => {
   const lines = [
-    "MSKU Racing Dynamics Studio — Engineering Report",
-    `Report version: ${report.reportVersion}`,
-    `Application version: ${report.applicationVersion}`,
-    `Generated: ${report.generatedAt}`,
-    `Project: ${report.project.name}`,
-    `Project ID: ${report.project.projectId}`,
-    `Project schema: ${report.project.schemaVersion}`,
-    `Classification: ${report.project.dataClassification}`,
-    `Declared model status: ${report.project.modelStatus}`,
-    `Numerical validation: ${report.project.validation.numerical}`,
-    `Reference validation: ${report.project.validation.reference}`,
-    `Physical validation: ${report.project.validation.physical}`,
-    `Engineering approval: ${report.project.validation.engineeringApproval}`,
-    `Frame: ${report.coordinateFrame}`,
-    `Source: ${report.project.provenance.sourceLabel}`,
-    `Wheelbase: ${report.project.vehicle.wheelbaseM} m`,
-    `Tracks: front ${report.project.vehicle.frontTrackM} m / rear ${report.project.vehicle.rearTrackM} m`,
-    `CG: (${report.project.vehicle.cgPositionM.x}, ${report.project.vehicle.cgPositionM.y}, ${report.project.vehicle.cgPositionM.z}) m`,
+    "MSKU Racing Dinamik Stüdyosu — Mühendislik Raporu",
+    `Rapor sürümü: ${report.reportVersion}`,
+    `Uygulama sürümü: ${report.applicationVersion}`,
+    `Oluşturma: ${report.generatedAt}`,
+    `Proje: ${report.project.name}`,
+    `Proje kimliği: ${report.project.projectId}`,
+    `Proje şeması: ${report.project.schemaVersion}`,
+    `Sınıflandırma: ${report.project.dataClassification}`,
+    `Beyan edilen model durumu: ${report.project.modelStatus}`,
+    `Sayısal doğrulama: ${report.project.validation.numerical}`,
+    `Referans doğrulaması: ${report.project.validation.reference}`,
+    `Fiziksel doğrulama: ${report.project.validation.physical}`,
+    `Mühendislik onayı: ${report.project.validation.engineeringApproval}`,
+    `Eksen takımı: ${report.coordinateFrame}`,
+    `Kaynak: ${report.project.provenance.sourceLabel}`,
+    `Dingil mesafesi: ${report.project.vehicle.wheelbaseM} m`,
+    `İz genişlikleri: ön ${report.project.vehicle.frontTrackM} m / arka ${report.project.vehicle.rearTrackM} m`,
+    `Ağırlık merkezi: (${report.project.vehicle.cgPositionM.x}, ${report.project.vehicle.cgPositionM.y}, ${report.project.vehicle.cgPositionM.z}) m`,
     "",
-    "CORNER DEFINITIONS",
+    "KÖŞE TANIMLARI",
     ...Object.values(report.project.vehicle.corners).flatMap((corner) => [
       `${corner.id}: ${corner.geometrySource}${corner.derivedFrom ? ` from ${corner.derivedFrom}` : ""}`,
       `  ${corner.provenanceNote}`,
       ...corner.suspension.hardpoints.map((point) => `  ${point.id}: ${point.position.x}, ${point.position.y}, ${point.position.z} m`),
     ]),
     "",
-    "RESULT INVENTORY",
+    "SONUÇ ENVANTERİ",
     ...(report.resultInventory.length ? report.resultInventory.flatMap((result) => [
-      `${result.model} / solver ${result.solverVersion}`,
-      `  numerical=${result.numericalStatus}; physical=${result.physicalStatus}; approval=${result.approvalStatus}`,
-      `  input SHA-256=${result.inputSha256}`,
-      ...result.warnings.map((warning) => `  warning: ${warning}`),
-    ]) : ["No accepted solver result was attached to this report."]),
+      `${result.model} / çözücü ${result.solverVersion}`,
+      `  sayısal=${result.numericalStatus}; fiziksel=${result.physicalStatus}; onay=${result.approvalStatus}`,
+      `  girdi SHA-256=${result.inputSha256}`,
+      ...result.warnings.map((warning) => `  uyarı: ${warning}`),
+    ]) : ["Bu rapora kabul edilmiş çözücü sonucu eklenmedi."]),
     "",
-    "VALIDATION EVIDENCE",
-    ...(report.project.validation.evidence.length ? report.project.validation.evidence.map((item) => `${item.kind}: ${item.title} / ${item.status} / ${item.source}`) : ["No project-specific evidence records supplied."]),
+    "DOĞRULAMA KANITLARI",
+    ...(report.project.validation.evidence.length ? report.project.validation.evidence.map((item) => `${item.kind}: ${item.title} / ${item.status} / ${item.source}`) : ["Projeye özel kanıt kaydı sağlanmadı."]),
     "",
-    "LIMITATIONS",
+    "SINIRLAMALAR",
     ...report.limitations.map((item) => `- ${item}`),
     "",
-    `ENGINEERING APPROVAL: ${report.approval.status}`,
+    `MÜHENDİSLİK ONAYI: ${report.approval.status}`,
     report.approval.reason,
   ];
   const pageLines = 56;

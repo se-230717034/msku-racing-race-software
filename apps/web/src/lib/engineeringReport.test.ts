@@ -8,8 +8,8 @@ describe("Phase 6 engineering report", () => {
     const project = createDemoProject();
     const report = buildEngineeringReport(project, {}, "2026-10-16T00:00:00.000Z");
     expect(Object.keys(report.project.vehicle.corners)).toHaveLength(4);
-    expect(report.project.provenance.sourceLabel).toContain("synthetic");
-    expect(report.limitations.join(" ")).toContain("Physical vehicle correlation");
+    expect(report.project.provenance.sourceLabel).toContain("sentetik");
+    expect(report.limitations.join(" ")).toContain("Fiziksel araç korelasyonu");
     expect(report.limitations.join(" ")).toContain("mirrored_assumption");
     expect(report.approval.status).toBe("NOT_APPROVED");
   });

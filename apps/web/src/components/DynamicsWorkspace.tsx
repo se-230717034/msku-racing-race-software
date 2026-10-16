@@ -20,14 +20,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { API_BASE_URL } from "../lib/api";
+import { uiStatus } from "../lib/uiText";
 import { AdvancedDynamicsWorkspace, type DynamicsModel } from "./AdvancedDynamicsWorkspace";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const apiBaseUrl = API_BASE_URL;
 const displacementVisualScale = 8;
 
 const initialRequest: QuarterCarSimulationRequest = {
   dataClassification: "demonstration",
-  sourceLabel: "Synthetic Phase 4 quarter-car demonstration preset",
+  sourceLabel: "Sentetik Faz 4 çeyrek araç gösterim ön ayarı",
   parameters: {
     sprungMassKg: 75,
     unsprungMassKg: 12,
@@ -87,7 +89,7 @@ function StatusChip({ status }: { status: string | undefined }) {
   return (
     <span className={`status-chip ${accepted ? "ok" : status ? "error" : ""}`}>
       {accepted ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-      {status ?? "NOT RUN"}
+      {status ? uiStatus(status) : "ÇALIŞTIRILMADI"}
     </span>
   );
 }
@@ -270,7 +272,7 @@ function QuarterCarWorkspace({ onModelChange }: { onModelChange: (model: Dynamic
       }
     } catch (reason) {
       setResult(undefined);
-      setError(reason instanceof Error ? reason.message : "Dynamics simulation failed.");
+      setError(reason instanceof Error ? reason.message : "Dinamik simülasyonu başarısız oldu.");
     } finally {
       setLoading(false);
     }
@@ -279,95 +281,95 @@ function QuarterCarWorkspace({ onModelChange }: { onModelChange: (model: Dynamic
   return (
     <div className="dynamics-workspace">
       <header className="dynamics-toolbar">
-        <div><span className="eyebrow">PHASE 5 · VERIFIED LINEAR DYNAMICS</span><strong>Road & vehicle dynamics</strong></div>
-        <span>Calculated SI response · physically unvalidated</span>
+        <div><span className="eyebrow">FAZ 5 · DOĞRULANMIŞ DOĞRUSAL DİNAMİK</span><strong>Yol ve araç dinamiği</strong></div>
+        <span>Hesaplanan SI yanıtı · fiziksel olarak doğrulanmamış</span>
         <button type="button" onClick={() => result && exportCsv(result)} disabled={result?.calculationStatus !== "VERIFIED_NUMERICALLY"}>
-          <Download size={14} /> Export unvalidated CSV
+          <Download size={14} /> Doğrulanmamış CSV dışa aktar
         </button>
       </header>
 
       <div className="dynamics-content">
         <aside className="dynamics-inputs">
           <section className="inspector-section">
-            <div className="section-heading"><span className="eyebrow">MODEL SELECTION</span><StatusChip status={result?.calculationStatus} /></div>
-            <label className="select-field"><span>Dynamics model</span><select aria-label="Dynamics model" value="quarter_car" onChange={(event) => onModelChange(event.target.value as DynamicsModel)}><option value="quarter_car">2DOF quarter car</option><option value="full_car">7DOF full-car ride</option><option value="bicycle">Planar bicycle handling</option></select></label>
-            <p className="field-note">Select a separately benchmarked linear model. Results remain physically unvalidated until correlated with measured vehicle data.</p>
+            <div className="section-heading"><span className="eyebrow">MODEL SEÇİMİ</span><StatusChip status={result?.calculationStatus} /></div>
+            <label className="select-field"><span>Dinamik modeli</span><select aria-label="Dinamik modeli" value="quarter_car" onChange={(event) => onModelChange(event.target.value as DynamicsModel)}><option value="quarter_car">2SD çeyrek araç</option><option value="full_car">7SD tam araç sürüşü</option><option value="bicycle">Düzlemsel bisiklet modeli</option></select></label>
+            <p className="field-note">Ayrı olarak referanslanmış doğrusal bir model seçin. Sonuçlar ölçülmüş araç verileriyle ilişkilendirilene kadar fiziksel olarak doğrulanmamış kalır.</p>
           </section>
 
           <section className="inspector-section">
-            <div className="section-heading"><span className="eyebrow">VEHICLE PARAMETERS</span><span className="unit-chip">SI</span></div>
+            <div className="section-heading"><span className="eyebrow">ARAÇ PARAMETRELERİ</span><span className="unit-chip">SI</span></div>
             <div className="parameter-grid">
-              <NumberField label="Sprung mass" unit="kg" value={request.parameters.sprungMassKg} onChange={(value) => setParameter("sprungMassKg", value)} />
-              <NumberField label="Unsprung mass" unit="kg" value={request.parameters.unsprungMassKg} onChange={(value) => setParameter("unsprungMassKg", value)} />
-              <NumberField label="Suspension stiffness" unit="N/m" value={request.parameters.suspensionStiffnessNPerM} onChange={(value) => setParameter("suspensionStiffnessNPerM", value)} />
-              <NumberField label="Suspension damping" unit="N·s/m" value={request.parameters.suspensionDampingNsPerM} onChange={(value) => setParameter("suspensionDampingNsPerM", value)} />
-              <NumberField label="Tire stiffness" unit="N/m" value={request.parameters.tireStiffnessNPerM} onChange={(value) => setParameter("tireStiffnessNPerM", value)} />
-              <NumberField label="Tire damping" unit="N·s/m" value={request.parameters.tireDampingNsPerM} onChange={(value) => setParameter("tireDampingNsPerM", value)} />
-              <NumberField label="Static tire load" unit="N" value={request.parameters.staticTireLoadN ?? 0} onChange={(value) => setParameter("staticTireLoadN", value)} />
+              <NumberField label="Yaylanan kütle" unit="kg" value={request.parameters.sprungMassKg} onChange={(value) => setParameter("sprungMassKg", value)} />
+              <NumberField label="Yaylanmayan kütle" unit="kg" value={request.parameters.unsprungMassKg} onChange={(value) => setParameter("unsprungMassKg", value)} />
+              <NumberField label="Süspansiyon rijitliği" unit="N/m" value={request.parameters.suspensionStiffnessNPerM} onChange={(value) => setParameter("suspensionStiffnessNPerM", value)} />
+              <NumberField label="Süspansiyon sönümü" unit="N·s/m" value={request.parameters.suspensionDampingNsPerM} onChange={(value) => setParameter("suspensionDampingNsPerM", value)} />
+              <NumberField label="Lastik rijitliği" unit="N/m" value={request.parameters.tireStiffnessNPerM} onChange={(value) => setParameter("tireStiffnessNPerM", value)} />
+              <NumberField label="Lastik sönümü" unit="N·s/m" value={request.parameters.tireDampingNsPerM} onChange={(value) => setParameter("tireDampingNsPerM", value)} />
+              <NumberField label="Statik lastik yükü" unit="N" value={request.parameters.staticTireLoadN ?? 0} onChange={(value) => setParameter("staticTireLoadN", value)} />
             </div>
-            <p className="field-note">Synthetic demonstration values. Static tire load is used only to detect loss of contact.</p>
+            <p className="field-note">Sentetik gösterim değerleri. Statik lastik yükü yalnızca temas kaybını algılamak için kullanılır.</p>
           </section>
 
           <section className="inspector-section">
-            <div className="section-heading"><span className="eyebrow">ROAD INPUT</span></div>
-            <label className="select-field"><span>Profile</span><select aria-label="Road profile" value={request.road.kind} onChange={(event) => setRoad("kind", event.target.value as QuarterCarSimulationRequest["road"]["kind"])}><option value="step">Step</option><option value="smooth_bump">Smooth raised-cosine bump</option><option value="half_sine">Half-sine bump</option><option value="sine">Continuous sine</option><option value="sampled">Sampled linear data</option></select></label>
+            <div className="section-heading"><span className="eyebrow">YOL GİRDİSİ</span></div>
+            <label className="select-field"><span>Profil</span><select aria-label="Yol profili" value={request.road.kind} onChange={(event) => setRoad("kind", event.target.value as QuarterCarSimulationRequest["road"]["kind"])}><option value="step">Basamak</option><option value="smooth_bump">Yumuşak yükseltilmiş kosinüs tümseği</option><option value="half_sine">Yarım sinüs tümseği</option><option value="sine">Sürekli sinüs</option><option value="sampled">Örneklenmiş doğrusal veri</option></select></label>
             {request.road.kind === "sampled" ? (
               <>
-                <label className="text-field"><span>Times (s)</span><input aria-label="Sample times" value={sampledTimes} onChange={(event) => setSampledTimes(event.target.value)} /></label>
-                <label className="text-field"><span>Displacements (m)</span><input aria-label="Sample displacements" value={sampledDisplacements} onChange={(event) => setSampledDisplacements(event.target.value)} /></label>
+                <label className="text-field"><span>Zamanlar (s)</span><input aria-label="Örnek zamanları" value={sampledTimes} onChange={(event) => setSampledTimes(event.target.value)} /></label>
+                <label className="text-field"><span>Yer değiştirmeler (m)</span><input aria-label="Örnek yer değiştirmeleri" value={sampledDisplacements} onChange={(event) => setSampledDisplacements(event.target.value)} /></label>
               </>
             ) : (
               <div className="parameter-grid">
-                <NumberField label="Amplitude" unit="mm" value={request.road.amplitudeM * 1_000} onChange={(value) => setRoad("amplitudeM", value / 1_000)} />
-                <NumberField label="Start time" unit="s" value={request.road.startTimeS} onChange={(value) => setRoad("startTimeS", value)} />
-                {(request.road.kind === "smooth_bump" || request.road.kind === "half_sine") && <NumberField label="Bump duration" unit="s" value={request.road.durationS} onChange={(value) => setRoad("durationS", value)} />}
-                {request.road.kind === "sine" && <NumberField label="Frequency" unit="Hz" value={request.road.frequencyHz} onChange={(value) => setRoad("frequencyHz", value)} />}
+                <NumberField label="Genlik" unit="mm" value={request.road.amplitudeM * 1_000} onChange={(value) => setRoad("amplitudeM", value / 1_000)} />
+                <NumberField label="Başlangıç zamanı" unit="s" value={request.road.startTimeS} onChange={(value) => setRoad("startTimeS", value)} />
+                {(request.road.kind === "smooth_bump" || request.road.kind === "half_sine") && <NumberField label="Tümsek süresi" unit="s" value={request.road.durationS} onChange={(value) => setRoad("durationS", value)} />}
+                {request.road.kind === "sine" && <NumberField label="Frekans" unit="Hz" value={request.road.frequencyHz} onChange={(value) => setRoad("frequencyHz", value)} />}
               </div>
             )}
           </section>
 
           <section className="inspector-section">
-            <div className="section-heading"><span className="eyebrow">INTEGRATOR</span></div>
-            <label className="select-field"><span>Method</span><select aria-label="Integration method" value={request.settings.method} onChange={(event) => setSetting("method", event.target.value as QuarterCarSimulationRequest["settings"]["method"])}><option>DOP853</option><option>Radau</option><option>BDF</option></select></label>
+            <div className="section-heading"><span className="eyebrow">TÜMLEYİCİ</span></div>
+            <label className="select-field"><span>Yöntem</span><select aria-label="Tümleme yöntemi" value={request.settings.method} onChange={(event) => setSetting("method", event.target.value as QuarterCarSimulationRequest["settings"]["method"])}><option>DOP853</option><option>Radau</option><option>BDF</option></select></label>
             <div className="parameter-grid">
-              <NumberField label="Duration" unit="s" value={request.settings.durationS} onChange={(value) => setSetting("durationS", value)} />
-              <NumberField label="Output samples" unit="count" value={request.settings.outputSamples} onChange={(value) => setSetting("outputSamples", Math.round(value))} />
-              <NumberField label="Relative tolerance" unit="—" value={request.settings.relativeTolerance} onChange={(value) => setSetting("relativeTolerance", value)} />
-              <NumberField label="Absolute tolerance" unit="—" value={request.settings.absoluteTolerance} onChange={(value) => setSetting("absoluteTolerance", value)} />
-              <NumberField label="Maximum step" unit="s" value={request.settings.maximumStepS} onChange={(value) => setSetting("maximumStepS", value)} />
+              <NumberField label="Süre" unit="s" value={request.settings.durationS} onChange={(value) => setSetting("durationS", value)} />
+              <NumberField label="Çıktı örnekleri" unit="adet" value={request.settings.outputSamples} onChange={(value) => setSetting("outputSamples", Math.round(value))} />
+              <NumberField label="Bağıl tolerans" unit="—" value={request.settings.relativeTolerance} onChange={(value) => setSetting("relativeTolerance", value)} />
+              <NumberField label="Mutlak tolerans" unit="—" value={request.settings.absoluteTolerance} onChange={(value) => setSetting("absoluteTolerance", value)} />
+              <NumberField label="En büyük adım" unit="s" value={request.settings.maximumStepS} onChange={(value) => setSetting("maximumStepS", value)} />
             </div>
-            <p className="input-subheading">Initial perturbation state</p>
+            <p className="input-subheading">Başlangıç bozuntu durumu</p>
             <div className="parameter-grid">
-              <NumberField label="Sprung displacement" unit="mm" value={request.initialState.sprungDisplacementM * 1_000} onChange={(value) => setInitial("sprungDisplacementM", value / 1_000)} />
-              <NumberField label="Sprung velocity" unit="m/s" value={request.initialState.sprungVelocityMps} onChange={(value) => setInitial("sprungVelocityMps", value)} />
-              <NumberField label="Unsprung displacement" unit="mm" value={request.initialState.unsprungDisplacementM * 1_000} onChange={(value) => setInitial("unsprungDisplacementM", value / 1_000)} />
-              <NumberField label="Unsprung velocity" unit="m/s" value={request.initialState.unsprungVelocityMps} onChange={(value) => setInitial("unsprungVelocityMps", value)} />
+              <NumberField label="Yaylanan kütle yer değiştirmesi" unit="mm" value={request.initialState.sprungDisplacementM * 1_000} onChange={(value) => setInitial("sprungDisplacementM", value / 1_000)} />
+              <NumberField label="Yaylanan kütle hızı" unit="m/s" value={request.initialState.sprungVelocityMps} onChange={(value) => setInitial("sprungVelocityMps", value)} />
+              <NumberField label="Yaylanmayan kütle yer değiştirmesi" unit="mm" value={request.initialState.unsprungDisplacementM * 1_000} onChange={(value) => setInitial("unsprungDisplacementM", value / 1_000)} />
+              <NumberField label="Yaylanmayan kütle hızı" unit="m/s" value={request.initialState.unsprungVelocityMps} onChange={(value) => setInitial("unsprungVelocityMps", value)} />
             </div>
-            <label className="select-field provenance-classification"><span>Data classification</span><select aria-label="Data classification" value={request.dataClassification} onChange={(event) => setRequest({ ...request, dataClassification: event.target.value as QuarterCarSimulationRequest["dataClassification"] })}><option value="demonstration">Demonstration</option><option value="team_private">Team private</option></select></label>
-            <label className="text-field"><span>Input source / provenance</span><input aria-label="Input source" value={request.sourceLabel} onChange={(event) => setRequest({ ...request, sourceLabel: event.target.value })} /></label>
-            <button className="wide-action" type="button" disabled={loading} onClick={() => void run()}><Play size={13} />{loading ? "Integrating…" : "Run simulation"}</button>
+            <label className="select-field provenance-classification"><span>Veri sınıflandırması</span><select aria-label="Veri sınıflandırması" value={request.dataClassification} onChange={(event) => setRequest({ ...request, dataClassification: event.target.value as QuarterCarSimulationRequest["dataClassification"] })}><option value="demonstration">Gösterim</option><option value="team_private">Takıma özel</option></select></label>
+            <label className="text-field"><span>Girdi kaynağı / kökeni</span><input aria-label="Girdi kaynağı" value={request.sourceLabel} onChange={(event) => setRequest({ ...request, sourceLabel: event.target.value })} /></label>
+            <button className="wide-action" type="button" disabled={loading} onClick={() => void run()}><Play size={13} />{loading ? "Tümleştiriliyor…" : "Simülasyonu çalıştır"}</button>
             {error && <p className="solver-failure">{error}</p>}
           </section>
         </aside>
 
         <main className="dynamics-results">
           <section className="dynamics-visual">
-            <div className="dynamics-scene" data-testid="quarter-car-animation"><QuarterCarScene sample={currentSample} /><span>CALCULATED SAMPLE · DISPLACEMENT VISUAL SCALE {displacementVisualScale}×</span></div>
+            <div className="dynamics-scene" data-testid="quarter-car-animation"><QuarterCarScene sample={currentSample} /><span>HESAPLANAN ÖRNEK · YER DEĞİŞTİRME GÖRSEL ÖLÇEĞİ {displacementVisualScale}×</span></div>
             <div className="playback-panel">
-              <div className="playback-controls"><button type="button" aria-label={playing ? "Pause animation" : "Play animation"} disabled={!result?.samples.length} onClick={() => setPlaying((value) => !value)}>{playing ? <Pause size={14} /> : <Play size={14} />}</button><button type="button" aria-label="Reset animation" disabled={!result?.samples.length} onClick={() => { setPlaying(false); setSampleIndex(0); }}><RotateCcw size={14} /></button><input aria-label="Simulation time" type="range" min={0} max={Math.max(0, (result?.samples.length ?? 1) - 1)} value={sampleIndex} onChange={(event) => { setPlaying(false); setSampleIndex(Number(event.target.value)); }} /></div>
-              <dl className="instant-values"><div><dt>Time</dt><dd>{display(currentSample?.timeS, 3)} s</dd></div><div><dt>Road</dt><dd>{display(currentSample && currentSample.roadDisplacementM * 1_000, 2)} mm</dd></div><div><dt>Sprung</dt><dd>{display(currentSample && currentSample.sprungDisplacementM * 1_000, 2)} mm</dd></div><div><dt>Unsprung</dt><dd>{display(currentSample && currentSample.unsprungDisplacementM * 1_000, 2)} mm</dd></div><div><dt>Body accel.</dt><dd>{display(currentSample?.sprungAccelerationMps2, 3)} m/s²</dd></div><div><dt>Contact</dt><dd>{display(currentSample?.totalTireContactForceN, 1)} N</dd></div></dl>
+              <div className="playback-controls"><button type="button" aria-label={playing ? "Animasyonu duraklat" : "Animasyonu oynat"} disabled={!result?.samples.length} onClick={() => setPlaying((value) => !value)}>{playing ? <Pause size={14} /> : <Play size={14} />}</button><button type="button" aria-label="Animasyonu sıfırla" disabled={!result?.samples.length} onClick={() => { setPlaying(false); setSampleIndex(0); }}><RotateCcw size={14} /></button><input aria-label="Simülasyon zamanı" type="range" min={0} max={Math.max(0, (result?.samples.length ?? 1) - 1)} value={sampleIndex} onChange={(event) => { setPlaying(false); setSampleIndex(Number(event.target.value)); }} /></div>
+              <dl className="instant-values"><div><dt>Zaman</dt><dd>{display(currentSample?.timeS, 3)} s</dd></div><div><dt>Yol</dt><dd>{display(currentSample && currentSample.roadDisplacementM * 1_000, 2)} mm</dd></div><div><dt>Yaylanan</dt><dd>{display(currentSample && currentSample.sprungDisplacementM * 1_000, 2)} mm</dd></div><div><dt>Yaylanmayan</dt><dd>{display(currentSample && currentSample.unsprungDisplacementM * 1_000, 2)} mm</dd></div><div><dt>Gövde ivmesi</dt><dd>{display(currentSample?.sprungAccelerationMps2, 3)} m/s²</dd></div><div><dt>Temas</dt><dd>{display(currentSample?.totalTireContactForceN, 1)} N</dd></div></dl>
             </div>
           </section>
 
           <section className="dynamics-charts">
-            <div className="chart-card"><div className="chart-heading"><span>DISPLACEMENT RESPONSE</span><b>mm vs s</b></div><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="#1f2630" vertical={false} /><XAxis dataKey="timeS" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Legend wrapperStyle={{ fontSize: 8 }} /><ReferenceLine x={currentSample?.timeS} stroke="#ef233c" /><ChartLine type="monotone" dot={false} dataKey="roadMm" name="Road" stroke="#94a3b8" /><ChartLine type="monotone" dot={false} dataKey="sprungMm" name="Sprung" stroke="#f43f5e" /><ChartLine type="monotone" dot={false} dataKey="unsprungMm" name="Unsprung" stroke="#f59e0b" /><ChartLine type="monotone" dot={false} dataKey="travelMm" name="Susp. travel" stroke="#60a5fa" /></LineChart></ResponsiveContainer></div>
-            <div className="chart-card"><div className="chart-heading"><span>ACCELERATION & CONTACT</span><b>m/s² · N</b></div><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="#1f2630" vertical={false} /><XAxis dataKey="timeS" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis yAxisId="accel" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis yAxisId="force" orientation="right" stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Legend wrapperStyle={{ fontSize: 8 }} /><ReferenceLine yAxisId="accel" x={currentSample?.timeS} stroke="#ef233c" /><ChartLine yAxisId="accel" type="monotone" dot={false} dataKey="sprungAccelerationMps2" name="Body accel." stroke="#f43f5e" /><ChartLine yAxisId="force" type="monotone" dot={false} dataKey="totalTireContactForceN" name="Contact force" stroke="#4ade80" /></LineChart></ResponsiveContainer></div>
+            <div className="chart-card"><div className="chart-heading"><span>YER DEĞİŞTİRME YANITI</span><b>mm / s</b></div><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="#1f2630" vertical={false} /><XAxis dataKey="timeS" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Legend wrapperStyle={{ fontSize: 8 }} /><ReferenceLine x={currentSample?.timeS} stroke="#ef233c" /><ChartLine type="monotone" dot={false} dataKey="roadMm" name="Yol" stroke="#94a3b8" /><ChartLine type="monotone" dot={false} dataKey="sprungMm" name="Yaylanan" stroke="#f43f5e" /><ChartLine type="monotone" dot={false} dataKey="unsprungMm" name="Yaylanmayan" stroke="#f59e0b" /><ChartLine type="monotone" dot={false} dataKey="travelMm" name="Süsp. hareketi" stroke="#60a5fa" /></LineChart></ResponsiveContainer></div>
+            <div className="chart-card"><div className="chart-heading"><span>İVME VE TEMAS</span><b>m/s² · N</b></div><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}><CartesianGrid stroke="#1f2630" vertical={false} /><XAxis dataKey="timeS" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis yAxisId="accel" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis yAxisId="force" orientation="right" stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Legend wrapperStyle={{ fontSize: 8 }} /><ReferenceLine yAxisId="accel" x={currentSample?.timeS} stroke="#ef233c" /><ChartLine yAxisId="accel" type="monotone" dot={false} dataKey="sprungAccelerationMps2" name="Gövde ivmesi" stroke="#f43f5e" /><ChartLine yAxisId="force" type="monotone" dot={false} dataKey="totalTireContactForceN" name="Temas kuvveti" stroke="#4ade80" /></LineChart></ResponsiveContainer></div>
           </section>
 
           <section className="dynamics-diagnostics">
-            <div className="engineering-card"><div className="section-heading"><span className="eyebrow">CALCULATION QUALITY</span><StatusChip status={result?.calculationStatus} /></div>{result ? <dl className="solver-diagnostics compact"><div><dt>Numerical</dt><dd>{result.validationStatus.numerical}</dd></div><div><dt>Reference</dt><dd>{result.validationStatus.reference}</dd></div><div><dt>Physical</dt><dd>{result.validationStatus.physical}</dd></div><div><dt>Approval</dt><dd>{result.validationStatus.engineeringApproval}</dd></div><div><dt>Solver</dt><dd>v{result.solverVersion}</dd></div><div title={result.inputProvenance.inputSha256}><dt>Input SHA-256</dt><dd>{result.inputProvenance.inputSha256.slice(0, 12)}…</dd></div></dl> : <p className="diagnostic-empty">Run the model to generate traceable status.</p>}</div>
-            <div className="engineering-card"><div className="section-heading"><span className="eyebrow">NUMERICAL DIAGNOSTICS</span></div>{result ? <dl className="solver-diagnostics compact"><div><dt>Method</dt><dd>{result.diagnostics.integrationMethod}</dd></div><div><dt>Function evaluations</dt><dd>{result.diagnostics.functionEvaluations}</dd></div><div><dt>Accepted steps</dt><dd>{result.diagnostics.acceptedSteps}</dd></div><div><dt>Accepted Δt range</dt><dd>{display(result.diagnostics.minimumAcceptedStepS, 6)}–{display(result.diagnostics.maximumAcceptedStepS, 6)} s</dd></div><div><dt>Energy residual</dt><dd>{display(result.diagnostics.energyBalanceResidualJ, 6)} J</dd></div><div><dt>Relative energy error</dt><dd>{result.diagnostics.relativeEnergyBalanceError?.toExponential(3) ?? "—"}</dd></div><div><dt>Min. total contact</dt><dd>{display(result.diagnostics.minimumTotalContactForceN, 2)} N</dd></div><div><dt>Natural modes</dt><dd>{result.naturalFrequenciesHz?.map((value) => value.toFixed(3)).join(" / ") ?? "—"} Hz</dd></div></dl> : <p className="diagnostic-empty">Integration diagnostics are not available yet.</p>}</div>
-            <div className="engineering-card"><div className="section-heading"><span className="eyebrow">ASSUMPTIONS & LIMITATIONS</span></div><p className="model-assumption">Linear 2DOF vertical model about static equilibrium; bilateral linear tire; no pitch, roll, wheelbase delay, aero, nonlinear damping, bump stops, tire enveloping, or impact/re-contact physics.</p>{result?.warnings.length ? <ul className="solver-warnings">{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}</div>
+            <div className="engineering-card"><div className="section-heading"><span className="eyebrow">HESAP KALİTESİ</span><StatusChip status={result?.calculationStatus} /></div>{result ? <dl className="solver-diagnostics compact"><div><dt>Sayısal</dt><dd>{uiStatus(result.validationStatus.numerical)}</dd></div><div><dt>Referans</dt><dd>{uiStatus(result.validationStatus.reference)}</dd></div><div><dt>Fiziksel</dt><dd>{uiStatus(result.validationStatus.physical)}</dd></div><div><dt>Onay</dt><dd>{uiStatus(result.validationStatus.engineeringApproval)}</dd></div><div><dt>Çözücü</dt><dd>v{result.solverVersion}</dd></div><div title={result.inputProvenance.inputSha256}><dt>Girdi SHA-256</dt><dd>{result.inputProvenance.inputSha256.slice(0, 12)}…</dd></div></dl> : <p className="diagnostic-empty">İzlenebilir durum üretmek için modeli çalıştırın.</p>}</div>
+            <div className="engineering-card"><div className="section-heading"><span className="eyebrow">SAYISAL TANILAMA</span></div>{result ? <dl className="solver-diagnostics compact"><div><dt>Yöntem</dt><dd>{result.diagnostics.integrationMethod}</dd></div><div><dt>Fonksiyon değerlendirmesi</dt><dd>{result.diagnostics.functionEvaluations}</dd></div><div><dt>Kabul edilen adım</dt><dd>{result.diagnostics.acceptedSteps}</dd></div><div><dt>Kabul edilen Δt aralığı</dt><dd>{display(result.diagnostics.minimumAcceptedStepS, 6)}–{display(result.diagnostics.maximumAcceptedStepS, 6)} s</dd></div><div><dt>Enerji artığı</dt><dd>{display(result.diagnostics.energyBalanceResidualJ, 6)} J</dd></div><div><dt>Bağıl enerji hatası</dt><dd>{result.diagnostics.relativeEnergyBalanceError?.toExponential(3) ?? "—"}</dd></div><div><dt>En düşük toplam temas</dt><dd>{display(result.diagnostics.minimumTotalContactForceN, 2)} N</dd></div><div><dt>Doğal modlar</dt><dd>{result.naturalFrequenciesHz?.map((value) => value.toFixed(3)).join(" / ") ?? "—"} Hz</dd></div></dl> : <p className="diagnostic-empty">Entegrasyon tanılaması henüz kullanılamıyor.</p>}</div>
+            <div className="engineering-card"><div className="section-heading"><span className="eyebrow">VARSAYIMLAR VE SINIRLAMALAR</span></div><p className="model-assumption">Statik denge çevresinde doğrusal 2SD düşey model; iki yönlü doğrusal lastik. Başvurma, yalpa, dingil mesafesi gecikmesi, aero, doğrusal olmayan sönüm, darbe takozu, lastik zarfı veya darbe/yeniden temas fiziği yoktur.</p>{result?.warnings.length ? <ul className="solver-warnings">{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}</div>
           </section>
         </main>
       </div>

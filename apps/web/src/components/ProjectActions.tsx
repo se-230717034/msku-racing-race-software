@@ -18,15 +18,15 @@ export function ProjectActions() {
   const newProject = () => {
     const id = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `demo-${Date.now()}`;
     resetDemo(id);
-    setNotice("New demonstration project created.");
+    setNotice("Yeni gösterim projesi oluşturuldu.");
   };
 
   const save = () => {
     try {
       saveProjectLocally(project);
-      setNotice("Saved locally.");
+      setNotice("Yerel olarak kaydedildi.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Local save failed.");
+      setNotice(error instanceof Error ? error.message : "Yerel kayıt başarısız oldu.");
     }
   };
 
@@ -34,18 +34,18 @@ export function ProjectActions() {
     try {
       const loaded = loadProjectLocally();
       if (!loaded) {
-        setNotice("No local project found.");
+        setNotice("Yerel proje bulunamadı.");
         return;
       }
       const loadedDiagnostics = validateProjectGeometry(loaded);
       if (loadedDiagnostics.some((item) => item.severity === "error")) {
-        setNotice("Stored project was rejected because its geometry contains errors.");
+        setNotice("Kayıtlı proje, geometrisinde hata bulunduğu için reddedildi.");
         return;
       }
       replaceProject(loaded);
-      setNotice("Local project loaded.");
+      setNotice("Yerel proje yüklendi.");
     } catch (error) {
-      setNotice(error instanceof Error ? `Load failed: ${error.message}` : "Load failed.");
+      setNotice(error instanceof Error ? `Yükleme başarısız: ${error.message}` : "Yükleme başarısız.");
     }
   };
 
@@ -55,13 +55,13 @@ export function ProjectActions() {
       const parsed = parseProject(JSON.parse(await file.text()) as unknown);
       const importedDiagnostics = validateProjectGeometry(parsed);
       if (importedDiagnostics.some((item) => item.severity === "error")) {
-        setNotice(`Import rejected: ${importedDiagnostics.find((item) => item.severity === "error")?.message ?? "invalid geometry"}`);
+        setNotice(`İçe aktarma reddedildi: ${importedDiagnostics.find((item) => item.severity === "error")?.message ?? "geçersiz geometri"}`);
         return;
       }
       replaceProject(parsed);
-      setNotice("Project imported and validated.");
+      setNotice("Proje içe aktarıldı ve doğrulandı.");
     } catch (error) {
-      setNotice(error instanceof Error ? `Import failed: ${error.message}` : "Import failed.");
+      setNotice(error instanceof Error ? `İçe aktarma başarısız: ${error.message}` : "İçe aktarma başarısız.");
     } finally {
       if (input.current) input.current.value = "";
     }
@@ -69,11 +69,11 @@ export function ProjectActions() {
 
   return (
     <div className="project-actions">
-      <button type="button" onClick={newProject}><FilePlus2 size={14} /> New</button>
-      <button type="button" onClick={save} disabled={hasErrors} title={hasErrors ? "Resolve geometry errors before saving" : "Save to this browser"}><Save size={14} /> Save</button>
-      <button type="button" onClick={load}><FolderOpen size={14} /> Load</button>
-      <button type="button" onClick={() => input.current?.click()}><Upload size={14} /> Import</button>
-      <button type="button" onClick={() => downloadProject(project)} disabled={hasErrors} title={hasErrors ? "Resolve geometry errors before exporting" : "Export versioned JSON"}><Download size={14} /> Export</button>
+      <button type="button" onClick={newProject}><FilePlus2 size={14} /> Yeni</button>
+      <button type="button" onClick={save} disabled={hasErrors} title={hasErrors ? "Kaydetmeden önce geometri hatalarını çözün" : "Bu tarayıcıya kaydet"}><Save size={14} /> Kaydet</button>
+      <button type="button" onClick={load}><FolderOpen size={14} /> Yükle</button>
+      <button type="button" onClick={() => input.current?.click()}><Upload size={14} /> İçe aktar</button>
+      <button type="button" onClick={() => downloadProject(project)} disabled={hasErrors} title={hasErrors ? "Dışa aktarmadan önce geometri hatalarını çözün" : "Sürümlü JSON dışa aktar"}><Download size={14} /> Dışa aktar</button>
       <input ref={input} type="file" accept=".json,.msku.json,application/json" hidden onChange={(event) => void importFile(event.target.files?.[0])} />
       <span className="action-notice" role="status">{notice}</span>
     </div>

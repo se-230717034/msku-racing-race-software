@@ -174,12 +174,12 @@ export function SuspensionViewport({
         </GizmoHelper>
       </Canvas>
       <div className="viewport-legend">
-        <span><i className="axis x" />X forward</span>
-        <span><i className="axis y" />Y left</span>
-        <span><i className="axis z" />Z up</span>
-        <span>Internal: m · Editor: mm</span>
-        {mirror && <span>MIRROR ASSUMPTION · visualization only</span>}
-        {mode === "loads" && <span>Force arrows: relative scale · values in table</span>}
+        <span><i className="axis x" />X ileri</span>
+        <span><i className="axis y" />Y sol</span>
+        <span><i className="axis z" />Z yukarı</span>
+        <span>İç birim: m · Düzenleyici: mm</span>
+        {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
+        {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>
     </div>
   );

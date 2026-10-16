@@ -32,7 +32,7 @@ export function KinematicsCharts({
   return (
     <div className="kinematics-charts">
       <section className="chart-card">
-        <div className="chart-heading"><span>ALIGNMENT</span><b>deg vs wheel travel</b></div>
+        <div className="chart-heading"><span>ROT AYARI</span><b>derece / tekerlek hareketi</b></div>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
             <CartesianGrid stroke="#252b36" strokeDasharray="2 4" />
@@ -41,13 +41,13 @@ export function KinematicsCharts({
             <Tooltip contentStyle={{ background: "#11151c", border: "1px solid #343c49", fontSize: 10 }} labelFormatter={(value) => `${Number(value).toFixed(1)} mm`} />
             <Legend wrapperStyle={{ fontSize: 9 }} />
             <ReferenceLine x={selectedTravelMm} stroke="#ef233c" strokeDasharray="3 3" />
-            <Line type="monotone" dataKey="camberDeg" name="Camber" stroke="#f43f5e" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="toeDeg" name="Toe" stroke="#60a5fa" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="camberDeg" name="Kamber" stroke="#f43f5e" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="toeDeg" name="Tekerlek yönelimi (toe)" stroke="#60a5fa" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </section>
       <section className="chart-card">
-        <div className="chart-heading"><span>GEOMETRY MIGRATION</span><b>mm vs wheel travel</b></div>
+        <div className="chart-heading"><span>GEOMETRİ DEĞİŞİMİ</span><b>mm / tekerlek hareketi</b></div>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
             <CartesianGrid stroke="#252b36" strokeDasharray="2 4" />
@@ -56,8 +56,8 @@ export function KinematicsCharts({
             <Tooltip contentStyle={{ background: "#11151c", border: "1px solid #343c49", fontSize: 10 }} labelFormatter={(value) => `${Number(value).toFixed(1)} mm`} />
             <Legend wrapperStyle={{ fontSize: 9 }} />
             <ReferenceLine x={selectedTravelMm} stroke="#ef233c" strokeDasharray="3 3" />
-            <Line type="monotone" dataKey="rollCenterMm" name="Roll centre height" stroke="#a78bfa" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="trackChangeMm" name="Track change" stroke="#4ade80" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="rollCenterMm" name="Yalpa merkezi yüksekliği" stroke="#a78bfa" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="trackChangeMm" name="İz genişliği değişimi" stroke="#4ade80" dot={false} strokeWidth={2} connectNulls={false} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </section>

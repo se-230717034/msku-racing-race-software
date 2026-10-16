@@ -146,3 +146,14 @@ Updated: 2026-10-16
 - [ ] Independent CAD motion-study, rig, and track validation evidence
 - [ ] Authenticated multi-user revision/approval workflow and electronic signatures
 
+## Release 0.6.1 — Turkish UI and production deployment
+
+- [x] Turkish navigation, workspaces, engineering panels, charts, validation states, reports, errors, and demo-data labels
+- [x] Centralized local-development and same-origin production API routing
+- [x] Vercel Vite SPA, FastAPI entry point, Python runtime requirements, and route rewrites
+- [x] Vercel bundle exclusions for local runtimes, development tests, reports, and unrelated frontend files
+- [x] Release version synchronized across npm, Python packages, API health, UI footer, and reports
+- [x] Quality gates: ESLint, TypeScript, production build, Ruff, mypy, 37 Vitest tests, 110 Python tests, and 8 Chromium flows
+- [x] Vercel project created and connected to the GitHub repository
+- [ ] Production URL activation — requires explicit Vercel Large Functions opt-in because the NumPy/SciPy API bundle is 595.15 MB and the standard Python limit is 500 MB
+

@@ -111,8 +111,8 @@ button { color: inherit; }
 .viewport { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #080a0e; }
 .viewport canvas { display: block; }
 .viewport::before { content: "STATIC GEOMETRY · NO KINEMATICS"; position: absolute; top: 12px; left: 13px; z-index: 2; padding: 5px 7px; border: 1px solid #3c2630; color: #d57c8b; background: #170d12cc; font: 600 8px/1 ui-monospace, monospace; letter-spacing: 0.12em; pointer-events: none; }
-.viewport.kinematics::before { content: "SOLVED KINEMATICS · UNVALIDATED"; }
-.viewport.loads::before { content: "CALCULATED FORCES · PHYSICALLY UNVALIDATED"; }
+.viewport.kinematics::before { content: "ÇÖZÜLMÜŞ KİNEMATİK · DOĞRULANMAMIŞ"; }
+.viewport.loads::before { content: "HESAPLANMIŞ KUVVETLER · FİZİKSEL OLARAK DOĞRULANMAMIŞ"; }
 .viewport-legend { position: absolute; left: 13px; bottom: 13px; display: flex; gap: 12px; padding: 7px 9px; border: 1px solid #232a34; border-radius: 3px; color: #7f8897; background: #0b0e13dc; font: 9px/1 ui-monospace, monospace; pointer-events: none; }
 .viewport-legend span { display: flex; align-items: center; gap: 4px; }
 .axis { width: 5px; height: 5px; border-radius: 50%; }

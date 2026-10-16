@@ -102,7 +102,7 @@ from .optimization_adapter import build_optimization_adapter
 
 app = FastAPI(
     title="MSKU Racing Dynamics Studio API",
-    version="0.1.0",
+    version="0.6.1",
     description="Typed geometry validation and unvalidated suspension-kinematics API.",
 )
 
@@ -125,7 +125,7 @@ app.add_middleware(
 
 @app.get("/api/v1/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "msku-racing-api", "version": "0.1.0"}
+    return {"status": "ok", "service": "msku-racing-api", "version": "0.6.1"}
 
 
 @app.post("/api/v1/projects/validate", response_model=ProjectValidationResponse)

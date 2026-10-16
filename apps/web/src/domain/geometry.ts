@@ -19,13 +19,13 @@ export interface LinkDefinition {
 }
 
 export const LINKS: LinkDefinition[] = [
-  { id: "uca_front_leg", label: "Upper front leg", start: "uca_front_inboard", end: "uca_outboard", group: "upper" },
-  { id: "uca_rear_leg", label: "Upper rear leg", start: "uca_rear_inboard", end: "uca_outboard", group: "upper" },
-  { id: "lca_front_leg", label: "Lower front leg", start: "lca_front_inboard", end: "lca_outboard", group: "lower" },
-  { id: "lca_rear_leg", label: "Lower rear leg", start: "lca_rear_inboard", end: "lca_outboard", group: "lower" },
-  { id: "tie_rod", label: "Tie rod", start: "tie_rod_inboard", end: "tie_rod_outboard", group: "steering" },
-  { id: "upright", label: "Upright reference", start: "lca_outboard", end: "uca_outboard", group: "upright" },
-  { id: "wheel_reference", label: "Wheel centre reference", start: "lca_outboard", end: "wheel_center", group: "wheel" },
+  { id: "uca_front_leg", label: "Üst ön kol", start: "uca_front_inboard", end: "uca_outboard", group: "upper" },
+  { id: "uca_rear_leg", label: "Üst arka kol", start: "uca_rear_inboard", end: "uca_outboard", group: "upper" },
+  { id: "lca_front_leg", label: "Alt ön kol", start: "lca_front_inboard", end: "lca_outboard", group: "lower" },
+  { id: "lca_rear_leg", label: "Alt arka kol", start: "lca_rear_inboard", end: "lca_outboard", group: "lower" },
+  { id: "tie_rod", label: "Rot kolu", start: "tie_rod_inboard", end: "tie_rod_outboard", group: "steering" },
+  { id: "upright", label: "Taşıyıcı referansı", start: "lca_outboard", end: "uca_outboard", group: "upright" },
+  { id: "wheel_reference", label: "Tekerlek merkezi referansı", start: "lca_outboard", end: "wheel_center", group: "wheel" },
 ];
 
 const MIN_LINK_LENGTH_M = 0.001;
@@ -92,7 +92,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     diagnostics.push({
       severity: "error",
       code: "DUPLICATE_HARDPOINT",
-      message: `Hardpoint identifiers must be unique: ${duplicateIds.join(", ")}.`,
+      message: `Bağlantı noktası kimlikleri benzersiz olmalıdır: ${duplicateIds.join(", ")}.`,
       pointIds: duplicateIds,
     });
   }
@@ -102,7 +102,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     diagnostics.push({
       severity: "error",
       code: "MISSING_HARDPOINT",
-      message: `Required hardpoints are missing: ${missingIds.join(", ")}.`,
+      message: `Zorunlu bağlantı noktaları eksik: ${missingIds.join(", ")}.`,
       pointIds: [...missingIds],
     });
     return diagnostics;
@@ -114,7 +114,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
       diagnostics.push({
         severity: "error",
         code: "NON_FINITE_COORDINATE",
-        message: `${point.label} contains a non-finite coordinate.`,
+        message: `${point.label} sonlu olmayan bir koordinat içeriyor.`,
         pointIds: [point.id],
       });
     }
@@ -129,15 +129,15 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
       diagnostics.push({
         severity: "error",
         code: "DEGENERATE_LINK",
-        message: `${link.label} is ${(length * 1000).toFixed(3)} mm; minimum is 1.000 mm.`,
+        message: `${link.label} ${(length * 1000).toFixed(3)} mm; en az 1.000 mm olmalıdır.`,
         pointIds: [link.start, link.end],
       });
     }
   }
 
   const pivotChecks: Array<[string, string, string]> = [
-    ["uca_front_inboard", "uca_rear_inboard", "upper wishbone inboard pivots"],
-    ["lca_front_inboard", "lca_rear_inboard", "lower wishbone inboard pivots"],
+    ["uca_front_inboard", "uca_rear_inboard", "üst salıncak iç pivotları"],
+    ["lca_front_inboard", "lca_rear_inboard", "alt salıncak iç pivotları"],
   ];
   for (const [firstId, secondId, label] of pivotChecks) {
     const first = points.get(firstId);
@@ -148,7 +148,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
       diagnostics.push({
         severity: "error",
         code: "COINCIDENT_PIVOTS",
-        message: `The ${label} are only ${(separation * 1000).toFixed(3)} mm apart.`,
+        message: `${label} arasındaki mesafe yalnızca ${(separation * 1000).toFixed(3)} mm.`,
         pointIds: [firstId, secondId],
       });
     }
@@ -163,7 +163,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     diagnostics.push({
       severity: "error",
       code: "UPRIGHT_ORDER",
-      message: "Upper upright joint must be above the lower upright joint (+Z).",
+      message: "Üst taşıyıcı mafsalı, alt taşıyıcı mafsalının üzerinde (+Z) olmalıdır.",
       pointIds: ["uca_outboard", "lca_outboard"],
     });
   }
@@ -185,7 +185,7 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     diagnostics.push({
       severity: "error",
       code: "CORNER_ORDER",
-      message: "Inboard joints must be closer to the vehicle centreline than outboard joints.",
+      message: "İç mafsallar araç merkez çizgisine dış mafsallardan daha yakın olmalıdır.",
       pointIds: misplaced,
     });
   }
@@ -197,26 +197,26 @@ export const validateProjectGeometry = (project: Project): GeometryDiagnostic[] 
     diagnostics.push({
       severity: "warning",
       code: "WHEEL_CENTER_INBOARD",
-      message: "Wheel centre is inboard of an upright joint; verify wheel-offset convention.",
+      message: "Tekerlek merkezi bir taşıyıcı mafsalının iç tarafında; tekerlek ofseti kabulünü doğrulayın.",
       pointIds: ["wheel_center", "uca_outboard", "lca_outboard"],
     });
   }
 
   const { radius, width } = project.suspension.wheel;
   if (!Number.isFinite(radius) || radius <= 0) {
-    diagnostics.push({ severity: "error", code: "WHEEL_RADIUS", message: "Wheel radius must be positive and finite.", pointIds: [] });
+    diagnostics.push({ severity: "error", code: "WHEEL_RADIUS", message: "Tekerlek yarıçapı pozitif ve sonlu olmalıdır.", pointIds: [] });
   }
   if (!Number.isFinite(width) || width <= 0) {
-    diagnostics.push({ severity: "error", code: "WHEEL_WIDTH", message: "Wheel width must be positive and finite.", pointIds: [] });
+    diagnostics.push({ severity: "error", code: "WHEEL_WIDTH", message: "Tekerlek genişliği pozitif ve sonlu olmalıdır.", pointIds: [] });
   }
   if (width >= 2 * radius) {
-    diagnostics.push({ severity: "warning", code: "WHEEL_PROPORTION", message: "Wheel width is at least the wheel diameter; verify units.", pointIds: [] });
+    diagnostics.push({ severity: "warning", code: "WHEEL_PROPORTION", message: "Tekerlek genişliği en az tekerlek çapı kadar; birimleri doğrulayın.", pointIds: [] });
   }
   if (!Number.isFinite(project.suspension.wheel.staticCamberRad) || Math.abs(project.suspension.wheel.staticCamberRad) > 0.35) {
-    diagnostics.push({ severity: "error", code: "STATIC_CAMBER_RANGE", message: "Static camber must be finite and within ±20.05 degrees.", pointIds: [] });
+    diagnostics.push({ severity: "error", code: "STATIC_CAMBER_RANGE", message: "Statik kamber sonlu ve ±20,05 derece aralığında olmalıdır.", pointIds: [] });
   }
   if (!Number.isFinite(project.suspension.wheel.staticToeRad) || Math.abs(project.suspension.wheel.staticToeRad) > 0.35) {
-    diagnostics.push({ severity: "error", code: "STATIC_TOE_RANGE", message: "Static toe must be finite and within ±20.05 degrees.", pointIds: [] });
+    diagnostics.push({ severity: "error", code: "STATIC_TOE_RANGE", message: "Statik toe sonlu ve ±20,05 derece aralığında olmalıdır.", pointIds: [] });
   }
 
   return diagnostics;

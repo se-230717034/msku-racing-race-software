@@ -1,5 +1,6 @@
 import type { KinematicState, KinematicsSweepResponse } from "@msku/contracts";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { uiStatus } from "../lib/uiText";
 
 const degrees = (radians: number): number => radians * 180 / Math.PI;
 const format = (value: number | null | undefined, digits = 3): string =>
@@ -30,42 +31,42 @@ export function KinematicsPanel({
     <aside className="inspector kinematics-panel">
       <section className="inspector-section">
         <div className="section-heading">
-          <span className="eyebrow">SOLVED STATE</span>
+          <span className="eyebrow">ÇÖZÜLMÜŞ DURUM</span>
           <span className={diagnostics?.converged ? "status-chip ok" : "status-chip error"}>
             {diagnostics?.converged ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-            {diagnostics?.converged ? "converged" : "failed"}
+            {diagnostics?.converged ? "yakınsadı" : "başarısız"}
           </span>
         </div>
         <div className="result-grid">
-          <Metric label="Wheel travel" value={format((state?.travelM ?? 0) * 1000, 2)} unit="mm" />
-          <Metric label="Camber" value={format(metrics ? degrees(metrics.camberRad) : null)} unit="deg" />
-          <Metric label="Camber change" value={format(metrics ? degrees(metrics.camberChangeRad) : null)} unit="deg" />
-          <Metric label="Camber gain" value={format(metrics?.camberGainRadPerM == null ? null : metrics.camberGainRadPerM * gainScale)} unit="deg/10mm" />
-          <Metric label="Toe" value={format(metrics ? degrees(metrics.toeRad) : null)} unit="deg" />
-          <Metric label="Bump steer" value={format(metrics ? degrees(metrics.bumpSteerRad) : null)} unit="deg" />
-          <Metric label="Bump-steer gradient" value={format(metrics?.bumpSteerGradientRadPerM == null ? null : metrics.bumpSteerGradientRadPerM * gainScale)} unit="deg/10mm" />
-          <Metric label="Caster" value={format(metrics ? degrees(metrics.casterRad) : null)} unit="deg" />
-          <Metric label="KPI / SAI" value={format(metrics ? degrees(metrics.kpiRad) : null)} unit="deg" />
-          <Metric label="Track change" value={format(metrics == null ? null : metrics.trackChangeM * 1000)} unit="mm" />
-          <Metric label="Roll-centre height" value={format(metrics?.rollCenterHeightM == null ? null : metrics.rollCenterHeightM * 1000)} unit="mm" />
+          <Metric label="Tekerlek hareketi" value={format((state?.travelM ?? 0) * 1000, 2)} unit="mm" />
+          <Metric label="Kamber" value={format(metrics ? degrees(metrics.camberRad) : null)} unit="derece" />
+          <Metric label="Kamber değişimi" value={format(metrics ? degrees(metrics.camberChangeRad) : null)} unit="derece" />
+          <Metric label="Kamber kazancı" value={format(metrics?.camberGainRadPerM == null ? null : metrics.camberGainRadPerM * gainScale)} unit="derece/10mm" />
+          <Metric label="Tekerlek yönelimi (toe)" value={format(metrics ? degrees(metrics.toeRad) : null)} unit="derece" />
+          <Metric label="Sıkışma yönlendirmesi" value={format(metrics ? degrees(metrics.bumpSteerRad) : null)} unit="derece" />
+          <Metric label="Sıkışma yönlendirmesi gradyanı" value={format(metrics?.bumpSteerGradientRadPerM == null ? null : metrics.bumpSteerGradientRadPerM * gainScale)} unit="derece/10mm" />
+          <Metric label="Kaster" value={format(metrics ? degrees(metrics.casterRad) : null)} unit="derece" />
+          <Metric label="KPI / SAI" value={format(metrics ? degrees(metrics.kpiRad) : null)} unit="derece" />
+          <Metric label="İz genişliği değişimi" value={format(metrics == null ? null : metrics.trackChangeM * 1000)} unit="mm" />
+          <Metric label="Yalpa merkezi yüksekliği" value={format(metrics?.rollCenterHeightM == null ? null : metrics.rollCenterHeightM * 1000)} unit="mm" />
         </div>
       </section>
 
       <section className="inspector-section">
         <div className="section-heading">
-          <span className="eyebrow">SOLVER DIAGNOSTICS</span>
+          <span className="eyebrow">ÇÖZÜCÜ TANILAMA</span>
           <span className="unit-chip">tol {sweep.residualToleranceM.toExponential(0)} m</span>
         </div>
         <dl className="solver-diagnostics">
-          <div><dt>Optimizer</dt><dd>{diagnostics?.optimizerSuccess ? "accepted" : "failed"}</dd></div>
-          <div><dt>Residual check</dt><dd>{diagnostics?.residualsAccepted ? "accepted" : "failed"}</dd></div>
-          <div><dt>Jacobian check</dt><dd>{diagnostics?.jacobianAccepted ? "accepted" : "failed"}</dd></div>
-          <div><dt>Continuity check</dt><dd>{diagnostics?.continuityAccepted ? "accepted" : "failed"}</dd></div>
-          <div><dt>Max residual</dt><dd>{diagnostics?.maxAbsResidualM == null ? "—" : `${diagnostics.maxAbsResidualM.toExponential(3)} m`}</dd></div>
-          <div><dt>Residual norm</dt><dd>{diagnostics?.residualNormM == null ? "—" : `${diagnostics.residualNormM.toExponential(3)} m`}</dd></div>
-          <div><dt>Jacobian rank</dt><dd>{diagnostics?.jacobianRank ?? "—"} / 6</dd></div>
-          <div><dt>Condition number</dt><dd>{diagnostics?.jacobianCondition == null ? "—" : diagnostics.jacobianCondition.toExponential(3)}</dd></div>
-          <div><dt>Function evaluations</dt><dd>{diagnostics?.functionEvaluations ?? "—"}</dd></div>
+          <div><dt>Eniyileyici</dt><dd>{diagnostics?.optimizerSuccess ? "kabul edildi" : "başarısız"}</dd></div>
+          <div><dt>Artık kontrolü</dt><dd>{diagnostics?.residualsAccepted ? "kabul edildi" : "başarısız"}</dd></div>
+          <div><dt>Jakoben kontrolü</dt><dd>{diagnostics?.jacobianAccepted ? "kabul edildi" : "başarısız"}</dd></div>
+          <div><dt>Süreklilik kontrolü</dt><dd>{diagnostics?.continuityAccepted ? "kabul edildi" : "başarısız"}</dd></div>
+          <div><dt>En büyük artık</dt><dd>{diagnostics?.maxAbsResidualM == null ? "—" : `${diagnostics.maxAbsResidualM.toExponential(3)} m`}</dd></div>
+          <div><dt>Artık normu</dt><dd>{diagnostics?.residualNormM == null ? "—" : `${diagnostics.residualNormM.toExponential(3)} m`}</dd></div>
+          <div><dt>Jakoben rankı</dt><dd>{diagnostics?.jacobianRank ?? "—"} / 6</dd></div>
+          <div><dt>Koşul sayısı</dt><dd>{diagnostics?.jacobianCondition == null ? "—" : diagnostics.jacobianCondition.toExponential(3)}</dd></div>
+          <div><dt>Fonksiyon değerlendirmesi</dt><dd>{diagnostics?.functionEvaluations ?? "—"}</dd></div>
         </dl>
         {diagnostics && !diagnostics.converged && <p className="solver-failure">{diagnostics.message}</p>}
         {state && state.warnings.length > 0 && (
@@ -74,14 +75,14 @@ export function KinematicsPanel({
       </section>
 
       <section className="inspector-section">
-        <span className="eyebrow">CALCULATION QUALITY</span>
+        <span className="eyebrow">HESAP KALİTESİ</span>
         <dl className="solver-diagnostics quality-status">
-          <div><dt>Numerical</dt><dd>{sweep.validationStatus.numerical}</dd></div>
-          <div><dt>Reference</dt><dd>{sweep.validationStatus.reference}</dd></div>
-          <div><dt>Physical</dt><dd>{sweep.validationStatus.physical}</dd></div>
-          <div><dt>Approval</dt><dd>{sweep.validationStatus.engineeringApproval}</dd></div>
-          <div><dt>Solver</dt><dd>v{sweep.solver.version}</dd></div>
-          <div title={sweep.inputProvenance.projectInputSha256}><dt>Input SHA-256</dt><dd>{sweep.inputProvenance.projectInputSha256.slice(0, 12)}…</dd></div>
+          <div><dt>Sayısal</dt><dd>{uiStatus(sweep.validationStatus.numerical)}</dd></div>
+          <div><dt>Referans</dt><dd>{uiStatus(sweep.validationStatus.reference)}</dd></div>
+          <div><dt>Fiziksel</dt><dd>{uiStatus(sweep.validationStatus.physical)}</dd></div>
+          <div><dt>Onay</dt><dd>{uiStatus(sweep.validationStatus.engineeringApproval)}</dd></div>
+          <div><dt>Çözücü</dt><dd>v{sweep.solver.version}</dd></div>
+          <div title={sweep.inputProvenance.projectInputSha256}><dt>Girdi SHA-256</dt><dd>{sweep.inputProvenance.projectInputSha256.slice(0, 12)}…</dd></div>
         </dl>
         <ul className="solver-warnings">
           {sweep.warnings.map((warning) => <li key={warning}>{warning}</li>)}
@@ -89,11 +90,11 @@ export function KinematicsPanel({
       </section>
 
       <section className="inspector-section grow model-note">
-        <span className="eyebrow">MODEL SCOPE</span>
-        <p>Rigid links and joints; no compliance, loads, tire forces, or transient dynamics.</p>
-        <p>Roll-centre height is a geometric front-view result. It assumes an exact mirrored opposite corner and a rigid circular tire contact point; unsupported pivot/arm projections return no value.</p>
-        <p>Positive travel is bump. Positive toe is toe-in; positive camber tilts the wheel top outward.</p>
-        <b>NOT PHYSICALLY VALIDATED — NOT FOR DESIGN SIGN-OFF</b>
+        <span className="eyebrow">MODEL KAPSAMI</span>
+        <p>Rijit bağlantılar ve mafsallar; esneklik, yükler, lastik kuvvetleri veya geçici rejim dinamiği içermez.</p>
+        <p>Yalpa merkezi yüksekliği geometrik ön görünüş sonucudur. Tam aynalanmış karşı köşe ve rijit dairesel lastik temas noktası varsayar; desteklenmeyen pivot/kol izdüşümleri değer döndürmez.</p>
+        <p>Pozitif hareket sıkışmadır. Pozitif toe içe bakışı, pozitif kamber tekerlek üstünün dışa yatmasını ifade eder.</p>
+        <b>FİZİKSEL OLARAK DOĞRULANMADI — TASARIM ONAYI İÇİN KULLANILAMAZ</b>
       </section>
     </aside>
   );

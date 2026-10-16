@@ -19,10 +19,12 @@ import {
   YAxis,
 } from "recharts";
 
+import { API_BASE_URL } from "../lib/api";
+import { uiStatus } from "../lib/uiText";
 import { useWorkspace } from "../store/workspace";
 import { SuspensionViewport } from "./SuspensionViewport";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const apiBaseUrl = API_BASE_URL;
 
 const readError = async (response: Response): Promise<string> => {
   try {
@@ -75,7 +77,7 @@ function StatusChip({ status }: { status: string | undefined }) {
   return (
     <span className={`status-chip ${accepted ? "ok" : status ? "error" : ""}`}>
       {accepted ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-      {status ?? "NOT RUN"}
+      {status ? uiStatus(status) : "ÇALIŞTIRILMADI"}
     </span>
   );
 }
@@ -184,7 +186,7 @@ export function QuasiStaticWorkspace() {
       setEquilibrium(uprightEquilibriumResponseSchema.parse(payload));
     } catch (reason) {
       setEquilibrium(undefined);
-      setEquilibriumError(reason instanceof Error ? reason.message : "Equilibrium request failed.");
+      setEquilibriumError(reason instanceof Error ? reason.message : "Denge isteği başarısız oldu.");
     } finally {
       setEquilibriumLoading(false);
     }
@@ -208,7 +210,7 @@ export function QuasiStaticWorkspace() {
       setLoadTransfer(vehicleLoadTransferResponseSchema.parse(payload));
     } catch (reason) {
       setLoadTransfer(undefined);
-      setLoadError(reason instanceof Error ? reason.message : "Load-transfer request failed.");
+      setLoadError(reason instanceof Error ? reason.message : "Yük transferi isteği başarısız oldu.");
     }
   };
 
@@ -227,7 +229,7 @@ export function QuasiStaticWorkspace() {
       setActuation(actuationSeriesResponseSchema.parse(payload));
     } catch (reason) {
       setActuation(undefined);
-      setActuationError(reason instanceof Error ? reason.message : "Actuation request failed.");
+      setActuationError(reason instanceof Error ? reason.message : "Çalıştırma sistemi isteği başarısız oldu.");
     }
   };
 
@@ -257,12 +259,12 @@ export function QuasiStaticWorkspace() {
     <div className="loads-workspace">
       <div className="loads-toolbar">
         <div>
-          <span className="eyebrow">PHASE 3 · QUASI-STATIC</span>
-          <strong>Loads & forces</strong>
+          <span className="eyebrow">FAZ 3 · YARI STATİK</span>
+          <strong>Yükler ve kuvvetler</strong>
         </div>
-        <span>SI calculation · editable display units</span>
-        <button type="button" disabled title="Approved export is disabled for physically unvalidated results">
-          <Download size={14} /> Approved export disabled
+        <span>SI hesabı · düzenlenebilir gösterim birimleri</span>
+        <button type="button" disabled title="Fiziksel olarak doğrulanmamış sonuçlar için onaylı dışa aktarma kapalıdır">
+          <Download size={14} /> Onaylı dışa aktarma kapalı
         </button>
       </div>
 
@@ -270,85 +272,85 @@ export function QuasiStaticWorkspace() {
         <aside className="loads-input-panel">
           <section className="inspector-section">
             <div className="section-heading">
-              <span className="eyebrow">UPRIGHT CONTACT WRENCH</span>
+              <span className="eyebrow">TAŞIYICI TEMAS KUVVET-MOMENTİ</span>
               <StatusChip status={equilibrium?.calculationStatus} />
             </div>
-            <NumberField label="Wheel travel" unit="mm" value={travelMm} onChange={setTravelMm} />
-            <VectorFields label="Contact force" unit="N" value={force} onChange={setForce} />
-            <VectorFields label="Free moment" unit="N·m" value={moment} onChange={setMoment} />
-            <VectorFields label="Application point" unit="m" value={application} onChange={setApplication} />
+            <NumberField label="Tekerlek hareketi" unit="mm" value={travelMm} onChange={setTravelMm} />
+            <VectorFields label="Temas kuvveti" unit="N" value={force} onChange={setForce} />
+            <VectorFields label="Serbest moment" unit="N·m" value={moment} onChange={setMoment} />
+            <VectorFields label="Uygulama noktası" unit="m" value={application} onChange={setApplication} />
             <label className="check-field">
               <input
                 type="checkbox"
                 checked={includeActuation}
                 onChange={(event) => setIncludeActuation(event.target.checked)}
               />
-              Explicit sixth actuation member
+              Açık altıncı çalıştırma elemanı
             </label>
             {includeActuation && (
               <>
-                <VectorFields label="Actuation chassis/rocker point" unit="m" value={actuationChassis} onChange={setActuationChassis} />
-                <VectorFields label="Actuation upright point at this pose" unit="m" value={actuationUpright} onChange={setActuationUpright} />
+                <VectorFields label="Şasi/külbütör çalıştırma noktası" unit="m" value={actuationChassis} onChange={setActuationChassis} />
+                <VectorFields label="Bu konumdaki taşıyıcı çalıştırma noktası" unit="m" value={actuationUpright} onChange={setActuationUpright} />
               </>
             )}
             <div className="action-row">
               <button type="button" className="secondary" onClick={loadSyntheticForcePreset}>
-                <FlaskConical size={13} /> Synthetic preset
+                <FlaskConical size={13} /> Sentetik ön ayar
               </button>
               <button type="button" onClick={() => void runEquilibrium()} disabled={equilibriumLoading}>
-                <Play size={13} /> {equilibriumLoading ? "Solving…" : "Solve"}
+                <Play size={13} /> {equilibriumLoading ? "Çözülüyor…" : "Çöz"}
               </button>
             </div>
-            <p className="field-note">The preset is synthetic software-test data, not MSKU vehicle geometry.</p>
+            <p className="field-note">Ön ayar sentetik yazılım test verisidir; MSKU araç geometrisi değildir.</p>
             {equilibriumError && <p className="solver-failure">{equilibriumError}</p>}
           </section>
 
           <section className="inspector-section">
             <div className="section-heading">
-              <span className="eyebrow">VEHICLE LOAD TRANSFER</span>
+              <span className="eyebrow">ARAÇ YÜK TRANSFERİ</span>
               <StatusChip status={loadTransfer?.calculationStatus} />
             </div>
             <div className="parameter-grid">
-              <NumberField label="Mass" unit="kg" value={vehicle.massKg} onChange={(massKg) => setVehicle({ ...vehicle, massKg })} />
-              <NumberField label="Wheelbase" unit="m" value={vehicle.wheelbaseM} onChange={(wheelbaseM) => setVehicle({ ...vehicle, wheelbaseM })} />
-              <NumberField label="CG from front" unit="m" value={vehicle.cgFromFrontAxleM} onChange={(cgFromFrontAxleM) => setVehicle({ ...vehicle, cgFromFrontAxleM })} />
-              <NumberField label="CG height" unit="m" value={vehicle.cgHeightM} onChange={(cgHeightM) => setVehicle({ ...vehicle, cgHeightM })} />
-              <NumberField label="Front track" unit="m" value={vehicle.frontTrackM} onChange={(frontTrackM) => setVehicle({ ...vehicle, frontTrackM })} />
-              <NumberField label="Rear track" unit="m" value={vehicle.rearTrackM} onChange={(rearTrackM) => setVehicle({ ...vehicle, rearTrackM })} />
-              <NumberField label="Longitudinal accel." unit="m/s²" value={vehicle.longitudinalAccelerationMps2} onChange={(longitudinalAccelerationMps2) => setVehicle({ ...vehicle, longitudinalAccelerationMps2 })} />
-              <NumberField label="Lateral accel." unit="m/s²" value={vehicle.lateralAccelerationMps2} onChange={(lateralAccelerationMps2) => setVehicle({ ...vehicle, lateralAccelerationMps2 })} />
-              <NumberField label="Front roll stiffness" unit="N·m/rad" value={vehicle.frontRollStiffnessNmPerRad} onChange={(frontRollStiffnessNmPerRad) => setVehicle({ ...vehicle, frontRollStiffnessNmPerRad })} />
-              <NumberField label="Rear roll stiffness" unit="N·m/rad" value={vehicle.rearRollStiffnessNmPerRad} onChange={(rearRollStiffnessNmPerRad) => setVehicle({ ...vehicle, rearRollStiffnessNmPerRad })} />
+              <NumberField label="Kütle" unit="kg" value={vehicle.massKg} onChange={(massKg) => setVehicle({ ...vehicle, massKg })} />
+              <NumberField label="Dingil mesafesi" unit="m" value={vehicle.wheelbaseM} onChange={(wheelbaseM) => setVehicle({ ...vehicle, wheelbaseM })} />
+              <NumberField label="Ön akstan ağırlık merkezi" unit="m" value={vehicle.cgFromFrontAxleM} onChange={(cgFromFrontAxleM) => setVehicle({ ...vehicle, cgFromFrontAxleM })} />
+              <NumberField label="Ağırlık merkezi yüksekliği" unit="m" value={vehicle.cgHeightM} onChange={(cgHeightM) => setVehicle({ ...vehicle, cgHeightM })} />
+              <NumberField label="Ön iz genişliği" unit="m" value={vehicle.frontTrackM} onChange={(frontTrackM) => setVehicle({ ...vehicle, frontTrackM })} />
+              <NumberField label="Arka iz genişliği" unit="m" value={vehicle.rearTrackM} onChange={(rearTrackM) => setVehicle({ ...vehicle, rearTrackM })} />
+              <NumberField label="Boylamsal ivme" unit="m/s²" value={vehicle.longitudinalAccelerationMps2} onChange={(longitudinalAccelerationMps2) => setVehicle({ ...vehicle, longitudinalAccelerationMps2 })} />
+              <NumberField label="Yanal ivme" unit="m/s²" value={vehicle.lateralAccelerationMps2} onChange={(lateralAccelerationMps2) => setVehicle({ ...vehicle, lateralAccelerationMps2 })} />
+              <NumberField label="Ön yalpa rijitliği" unit="N·m/rad" value={vehicle.frontRollStiffnessNmPerRad} onChange={(frontRollStiffnessNmPerRad) => setVehicle({ ...vehicle, frontRollStiffnessNmPerRad })} />
+              <NumberField label="Arka yalpa rijitliği" unit="N·m/rad" value={vehicle.rearRollStiffnessNmPerRad} onChange={(rearRollStiffnessNmPerRad) => setVehicle({ ...vehicle, rearRollStiffnessNmPerRad })} />
             </div>
             <button type="button" className="wide-action" onClick={() => void runLoadTransfer()}>
-              <Play size={13} /> Calculate load transfer
+              <Play size={13} /> Yük transferini hesapla
             </button>
-            <p className="field-note">Current values are an editable synthetic demonstration preset.</p>
+            <p className="field-note">Mevcut değerler düzenlenebilir sentetik gösterim ön ayarıdır.</p>
             {loadError && <p className="solver-failure">{loadError}</p>}
           </section>
 
           <section className="inspector-section">
             <div className="section-heading">
-              <span className="eyebrow">ACTUATION SERIES</span>
+              <span className="eyebrow">ÇALIŞTIRMA SERİSİ</span>
               <StatusChip status={actuation?.calculationStatus} />
             </div>
             <label className="text-field">
-              <span>Wheel travel samples (mm)</span>
+              <span>Tekerlek hareketi örnekleri (mm)</span>
               <input value={actuationInput.wheelTravelMm} onChange={(event) => setActuationInput({ ...actuationInput, wheelTravelMm: event.target.value })} />
             </label>
             <label className="text-field">
-              <span>Spring length samples (mm)</span>
+              <span>Yay uzunluğu örnekleri (mm)</span>
               <input value={actuationInput.springLengthMm} onChange={(event) => setActuationInput({ ...actuationInput, springLengthMm: event.target.value })} />
             </label>
             <div className="parameter-grid">
-              <NumberField label="Reference length" unit="mm" value={actuationInput.referenceSpringLengthMm} onChange={(referenceSpringLengthMm) => setActuationInput({ ...actuationInput, referenceSpringLengthMm })} />
-              <NumberField label="Spring rate" unit="N/mm" value={actuationInput.springRateNPerMm} onChange={(springRateNPerMm) => setActuationInput({ ...actuationInput, springRateNPerMm })} />
-              <NumberField label="Preload" unit="N" value={actuationInput.preloadN} onChange={(preloadN) => setActuationInput({ ...actuationInput, preloadN })} />
+              <NumberField label="Referans uzunluğu" unit="mm" value={actuationInput.referenceSpringLengthMm} onChange={(referenceSpringLengthMm) => setActuationInput({ ...actuationInput, referenceSpringLengthMm })} />
+              <NumberField label="Yay oranı" unit="N/mm" value={actuationInput.springRateNPerMm} onChange={(springRateNPerMm) => setActuationInput({ ...actuationInput, springRateNPerMm })} />
+              <NumberField label="Ön yük" unit="N" value={actuationInput.preloadN} onChange={(preloadN) => setActuationInput({ ...actuationInput, preloadN })} />
             </div>
             <button type="button" className="wide-action" onClick={() => void runActuation()}>
-              <Play size={13} /> Calculate motion ratio
+              <Play size={13} /> Hareket oranını hesapla
             </button>
-            <p className="field-note">Lengths require explicit CAD, solved rocker geometry, or measurement provenance.</p>
+            <p className="field-note">Uzunluklar açık CAD, çözülmüş külbütör geometrisi veya ölçüm kaynağı gerektirir.</p>
             {actuationError && <p className="solver-failure">{actuationError}</p>}
           </section>
         </aside>
@@ -365,36 +367,36 @@ export function QuasiStaticWorkspace() {
           <div className="loads-dashboard">
             <section className="engineering-card force-card">
               <div className="section-heading">
-                <span className="eyebrow">LINK AXIAL FORCES</span>
+                <span className="eyebrow">BAĞLANTI EKSENEL KUVVETLERİ</span>
                 <StatusChip status={equilibrium?.calculationStatus} />
               </div>
               {equilibrium?.memberForces.length ? (
                 <div className="force-table-wrap">
                   <table className="force-table">
-                    <thead><tr><th>Member</th><th>Axial force</th><th>State</th></tr></thead>
+                    <thead><tr><th>Eleman</th><th>Eksenel kuvvet</th><th>Durum</th></tr></thead>
                     <tbody>
                       {equilibrium.memberForces.map((item) => (
                         <tr key={item.id}>
                           <td>{item.id}</td>
                           <td>{item.axialForceN.toFixed(2)} N</td>
-                          <td>{item.state}</td>
+                          <td>{{ TENSION: "çekme", COMPRESSION: "basma", ZERO: "yüksüz" }[item.state]}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              ) : <p className="diagnostic-empty">No accepted member-force solution.</p>}
+              ) : <p className="diagnostic-empty">Kabul edilmiş eleman kuvveti çözümü yok.</p>}
               {equilibrium && (
                 <dl className="solver-diagnostics compact">
                   <div><dt>Rank</dt><dd>{equilibrium.diagnostics.matrixRank} / {equilibrium.diagnostics.matrixColumns}</dd></div>
-                  <div><dt>Condition</dt><dd>{equilibrium.diagnostics.conditionNumber?.toExponential(3) ?? "—"}</dd></div>
-                  <div><dt>Force residual</dt><dd>{equilibrium.diagnostics.forceResidualNormN.toExponential(3)} N</dd></div>
-                  <div><dt>Moment residual</dt><dd>{equilibrium.diagnostics.momentResidualNormNm.toExponential(3)} N·m</dd></div>
-                  <div><dt>Solver</dt><dd>v{equilibrium.solverVersion}</dd></div>
-                  <div><dt>Reference</dt><dd>{equilibrium.validationStatus.reference}</dd></div>
-                  <div><dt>Physical</dt><dd>{equilibrium.validationStatus.physical}</dd></div>
-                  <div><dt>Approval</dt><dd>{equilibrium.validationStatus.engineeringApproval}</dd></div>
-                  <div title={equilibrium.inputProvenance.projectInputSha256}><dt>Input SHA-256</dt><dd>{equilibrium.inputProvenance.projectInputSha256.slice(0, 12)}…</dd></div>
+                  <div><dt>Koşul</dt><dd>{equilibrium.diagnostics.conditionNumber?.toExponential(3) ?? "—"}</dd></div>
+                  <div><dt>Kuvvet artığı</dt><dd>{equilibrium.diagnostics.forceResidualNormN.toExponential(3)} N</dd></div>
+                  <div><dt>Moment artığı</dt><dd>{equilibrium.diagnostics.momentResidualNormNm.toExponential(3)} N·m</dd></div>
+                  <div><dt>Çözücü</dt><dd>v{equilibrium.solverVersion}</dd></div>
+                  <div><dt>Referans</dt><dd>{uiStatus(equilibrium.validationStatus.reference)}</dd></div>
+                  <div><dt>Fiziksel</dt><dd>{uiStatus(equilibrium.validationStatus.physical)}</dd></div>
+                  <div><dt>Onay</dt><dd>{uiStatus(equilibrium.validationStatus.engineeringApproval)}</dd></div>
+                  <div title={equilibrium.inputProvenance.projectInputSha256}><dt>Girdi SHA-256</dt><dd>{equilibrium.inputProvenance.projectInputSha256.slice(0, 12)}…</dd></div>
                 </dl>
               )}
               {equilibrium?.warnings.length ? <ul className="solver-warnings">{equilibrium.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
@@ -402,7 +404,7 @@ export function QuasiStaticWorkspace() {
 
             <section className="engineering-card">
               <div className="section-heading">
-                <span className="eyebrow">NORMAL LOAD DISTRIBUTION</span>
+                <span className="eyebrow">NORMAL YÜK DAĞILIMI</span>
                 <StatusChip status={loadTransfer?.calculationStatus} />
               </div>
               {wheelLoadValues.length ? (
@@ -415,15 +417,15 @@ export function QuasiStaticWorkspace() {
                     </div>
                   ))}
                 </div>
-              ) : <p className="diagnostic-empty">Wheel loads appear only when the model has sufficient inputs and remains physical.</p>}
+              ) : <p className="diagnostic-empty">Tekerlek yükleri yalnızca model yeterli girdiye sahip ve fiziksel kaldığında gösterilir.</p>}
               {loadTransfer && (
                 <dl className="solver-diagnostics compact">
-                  <div><dt>Front axle</dt><dd>{format(loadTransfer.axleLoads?.frontN)} N</dd></div>
-                  <div><dt>Rear axle</dt><dd>{format(loadTransfer.axleLoads?.rearN)} N</dd></div>
-                  <div><dt>Longitudinal transfer</dt><dd>{format(loadTransfer.longitudinalTransferN)} N</dd></div>
-                  <div><dt>Force residual</dt><dd>{loadTransfer.forceResidualN?.toExponential(3) ?? "—"} N</dd></div>
-                  <div><dt>Solver</dt><dd>v{loadTransfer.solverVersion}</dd></div>
-                  <div><dt>Physical</dt><dd>{loadTransfer.validationStatus.physical}</dd></div>
+                  <div><dt>Ön aks</dt><dd>{format(loadTransfer.axleLoads?.frontN)} N</dd></div>
+                  <div><dt>Arka aks</dt><dd>{format(loadTransfer.axleLoads?.rearN)} N</dd></div>
+                  <div><dt>Boylamsal transfer</dt><dd>{format(loadTransfer.longitudinalTransferN)} N</dd></div>
+                  <div><dt>Kuvvet artığı</dt><dd>{loadTransfer.forceResidualN?.toExponential(3) ?? "—"} N</dd></div>
+                  <div><dt>Çözücü</dt><dd>v{loadTransfer.solverVersion}</dd></div>
+                  <div><dt>Fiziksel</dt><dd>{uiStatus(loadTransfer.validationStatus.physical)}</dd></div>
                 </dl>
               )}
               {loadTransfer?.warnings.length ? <ul className="solver-warnings">{loadTransfer.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
@@ -431,7 +433,7 @@ export function QuasiStaticWorkspace() {
 
             <section className="engineering-card actuation-card">
               <div className="section-heading">
-                <span className="eyebrow">MOTION RATIO & WHEEL RATE</span>
+                <span className="eyebrow">HAREKET ORANI VE TEKERLEK ORANI</span>
                 <StatusChip status={actuation?.calculationStatus} />
               </div>
               {actuationChart.length ? (
@@ -443,21 +445,21 @@ export function QuasiStaticWorkspace() {
                     <YAxis yAxisId="rate" orientation="right" unit=" N/mm" tick={{ fill: "#727c8d", fontSize: 9 }} width={68} />
                     <Tooltip contentStyle={{ background: "#11151c", border: "1px solid #343c49", fontSize: 10 }} />
                     <Legend wrapperStyle={{ fontSize: 9 }} />
-                    <Line yAxisId="ratio" dataKey="motionRatio" name="Motion ratio" stroke="#f43f5e" dot={false} isAnimationActive={false} />
-                    <Line yAxisId="rate" dataKey="wheelRateNPerMm" name="Wheel rate" stroke="#60a5fa" dot={false} isAnimationActive={false} />
+                    <Line yAxisId="ratio" dataKey="motionRatio" name="Hareket oranı" stroke="#f43f5e" dot={false} isAnimationActive={false} />
+                    <Line yAxisId="rate" dataKey="wheelRateNPerMm" name="Tekerlek oranı" stroke="#60a5fa" dot={false} isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>
-              ) : <p className="diagnostic-empty">No supported actuation series has been calculated.</p>}
+              ) : <p className="diagnostic-empty">Desteklenen bir çalıştırma serisi hesaplanmadı.</p>}
               {actuation && (
                 <dl className="solver-diagnostics compact">
-                  <div><dt>Solver</dt><dd>v{actuation.solverVersion}</dd></div>
-                  <div><dt>Reference</dt><dd>{actuation.validationStatus.reference}</dd></div>
-                  <div><dt>Physical</dt><dd>{actuation.validationStatus.physical}</dd></div>
-                  <div><dt>Approval</dt><dd>{actuation.validationStatus.engineeringApproval}</dd></div>
+                  <div><dt>Çözücü</dt><dd>v{actuation.solverVersion}</dd></div>
+                  <div><dt>Referans</dt><dd>{uiStatus(actuation.validationStatus.reference)}</dd></div>
+                  <div><dt>Fiziksel</dt><dd>{uiStatus(actuation.validationStatus.physical)}</dd></div>
+                  <div><dt>Onay</dt><dd>{uiStatus(actuation.validationStatus.engineeringApproval)}</dd></div>
                 </dl>
               )}
               {actuation?.warnings.length ? <ul className="solver-warnings">{actuation.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
-              <p className="model-assumption">MR = d(spring compression) / d(wheel bump). Damper force remains unavailable unless velocity is explicitly supplied.</p>
+              <p className="model-assumption">HO = d(yay sıkışması) / d(tekerlek sıkışması). Hız açıkça sağlanmadıkça amortisör kuvveti kullanılamaz.</p>
             </section>
           </div>
         </main>

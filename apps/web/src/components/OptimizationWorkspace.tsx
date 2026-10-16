@@ -24,13 +24,15 @@ import {
   YAxis,
 } from "recharts";
 
+import { API_BASE_URL } from "../lib/api";
+import { uiStatus } from "../lib/uiText";
 import { useWorkspace } from "../store/workspace";
 import { SuspensionViewport } from "./SuspensionViewport";
 
 type OptimizationModel = EngineeringOptimizationRequest["model"];
 type VariableRow = { enabled: boolean; path: string; lowerBound: number; upperBound: number };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const apiBaseUrl = API_BASE_URL;
 const dynamicsSettings = {
   durationS: 0.5,
   outputSamples: 101,
@@ -51,7 +53,7 @@ const road = {
 
 const quarterCar: QuarterCarSimulationRequest = {
   dataClassification: "demonstration",
-  sourceLabel: "Synthetic Phase 5 optimization preset",
+  sourceLabel: "Sentetik Faz 5 optimizasyon ön ayarı",
   parameters: {
     sprungMassKg: 75,
     unsprungMassKg: 12,
@@ -81,7 +83,7 @@ const fullCorner = {
 };
 const fullCar: FullCarSimulationRequest = {
   dataClassification: "demonstration",
-  sourceLabel: "Synthetic Phase 5 optimization preset",
+  sourceLabel: "Sentetik Faz 5 optimizasyon ön ayarı",
   parameters: {
     sprungMassKg: 300,
     pitchInertiaKgM2: 120,
@@ -109,7 +111,7 @@ const fullCar: FullCarSimulationRequest = {
 
 const bicycle: BicycleSimulationRequest = {
   dataClassification: "demonstration",
-  sourceLabel: "Synthetic Phase 5 optimization preset",
+  sourceLabel: "Sentetik Faz 5 optimizasyon ön ayarı",
   parameters: {
     massKg: 300,
     yawInertiaKgM2: 150,
@@ -139,26 +141,26 @@ const bicycle: BicycleSimulationRequest = {
 
 const objectiveOptions: Record<OptimizationModel, Array<{ id: string; label: string; normalization: number }>> = {
   kinematics: [
-    { id: "bump_steer_rms_rad", label: "Bump steer RMS", normalization: 0.01 },
-    { id: "camber_variation_rms_rad", label: "Camber variation RMS", normalization: 0.02 },
-    { id: "roll_center_migration_rms_m", label: "Roll-centre migration RMS", normalization: 0.01 },
-    { id: "maximum_abs_track_change_m", label: "Maximum track change", normalization: 0.01 },
+    { id: "bump_steer_rms_rad", label: "Sıkışma yönlendirmesi RMS", normalization: 0.01 },
+    { id: "camber_variation_rms_rad", label: "Kamber değişimi RMS", normalization: 0.02 },
+    { id: "roll_center_migration_rms_m", label: "Yalpa merkezi hareketi RMS", normalization: 0.01 },
+    { id: "maximum_abs_track_change_m", label: "En büyük iz genişliği değişimi", normalization: 0.01 },
   ],
   quarter_car: [
-    { id: "sprung_acceleration_rms_mps2", label: "Sprung acceleration RMS", normalization: 1 },
-    { id: "maximum_abs_suspension_travel_m", label: "Maximum suspension travel", normalization: 0.02 },
+    { id: "sprung_acceleration_rms_mps2", label: "Yaylanan kütle ivmesi RMS", normalization: 1 },
+    { id: "maximum_abs_suspension_travel_m", label: "En büyük süspansiyon hareketi", normalization: 0.02 },
   ],
   full_car: [
-    { id: "body_heave_acceleration_rms_mps2", label: "Body heave acceleration RMS", normalization: 1 },
-    { id: "maximum_abs_suspension_travel_m", label: "Maximum suspension travel", normalization: 0.02 },
-    { id: "maximum_abs_pitch_rad", label: "Maximum pitch", normalization: 0.02 },
-    { id: "maximum_abs_roll_rad", label: "Maximum roll", normalization: 0.02 },
+    { id: "body_heave_acceleration_rms_mps2", label: "Gövde yükselme ivmesi RMS", normalization: 1 },
+    { id: "maximum_abs_suspension_travel_m", label: "En büyük süspansiyon hareketi", normalization: 0.02 },
+    { id: "maximum_abs_pitch_rad", label: "En büyük başvurma", normalization: 0.02 },
+    { id: "maximum_abs_roll_rad", label: "En büyük yalpa", normalization: 0.02 },
   ],
   bicycle: [
-    { id: "final_yaw_rate_radps", label: "Target final yaw rate", normalization: 0.1 },
-    { id: "maximum_abs_sideslip_rad", label: "Maximum sideslip", normalization: 0.05 },
-    { id: "lateral_acceleration_rms_mps2", label: "Lateral acceleration RMS", normalization: 2 },
-    { id: "final_lateral_acceleration_mps2", label: "Target final lateral acceleration", normalization: 2 },
+    { id: "final_yaw_rate_radps", label: "Hedef son sapma hızı", normalization: 0.1 },
+    { id: "maximum_abs_sideslip_rad", label: "En büyük yana kayma", normalization: 0.05 },
+    { id: "lateral_acceleration_rms_mps2", label: "Yanal ivme RMS", normalization: 2 },
+    { id: "final_lateral_acceleration_mps2", label: "Hedef son yanal ivme", normalization: 2 },
   ],
 };
 
@@ -189,7 +191,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
 
 function StatusChip({ status }: { status?: string }) {
   const ok = status === "VERIFIED_NUMERICALLY";
-  return <span className={`status-chip ${ok ? "ok" : status ? "error" : ""}`}>{ok ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}{status ?? "NOT RUN"}</span>;
+  return <span className={`status-chip ${ok ? "ok" : status ? "error" : ""}`}>{ok ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}{status ? uiStatus(status) : "ÇALIŞTIRILMADI"}</span>;
 }
 
 async function readError(response: Response): Promise<string> {
@@ -309,7 +311,7 @@ export function OptimizationWorkspace() {
       setResult(next);
       if (next.calculationStatus !== "VERIFIED_NUMERICALLY") setError(next.diagnostics.message);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Optimization failed.");
+      setError(reason instanceof Error ? reason.message : "Optimizasyon başarısız oldu.");
     } finally {
       setLoading(false);
     }
@@ -329,60 +331,60 @@ export function OptimizationWorkspace() {
 
   return <div className="optimization-workspace">
     <header className="optimization-toolbar">
-      <div><span className="eyebrow">PHASE 5 · ENGINEERING OPTIMIZATION</span><strong>Bounded deterministic design search</strong></div>
-      <span>Verified numerical objectives · physically unvalidated candidates</span>
+      <div><span className="eyebrow">FAZ 5 · MÜHENDİSLİK OPTİMİZASYONU</span><strong>Sınırlı deterministik tasarım araması</strong></div>
+      <span>Doğrulanmış sayısal hedefler · fiziksel olarak doğrulanmamış adaylar</span>
       <StatusChip status={result?.calculationStatus} />
     </header>
     <div className="optimization-content">
       <aside className="optimization-inputs">
         <section className="inspector-section">
-          <div className="section-heading"><span className="eyebrow">MODEL & OBJECTIVES</span></div>
-          <label className="select-field"><span>Verified model</span><select value={model} onChange={(event) => changeModel(event.target.value as OptimizationModel)}><option value="kinematics">Suspension kinematics</option><option value="quarter_car">2DOF quarter car</option><option value="full_car">7DOF full car</option><option value="bicycle">Planar bicycle</option></select></label>
-          <label className="select-field"><span>Primary objective</span><select value={primary} onChange={(event) => setPrimary(event.target.value)}>{options.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-          <label className="checkbox-field"><input type="checkbox" checked={multiObjective} onChange={(event) => setMultiObjective(event.target.checked)} /><span>Weighted multi-objective + Pareto</span></label>
-          {multiObjective && <label className="select-field"><span>Secondary objective</span><select value={secondary} onChange={(event) => setSecondary(event.target.value)}>{options.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
-          {(primary.startsWith("final_") || secondary.startsWith("final_")) && <NumberField label="Target value" value={targetValue} onChange={setTargetValue} />}
-          <p className="field-note">Weights are 1.0. Each objective is divided by its documented nonzero SI normalization before scalarization.</p>
+          <div className="section-heading"><span className="eyebrow">MODEL VE HEDEFLER</span></div>
+          <label className="select-field"><span>Doğrulanmış model</span><select aria-label="Doğrulanmış model" value={model} onChange={(event) => changeModel(event.target.value as OptimizationModel)}><option value="kinematics">Süspansiyon kinematiği</option><option value="quarter_car">2SD çeyrek araç</option><option value="full_car">7SD tam araç</option><option value="bicycle">Düzlemsel bisiklet modeli</option></select></label>
+          <label className="select-field"><span>Birincil hedef</span><select value={primary} onChange={(event) => setPrimary(event.target.value)}>{options.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+          <label className="checkbox-field"><input type="checkbox" checked={multiObjective} onChange={(event) => setMultiObjective(event.target.checked)} /><span>Ağırlıklı çoklu hedef + Pareto</span></label>
+          {multiObjective && <label className="select-field"><span>İkincil hedef</span><select value={secondary} onChange={(event) => setSecondary(event.target.value)}>{options.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
+          {(primary.startsWith("final_") || secondary.startsWith("final_")) && <NumberField label="Hedef değer" value={targetValue} onChange={setTargetValue} />}
+          <p className="field-note">Ağırlıklar 1,0'dır. Her hedef, skalerleştirme öncesinde belgelenmiş sıfırdan farklı SI normalizasyonuna bölünür.</p>
         </section>
 
         <section className="inspector-section">
-          <div className="section-heading"><span className="eyebrow">DESIGN VARIABLES & BOUNDS</span><span className="unit-chip">SI</span></div>
+          <div className="section-heading"><span className="eyebrow">TASARIM DEĞİŞKENLERİ VE SINIRLAR</span><span className="unit-chip">SI</span></div>
           {variables.map((variable, index) => <div className="optimization-variable" key={variable.path}>
             <label className="checkbox-field"><input type="checkbox" checked={variable.enabled} onChange={(event) => updateVariable(index, { enabled: event.target.checked })} /><span>{variable.path}</span></label>
-            <div className="parameter-grid"><NumberField label="Lower" value={variable.lowerBound} onChange={(value) => updateVariable(index, { lowerBound: value })} /><NumberField label="Upper" value={variable.upperBound} onChange={(value) => updateVariable(index, { upperBound: value })} /></div>
+            <div className="parameter-grid"><NumberField label="Alt sınır" value={variable.lowerBound} onChange={(value) => updateVariable(index, { lowerBound: value })} /><NumberField label="Üst sınır" value={variable.upperBound} onChange={(value) => updateVariable(index, { upperBound: value })} /></div>
           </div>)}
         </section>
 
         <section className="inspector-section">
-          <div className="section-heading"><span className="eyebrow">METHOD & CONSTRAINTS</span></div>
-          <div className="parameter-grid"><NumberField label="Seed" value={seed} onChange={(value) => setSeed(Math.round(value))} /><NumberField label="Generations" value={maximumGenerations} onChange={(value) => setMaximumGenerations(Math.round(value))} /><NumberField label="Population ×N" value={populationMultiplier} onChange={(value) => setPopulationMultiplier(Math.round(value))} /></div>
-          <p className="field-note">SciPy differential evolution; fixed seed, serial evaluation, no polishing. Geometry validity, solver convergence, 10 mm minimum link length, model domain, stability, contact, and 40 mm ride-travel constraints are enforced where applicable.</p>
-          <button className="wide-action" type="button" disabled={loading || !variables.some((item) => item.enabled)} onClick={() => void run()}><Play size={13} />{loading ? "Evaluating bounded population…" : "Run optimization"}</button>
+          <div className="section-heading"><span className="eyebrow">YÖNTEM VE KISITLAR</span></div>
+          <div className="parameter-grid"><NumberField label="Tohum" value={seed} onChange={(value) => setSeed(Math.round(value))} /><NumberField label="Nesiller" value={maximumGenerations} onChange={(value) => setMaximumGenerations(Math.round(value))} /><NumberField label="Popülasyon ×N" value={populationMultiplier} onChange={(value) => setPopulationMultiplier(Math.round(value))} /></div>
+          <p className="field-note">SciPy diferansiyel evrim; sabit tohum, seri değerlendirme, son iyileştirme yok. Uygun olduğunda geometri geçerliliği, çözücü yakınsaması, 10 mm asgari bağlantı uzunluğu, model bölgesi, kararlılık, temas ve 40 mm sürüş hareketi kısıtları uygulanır.</p>
+          <button className="wide-action" type="button" disabled={loading || !variables.some((item) => item.enabled)} onClick={() => void run()}><Play size={13} />{loading ? "Sınırlı popülasyon değerlendiriliyor…" : "Optimizasyonu çalıştır"}</button>
           {error && <p className="solver-failure">{error}</p>}
         </section>
       </aside>
 
       <main className="optimization-results">
         <section className="optimization-preview">
-          {model === "kinematics" ? <SuspensionViewport mode="optimization" hardpointOverrides={overrides} /> : <div className="optimization-no-geometry"><span className="eyebrow">PARAMETRIC MODEL</span><strong>{model.replaceAll("_", " ").toUpperCase()}</strong><p>Candidate inspection uses calculated metrics and parameter values. No unrelated geometry is fabricated for this model.</p></div>}
+          {model === "kinematics" ? <SuspensionViewport mode="optimization" hardpointOverrides={overrides} /> : <div className="optimization-no-geometry"><span className="eyebrow">PARAMETRİK MODEL</span><strong>{{ quarter_car: "2SD ÇEYREK ARAÇ", full_car: "7SD TAM ARAÇ", bicycle: "DÜZLEMSEL BİSİKLET" }[model]}</strong><p>Aday incelemesi hesaplanan metrikleri ve parametre değerlerini kullanır. Bu model için ilgisiz geometri üretilmez.</p></div>}
           <div className="candidate-panel">
-            <div className="section-heading"><span className="eyebrow">CANDIDATE INSPECTION</span><StatusChip status={result?.calculationStatus} /></div>
-            <label className="select-field"><span>Candidate</span><select value={selectedPareto} disabled={!result?.optimized} onChange={(event) => setSelectedPareto(Number(event.target.value))}><option value={-1}>Weighted optimum</option>{result?.paretoFront.map((_, index) => <option value={index} key={index}>Pareto {index + 1}</option>)}</select></label>
-            {selectedCandidate ? <dl className="candidate-values">{Object.entries(selectedCandidate.variableValues).map(([path, value]) => <div key={path}><dt>{path}</dt><dd>{display(value, 7)}</dd></div>)}</dl> : <p className="diagnostic-empty">Run an optimization to inspect a feasible candidate.</p>}
-            {model === "kinematics" && <div className="candidate-actions"><button type="button" disabled={!overrides} onClick={() => setPreview((value) => !value)}><Eye size={13} />{preview ? "Hide preview" : "Preview candidate"}</button><button type="button" disabled={!overrides || result?.calculationStatus !== "VERIFIED_NUMERICALLY"} onClick={() => overrides && applyHardpoints(overrides)}><Save size={13} />Apply to active project</button></div>}
-            <p className="field-note">Preview never mutates the project. Apply is explicit and remains physically unvalidated.</p>
+            <div className="section-heading"><span className="eyebrow">ADAY İNCELEMESİ</span><StatusChip status={result?.calculationStatus} /></div>
+            <label className="select-field"><span>Aday</span><select value={selectedPareto} disabled={!result?.optimized} onChange={(event) => setSelectedPareto(Number(event.target.value))}><option value={-1}>Ağırlıklı optimum</option>{result?.paretoFront.map((_, index) => <option value={index} key={index}>Pareto {index + 1}</option>)}</select></label>
+            {selectedCandidate ? <dl className="candidate-values">{Object.entries(selectedCandidate.variableValues).map(([path, value]) => <div key={path}><dt>{path}</dt><dd>{display(value, 7)}</dd></div>)}</dl> : <p className="diagnostic-empty">Uygun bir adayı incelemek için optimizasyon çalıştırın.</p>}
+            {model === "kinematics" && <div className="candidate-actions"><button type="button" disabled={!overrides} onClick={() => setPreview((value) => !value)}><Eye size={13} />{preview ? "Ön izlemeyi gizle" : "Adayı ön izle"}</button><button type="button" disabled={!overrides || result?.calculationStatus !== "VERIFIED_NUMERICALLY"} onClick={() => overrides && applyHardpoints(overrides)}><Save size={13} />Etkin projeye uygula</button></div>}
+            <p className="field-note">Ön izleme projeyi hiçbir zaman değiştirmez. Uygulama açıktır ve fiziksel olarak doğrulanmamış kalır.</p>
           </div>
         </section>
 
         <section className="optimization-charts">
-          <div className="chart-card"><div className="chart-heading"><span>CONVERGENCE</span><b>normalized weighted objective</b></div><ResponsiveContainer width="100%" height="100%"><LineChart data={result?.convergence ?? []}><CartesianGrid stroke="#1f2630" vertical={false} /><XAxis dataKey="generation" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Line dataKey="bestWeightedObjective" name="Best feasible" dot={false} stroke="#f43f5e" /></LineChart></ResponsiveContainer></div>
-          <div className="chart-card"><div className="chart-heading"><span>PARETO FRONT</span><b>{paretoKeys.length >= 2 ? `${paretoKeys[0]} vs ${paretoKeys[1]}` : "requires two objectives"}</b></div><ResponsiveContainer width="100%" height="100%"><ScatterChart><CartesianGrid stroke="#1f2630" /><XAxis dataKey="x" type="number" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis dataKey="y" type="number" stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Scatter data={paretoData} fill="#f43f5e" /></ScatterChart></ResponsiveContainer></div>
+          <div className="chart-card"><div className="chart-heading"><span>YAKINSAMA</span><b>normalleştirilmiş ağırlıklı hedef</b></div><ResponsiveContainer width="100%" height="100%"><LineChart data={result?.convergence ?? []}><CartesianGrid stroke="#1f2630" vertical={false} /><XAxis dataKey="generation" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Line dataKey="bestWeightedObjective" name="En iyi uygun" dot={false} stroke="#f43f5e" /></LineChart></ResponsiveContainer></div>
+          <div className="chart-card"><div className="chart-heading"><span>PARETO CEPHESİ</span><b>{paretoKeys.length >= 2 ? `${paretoKeys[0]} / ${paretoKeys[1]}` : "iki hedef gerektirir"}</b></div><ResponsiveContainer width="100%" height="100%"><ScatterChart><CartesianGrid stroke="#1f2630" /><XAxis dataKey="x" type="number" stroke="#667080" tick={{ fontSize: 8 }} /><YAxis dataKey="y" type="number" stroke="#667080" tick={{ fontSize: 8 }} /><Tooltip contentStyle={{ background: "#11151b", border: "1px solid #303744", fontSize: 9 }} /><Scatter data={paretoData} fill="#f43f5e" /></ScatterChart></ResponsiveContainer></div>
         </section>
 
         <section className="optimization-detail">
-          <div className="engineering-card"><div className="section-heading"><span className="eyebrow">BASELINE VS CANDIDATE</span></div>{comparisonMetrics.length ? <table className="comparison-table"><thead><tr><th>Metric</th><th>Baseline</th><th>Candidate</th></tr></thead><tbody>{comparisonMetrics.map((item) => <tr key={item.id}><td>{item.id}</td><td>{display(item.baseline)}</td><td>{display(item.candidate)}</td></tr>)}</tbody></table> : <p className="diagnostic-empty">No accepted candidate.</p>}</div>
-          <div className="engineering-card"><div className="section-heading"><span className="eyebrow">LOCAL SENSITIVITY</span></div>{result?.sensitivities.length ? <dl className="candidate-values">{result.sensitivities.map((item) => <div key={`${item.variablePath}-${item.metricId}`}><dt>{item.variablePath} → {item.metricId}</dt><dd>{display(item.derivative, 4)} · {item.method}</dd></div>)}</dl> : <p className="diagnostic-empty">No finite-difference sensitivity.</p>}</div>
-          <div className="engineering-card"><div className="section-heading"><span className="eyebrow">QUALITY & WARNINGS</span></div>{result ? <dl className="solver-diagnostics compact"><div><dt>Numerical</dt><dd>{result.validationStatus.numerical}</dd></div><div><dt>Reference</dt><dd>{result.validationStatus.reference}</dd></div><div><dt>Physical</dt><dd>{result.validationStatus.physical}</dd></div><div><dt>Approval</dt><dd>{result.validationStatus.engineeringApproval}</dd></div><div><dt>Evaluations</dt><dd>{result.diagnostics.evaluations}</dd></div><div><dt>Rejected</dt><dd>{result.diagnostics.rejectedEvaluations}</dd></div><div><dt>Seed</dt><dd>{result.diagnostics.seed}</dd></div></dl> : <p className="diagnostic-empty">No run diagnostics.</p>}{result?.warnings.length ? <ul className="solver-warnings">{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}</div>
+          <div className="engineering-card"><div className="section-heading"><span className="eyebrow">REFERANS VE ADAY</span></div>{comparisonMetrics.length ? <table className="comparison-table"><thead><tr><th>Metrik</th><th>Referans</th><th>Aday</th></tr></thead><tbody>{comparisonMetrics.map((item) => <tr key={item.id}><td>{item.id}</td><td>{display(item.baseline)}</td><td>{display(item.candidate)}</td></tr>)}</tbody></table> : <p className="diagnostic-empty">Kabul edilmiş aday yok.</p>}</div>
+          <div className="engineering-card"><div className="section-heading"><span className="eyebrow">YEREL DUYARLILIK</span></div>{result?.sensitivities.length ? <dl className="candidate-values">{result.sensitivities.map((item) => <div key={`${item.variablePath}-${item.metricId}`}><dt>{item.variablePath} → {item.metricId}</dt><dd>{display(item.derivative, 4)} · {item.method}</dd></div>)}</dl> : <p className="diagnostic-empty">Sonlu fark duyarlılığı yok.</p>}</div>
+          <div className="engineering-card"><div className="section-heading"><span className="eyebrow">KALİTE VE UYARILAR</span></div>{result ? <dl className="solver-diagnostics compact"><div><dt>Sayısal</dt><dd>{uiStatus(result.validationStatus.numerical)}</dd></div><div><dt>Referans</dt><dd>{uiStatus(result.validationStatus.reference)}</dd></div><div><dt>Fiziksel</dt><dd>{uiStatus(result.validationStatus.physical)}</dd></div><div><dt>Onay</dt><dd>{uiStatus(result.validationStatus.engineeringApproval)}</dd></div><div><dt>Değerlendirmeler</dt><dd>{result.diagnostics.evaluations}</dd></div><div><dt>Reddedilen</dt><dd>{result.diagnostics.rejectedEvaluations}</dd></div><div><dt>Tohum</dt><dd>{result.diagnostics.seed}</dd></div></dl> : <p className="diagnostic-empty">Çalıştırma tanılaması yok.</p>}{result?.warnings.length ? <ul className="solver-warnings">{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}</div>
         </section>
       </main>
     </div>

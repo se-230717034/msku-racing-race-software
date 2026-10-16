@@ -3,6 +3,7 @@ import { Box, Camera, Eye, EyeOff, Play, SlidersHorizontal } from "lucide-react"
 import { useState } from "react";
 
 import { integratedYawRad } from "../domain/vehicle";
+import { uiCorner, uiStatus } from "../lib/uiText";
 import { useKinematics } from "../store/kinematics";
 import {
   useWorkspace,
@@ -12,24 +13,32 @@ import {
 import { FullVehicleViewport } from "./FullVehicleViewport";
 
 const cameraPresets: Array<{ id: CameraPreset; label: string }> = [
-  { id: "perspective", label: "Perspective" },
-  { id: "isometric", label: "Isometric" },
-  { id: "front", label: "Front" },
-  { id: "rear", label: "Rear" },
-  { id: "side", label: "Side" },
-  { id: "top", label: "Top" },
+  { id: "perspective", label: "Perspektif" },
+  { id: "isometric", label: "İzometrik" },
+  { id: "front", label: "Ön" },
+  { id: "rear", label: "Arka" },
+  { id: "side", label: "Yan" },
+  { id: "top", label: "Üst" },
 ];
 
 const viewModes: Array<{ id: VehicleViewMode; label: string }> = [
-  { id: "full_vehicle", label: "Full vehicle" },
-  { id: "front_axle", label: "Front axle" },
-  { id: "rear_axle", label: "Rear axle" },
-  { id: "active_corner", label: "Individual corner" },
-  { id: "chassis_cg", label: "Chassis / CG" },
-  { id: "suspension", label: "Suspension" },
-  { id: "kinematics", label: "Kinematics playback" },
-  { id: "dynamics", label: "Dynamics playback" },
+  { id: "full_vehicle", label: "Tam araç" },
+  { id: "front_axle", label: "Ön aks" },
+  { id: "rear_axle", label: "Arka aks" },
+  { id: "active_corner", label: "Tek köşe" },
+  { id: "chassis_cg", label: "Şasi / Ağırlık merkezi" },
+  { id: "suspension", label: "Süspansiyon" },
+  { id: "kinematics", label: "Kinematik oynatma" },
+  { id: "dynamics", label: "Dinamik oynatma" },
 ];
+
+const visibilityLabels = {
+  wheel: "tekerlek",
+  hardpoints: "bağlantı noktaları",
+  chassis: "şasi",
+  referencePlanes: "referans düzlemleri",
+  labels: "etiketler",
+};
 
 const cornerIds: CornerId[] = ["front_left", "front_right", "rear_left", "rear_right"];
 
@@ -81,20 +90,20 @@ export function FullVehicleWorkspace() {
   return (
     <div className="vehicle-workspace">
       <header className="vehicle-toolbar">
-        <div className="toolbar-group" aria-label="Vehicle display controls">
+        <div className="toolbar-group" aria-label="Araç görünüm kontrolleri">
           <Box size={14} />
-          <select aria-label="Vehicle view mode" value={viewMode} onChange={(event) => setViewMode(event.target.value as VehicleViewMode)}>
+          <select aria-label="Araç görünüm modu" value={viewMode} onChange={(event) => setViewMode(event.target.value as VehicleViewMode)}>
             {viewModes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
         </div>
         <div className="toolbar-divider" />
-        <div className="toolbar-group" aria-label="Full vehicle camera presets">
+        <div className="toolbar-group" aria-label="Tam araç kamera görünümleri">
           <Camera size={14} />
           {cameraPresets.map((item) => <button key={item.id} type="button" className={preset === item.id ? "active" : ""} onClick={() => setPreset(item.id)}>{item.label}</button>)}
         </div>
         <div className="toolbar-divider" />
-        <div className="toolbar-group" aria-label="Full vehicle visibility">
-          {(["wheel", "hardpoints", "chassis", "referencePlanes", "labels"] as const).map((key) => <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggleVisibility(key)}>{visibility[key] ? <Eye size={12} /> : <EyeOff size={12} />}{key.replace(/([A-Z])/g, " $1")}</button>)}
+        <div className="toolbar-group" aria-label="Tam araç görünürlüğü">
+          {(["wheel", "hardpoints", "chassis", "referencePlanes", "labels"] as const).map((key) => <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggleVisibility(key)}>{visibility[key] ? <Eye size={12} /> : <EyeOff size={12} />}{visibilityLabels[key]}</button>)}
         </div>
       </header>
 
@@ -108,10 +117,10 @@ export function FullVehicleWorkspace() {
         {(viewMode === "kinematics" || viewMode === "dynamics") && (
           <div className="vehicle-playback">
             <Play size={13} />
-            <span>{viewMode === "kinematics" ? "Solved wheel travel" : fullCarResult ? "7DOF time sample" : bicycleResult ? "Bicycle time sample" : "No supported result"}</span>
+            <span>{viewMode === "kinematics" ? "Çözülmüş tekerlek hareketi" : fullCarResult ? "7SD zaman örneği" : bicycleResult ? "Bisiklet modeli zaman örneği" : "Desteklenen sonuç yok"}</span>
             {viewMode === "kinematics" ? (
               <input
-                aria-label="Full vehicle kinematics playback"
+                aria-label="Tam araç kinematik oynatma"
                 type="range"
                 min="0"
                 max={Math.max((sweep?.states.length ?? 1) - 1, 0)}
@@ -121,7 +130,7 @@ export function FullVehicleWorkspace() {
               />
             ) : (
               <input
-                aria-label="Full vehicle dynamics playback"
+                aria-label="Tam araç dinamik oynatma"
                 type="range"
                 min="0"
                 max={Math.max(dynamicSamples.length - 1, 0)}
@@ -134,40 +143,40 @@ export function FullVehicleWorkspace() {
               />
             )}
             <b>{viewMode === "kinematics"
-              ? kinematicsAvailable ? `${((sweep?.states[selectedKinematicsIndex]?.travelM ?? 0) * 1_000).toFixed(1)} mm` : "RUN REQUIRED"
-              : currentFullCar ? `${currentFullCar.timeS.toFixed(3)} s` : currentBicycle ? `${currentBicycle.timeS.toFixed(3)} s` : "RUN REQUIRED"}</b>
+              ? kinematicsAvailable ? `${((sweep?.states[selectedKinematicsIndex]?.travelM ?? 0) * 1_000).toFixed(1)} mm` : "ÇALIŞTIRMA GEREKLİ"
+              : currentFullCar ? `${currentFullCar.timeS.toFixed(3)} s` : currentBicycle ? `${currentBicycle.timeS.toFixed(3)} s` : "ÇALIŞTIRMA GEREKLİ"}</b>
           </div>
         )}
       </main>
 
       <aside className="vehicle-inspector">
         <section className="inspector-section">
-          <div className="section-heading"><span className="eyebrow">FOUR-CORNER CONFIGURATION</span><span className="unit-chip">SI</span></div>
-          <label className="select-field"><span>Active editable corner</span><select aria-label="Active vehicle corner" value={project.activeCornerId} onChange={(event) => setActiveCorner(event.target.value as CornerId)}>{cornerIds.map((id) => <option key={id} value={id}>{project.vehicle.corners[id].label}</option>)}</select></label>
-          <p className="corner-source"><b>{activeCorner.geometrySource.replaceAll("_", " ")}</b>{activeCorner.derivedFrom ? ` · derived from ${activeCorner.derivedFrom.replace("_", " ")}` : ""}<span>{activeCorner.provenanceNote}</span></p>
-          <button className="wide-action" type="button" onClick={() => setActiveModule("geometry")}><SlidersHorizontal size={13} />Edit active corner hardpoints</button>
+          <div className="section-heading"><span className="eyebrow">DÖRT KÖŞE YAPILANDIRMASI</span><span className="unit-chip">SI</span></div>
+          <label className="select-field"><span>Düzenlenen etkin köşe</span><select aria-label="Etkin araç köşesi" value={project.activeCornerId} onChange={(event) => setActiveCorner(event.target.value as CornerId)}>{cornerIds.map((id) => <option key={id} value={id}>{uiCorner(id)}</option>)}</select></label>
+          <p className="corner-source"><b>{uiStatus(activeCorner.geometrySource)}</b>{activeCorner.derivedFrom ? ` · ${uiCorner(activeCorner.derivedFrom)} köşesinden türetildi` : ""}<span>{activeCorner.provenanceNote}</span></p>
+          <button className="wide-action" type="button" onClick={() => setActiveModule("geometry")}><SlidersHorizontal size={13} />Etkin köşe bağlantı noktalarını düzenle</button>
         </section>
         <section className="inspector-section">
-          <div className="section-heading"><span className="eyebrow">VEHICLE REFERENCES</span></div>
+          <div className="section-heading"><span className="eyebrow">ARAÇ REFERANSLARI</span></div>
           <div className="vehicle-metric-grid">
-            <MetricField label="Wheelbase" value={project.vehicle.wheelbaseM} onChange={(value) => updateDimension("wheelbaseM", value)} />
-            <MetricField label="Front track" value={project.vehicle.frontTrackM} onChange={(value) => updateDimension("frontTrackM", value)} />
-            <MetricField label="Rear track" value={project.vehicle.rearTrackM} onChange={(value) => updateDimension("rearTrackM", value)} />
+            <MetricField label="Dingil mesafesi" value={project.vehicle.wheelbaseM} onChange={(value) => updateDimension("wheelbaseM", value)} />
+            <MetricField label="Ön iz genişliği" value={project.vehicle.frontTrackM} onChange={(value) => updateDimension("frontTrackM", value)} />
+            <MetricField label="Arka iz genişliği" value={project.vehicle.rearTrackM} onChange={(value) => updateDimension("rearTrackM", value)} />
           </div>
           <div className="coordinate-grid">
-            {(["x", "y", "z"] as const).map((axis) => <MetricField key={axis} axis={axis} label="CG" value={project.vehicle.cgPositionM[axis]} onChange={(value) => updateCg(axis, value)} />)}
+            {(["x", "y", "z"] as const).map((axis) => <MetricField key={axis} axis={axis} label="Ağırlık merkezi" value={project.vehicle.cgPositionM[axis]} onChange={(value) => updateCg(axis, value)} />)}
           </div>
-          <p className="field-note">Wheelbase, track, and CG are configurable reference data. The wireframe chassis is a non-structural envelope and never creates suspension pickups.</p>
+          <p className="field-note">Dingil mesafesi, iz genişliği ve ağırlık merkezi yapılandırılabilir referans verileridir. Tel kafes şasi yapısal olmayan bir zarftır ve süspansiyon bağlantı noktası üretmez.</p>
         </section>
         <section className="inspector-section grow">
-          <div className="section-heading"><span className="eyebrow">MODEL AVAILABILITY</span></div>
+          <div className="section-heading"><span className="eyebrow">MODEL KULLANILABİLİRLİĞİ</span></div>
           <dl className="solver-diagnostics quality-status">
-            <div><dt>Kinematics</dt><dd>{kinematicsAvailable ? `SOLVED · ${project.activeCornerId}` : "ACTIVE CORNER NOT SOLVED"}</dd></div>
-            <div><dt>Full-car ride</dt><dd>{fullCarResult ? "VERIFIED_NUMERICALLY" : "NO ACCEPTED RESULT"}</dd></div>
-            <div><dt>Bicycle</dt><dd>{bicycleResult ? "VERIFIED_NUMERICALLY" : "NO ACCEPTED RESULT"}</dd></div>
-            <div><dt>Physical status</dt><dd>{project.validation.physical}</dd></div>
+            <div><dt>Kinematik</dt><dd>{kinematicsAvailable ? `ÇÖZÜLDÜ · ${uiCorner(project.activeCornerId)}` : "ETKİN KÖŞE ÇÖZÜLMEDİ"}</dd></div>
+            <div><dt>Tam araç sürüşü</dt><dd>{fullCarResult ? uiStatus("VERIFIED_NUMERICALLY") : "KABUL EDİLMİŞ SONUÇ YOK"}</dd></div>
+            <div><dt>Bisiklet modeli</dt><dd>{bicycleResult ? uiStatus("VERIFIED_NUMERICALLY") : "KABUL EDİLMİŞ SONUÇ YOK"}</dd></div>
+            <div><dt>Fiziksel durum</dt><dd>{uiStatus(project.validation.physical)}</dd></div>
           </dl>
-          <p className="field-note">One solved corner is never copied to the other three. Unsupported coupling is blocked or left static with an explicit explanation.</p>
+          <p className="field-note">Çözülmüş bir köşe diğer üç köşeye hiçbir zaman kopyalanmaz. Desteklenmeyen bağlantılar engellenir veya açık bir açıklamayla statik bırakılır.</p>
         </section>
       </aside>
     </div>

@@ -3,6 +3,7 @@ import { AlertTriangle, Download, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
 import { validateProjectGeometry } from "../domain/geometry";
+import { API_BASE_URL } from "../lib/api";
 import { downloadKinematicsCsv } from "../lib/kinematicsCsv";
 import { useKinematics } from "../store/kinematics";
 import { useWorkspace } from "../store/workspace";
@@ -35,14 +36,13 @@ export function KinematicsWorkspace() {
   useEffect(() => {
     const blocking = geometryDiagnostics.find((item) => item.severity === "error");
     if (blocking) {
-      setError(`Geometry must be corrected before solving: ${blocking.message}`);
+      setError(`Çözümden önce geometri düzeltilmelidir: ${blocking.message}`);
       return;
     }
     const controller = new AbortController();
     setLoading(project.activeCornerId);
     const timer = window.setTimeout(() => {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-      void fetch(`${baseUrl}/api/v1/kinematics/sweep`, {
+      void fetch(`${API_BASE_URL}/api/v1/kinematics/sweep`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -59,7 +59,7 @@ export function KinematicsWorkspace() {
         .then((payload) => setSweep(kinematicsSweepResponseSchema.parse(payload), project.activeCornerId))
         .catch((reason: unknown) => {
           if (reason instanceof DOMException && reason.name === "AbortError") return;
-          setError(reason instanceof Error ? reason.message : "Kinematics request failed.");
+          setError(reason instanceof Error ? reason.message : "Kinematik isteği başarısız oldu.");
         });
     }, 200);
     return () => {
@@ -77,13 +77,13 @@ export function KinematicsWorkspace() {
       <GeometryToolbar />
       <div className="travel-toolbar">
         <div className="travel-readout">
-          <span className="eyebrow">WHEEL TRAVEL</span>
+          <span className="eyebrow">TEKERLEK HAREKETİ</span>
           <strong>{selectedState ? `${(selectedState.travelM * 1000).toFixed(1)} mm` : "—"}</strong>
-          <b>{selectedState ? (selectedState.travelM >= 0 ? "BUMP" : "REBOUND") : "NO SOLUTION"}</b>
+          <b>{selectedState ? (selectedState.travelM >= 0 ? "SIKIŞMA" : "AÇILMA") : "ÇÖZÜM YOK"}</b>
         </div>
         <span>-50 mm</span>
         <input
-          aria-label="Wheel travel"
+          aria-label="Tekerlek hareketi"
           type="range"
           min="0"
           max={Math.max((sweep?.states.length ?? 1) - 1, 0)}
@@ -96,23 +96,23 @@ export function KinematicsWorkspace() {
         <button
           type="button"
           disabled={!exportAllowed}
-          title={exportAllowed ? "Export unvalidated engineering data with provenance" : "Export blocked: the sweep contains failed or unreliable states"}
+          title={exportAllowed ? "Doğrulanmamış mühendislik verisini kaynak bilgisiyle dışa aktar" : "Dışa aktarma engellendi: tarama başarısız veya güvenilmez durumlar içeriyor"}
           onClick={() => sweep && exportAllowed && downloadKinematicsCsv(sweep, project.name)}
         >
-          <Download size={14} /> Export CSV
+          <Download size={14} /> CSV dışa aktar
         </button>
       </div>
       <div className="kinematics-content">
         <main className="kinematics-main">
           <div className="kinematics-viewport-wrap">
             <SuspensionViewport pose={selectedState?.pose ?? undefined} mode="kinematics" />
-            {status === "loading" && <div className="solver-overlay"><LoaderCircle className="spin" />Solving 41 constrained poses…</div>}
-            {status === "error" && <div className="solver-overlay error"><AlertTriangle />Solver unavailable: {error}</div>}
-            {selectedState && !selectedState.diagnostics.converged && <div className="solver-overlay error"><AlertTriangle />Pose failed: {selectedState.diagnostics.message}</div>}
+            {status === "loading" && <div className="solver-overlay"><LoaderCircle className="spin" />41 kısıtlı konum çözülüyor…</div>}
+            {status === "error" && <div className="solver-overlay error"><AlertTriangle />Çözücü kullanılamıyor: {error}</div>}
+            {selectedState && !selectedState.diagnostics.converged && <div className="solver-overlay error"><AlertTriangle />Konum çözülemedi: {selectedState.diagnostics.message}</div>}
           </div>
-          {sweep ? <KinematicsCharts sweep={sweep} selectedTravelM={selectedState?.travelM ?? 0} /> : <div className="chart-placeholder">Graphs appear only after a validated solver response.</div>}
+          {sweep ? <KinematicsCharts sweep={sweep} selectedTravelM={selectedState?.travelM ?? 0} /> : <div className="chart-placeholder">Grafikler yalnızca doğrulanmış çözücü yanıtından sonra gösterilir.</div>}
         </main>
-        {sweep ? <KinematicsPanel state={selectedState} sweep={sweep} /> : <aside className="inspector kinematics-panel"><section className="inspector-section"><span className="eyebrow">KINEMATICS</span><p className="diagnostic-empty">{status === "loading" ? "Solving constrained travel sweep…" : error ?? "Waiting for solver."}</p></section></aside>}
+        {sweep ? <KinematicsPanel state={selectedState} sweep={sweep} /> : <aside className="inspector kinematics-panel"><section className="inspector-section"><span className="eyebrow">KİNEMATİK</span><p className="diagnostic-empty">{status === "loading" ? "Kısıtlı hareket taraması çözülüyor…" : error ?? "Çözücü bekleniyor."}</p></section></aside>}
       </div>
     </div>
   );

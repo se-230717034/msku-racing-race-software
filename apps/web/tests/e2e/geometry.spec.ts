@@ -4,32 +4,32 @@ test.describe.configure({ mode: "serial" });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("DYNAMICS STUDIO")).toBeVisible();
+  await expect(page.getByText("DİNAMİK STÜDYOSU")).toBeVisible();
   await expect(page.getByTestId("full-vehicle-viewport")).toBeVisible();
   for (const corner of ["front-left", "front-right", "rear-left", "rear-right"]) {
     await expect(page.getByTestId(`wheel-assembly-${corner}`)).toBeAttached();
   }
-  await page.getByRole("button", { name: "Geometry" }).click();
+  await page.getByRole("button", { name: "Geometri" }).click();
   await expect(page.getByTestId("suspension-viewport")).toBeVisible();
 
-  await page.getByLabel("Selected hardpoint").selectOption("uca_outboard");
+  await page.getByLabel("Seçili bağlantı noktası").selectOption("uca_outboard");
   const x = page.getByLabel("X");
   await x.fill("15.00");
   await x.press("Enter");
   await expect(x).toHaveValue("15.00");
 
-  await page.getByRole("button", { name: "Kinematics" }).click();
-  await expect(page.getByText("SOLVED STATE")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("converged", { exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("ALIGNMENT", { exact: true })).toBeVisible();
-  await expect(page.getByText("SOLVER DIAGNOSTICS", { exact: true })).toBeVisible();
-  await expect(page.getByText("CALCULATION QUALITY", { exact: true })).toBeVisible();
-  await expect(page.getByText("VERIFIED_NUMERICALLY", { exact: true })).toBeVisible();
-  await expect(page.getByText("REFERENCE_BENCHMARKED", { exact: true })).toBeVisible();
-  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export CSV" })).toBeEnabled();
+  await page.getByRole("button", { name: "Kinematik" }).click();
+  await expect(page.getByText("ÇÖZÜLMÜŞ DURUM")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("yakınsadı", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("ROT AYARI", { exact: true })).toBeVisible();
+  await expect(page.getByText("ÇÖZÜCÜ TANILAMA", { exact: true })).toBeVisible();
+  await expect(page.getByText("HESAP KALİTESİ", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sayısal olarak doğrulandı", { exact: true })).toBeVisible();
+  await expect(page.getByText("Referansla karşılaştırıldı", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fiziksel olarak doğrulanmadı", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "CSV dışa aktar" })).toBeEnabled();
 
-  const slider = page.getByLabel("Wheel travel");
+  const slider = page.getByLabel("Tekerlek hareketi");
   await slider.fill("30");
   await expect(page.getByText("25.0 mm", { exact: true })).toBeVisible();
 });
@@ -48,87 +48,87 @@ test("renders four distinct assemblies at the configured wheelbase and tracks", 
   expect(positions[0].x - positions[2].x).toBeCloseTo(1.6, 10);
   expect(positions[0].y - positions[1].y).toBeCloseTo(1.44, 10);
   expect(positions[2].y - positions[3].y).toBeCloseTo(1.4, 10);
-  await expect(page.getByText("Chassis envelope and axle lines are references only", { exact: false })).toBeVisible();
+  await expect(page.getByText("Şasi zarfı ve aks çizgileri yalnızca referanstır", { exact: false })).toBeVisible();
 });
 
 test("keeps per-corner edits persistent and blocks unsupported playback", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Active vehicle corner").selectOption("rear_left");
-  await page.getByRole("button", { name: "Geometry" }).click();
-  await page.getByLabel("Selected hardpoint").selectOption("uca_outboard");
+  await page.getByLabel("Etkin araç köşesi").selectOption("rear_left");
+  await page.getByRole("button", { name: "Geometri" }).click();
+  await page.getByLabel("Seçili bağlantı noktası").selectOption("uca_outboard");
   const rearX = page.getByRole("spinbutton", { name: "X mm" });
   await rearX.fill("27.00");
   await rearX.press("Enter");
-  await page.getByRole("button", { name: "Vehicle" }).click();
-  await page.getByLabel("Active vehicle corner").selectOption("front_left");
-  await page.getByRole("button", { name: "Geometry" }).click();
-  await page.getByLabel("Selected hardpoint").selectOption("uca_outboard");
+  await page.getByRole("button", { name: "Araç" }).click();
+  await page.getByLabel("Etkin araç köşesi").selectOption("front_left");
+  await page.getByRole("button", { name: "Geometri" }).click();
+  await page.getByLabel("Seçili bağlantı noktası").selectOption("uca_outboard");
   await expect(page.getByRole("spinbutton", { name: "X mm" })).toHaveValue("10.00");
-  await page.getByRole("button", { name: "Vehicle" }).click();
-  await page.getByLabel("Active vehicle corner").selectOption("rear_left");
-  await page.getByLabel("Vehicle view mode").selectOption("kinematics");
-  await expect(page.getByText("Run that corner's solver first", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Araç" }).click();
+  await page.getByLabel("Etkin araç köşesi").selectOption("rear_left");
+  await page.getByLabel("Araç görünüm modu").selectOption("kinematics");
+  await expect(page.getByText("Önce bu köşenin çözücüsünü çalıştırın", { exact: false })).toBeVisible();
 });
 
 test("exposes traceable reports and evidence-led validation without auto approval", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Compare" }).click();
-  await expect(page.getByRole("heading", { name: "Corner comparison" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Rigid-link length comparison" })).toBeVisible();
-  await expect(page.getByText("No corner sweep is available", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "Reports" }).click();
-  await expect(page.getByText("Engineering report package")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Download PDF" })).toBeEnabled();
-  await expect(page.getByText("NOT_APPROVED", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Four-corner geometry diagrams")).toBeVisible();
-  await page.getByRole("button", { name: "Validation" }).click();
-  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Engineering approval unavailable in software" })).toBeDisabled();
-  await page.getByPlaceholder("e.g. CAD motion study comparison rev B").fill("Fixture provenance review");
-  await page.getByPlaceholder("Controlled path, drawing ID, test ID, or URI").fill("TEST-TRACE-001");
-  await page.getByRole("button", { name: "Add traceability record" }).click();
-  await expect(page.getByText("Fixture provenance review")).toBeVisible();
-  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Karşılaştır" }).click();
+  await expect(page.getByRole("heading", { name: "Köşe karşılaştırması" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Rijit bağlantı uzunluğu karşılaştırması" })).toBeVisible();
+  await expect(page.getByText("Köşe taraması yok", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Raporlar" }).click();
+  await expect(page.getByText("Mühendislik rapor paketi")).toBeVisible();
+  await expect(page.getByRole("button", { name: "PDF indir" })).toBeEnabled();
+  await expect(page.getByText("Onaylanmadı", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Dört köşe geometri diyagramları")).toBeVisible();
+  await page.getByRole("button", { name: "Doğrulama" }).click();
+  await expect(page.getByText("Fiziksel olarak doğrulanmadı", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mühendislik onayı yazılım üzerinden verilemez" })).toBeDisabled();
+  await page.getByPlaceholder("ör. CAD hareket analizi karşılaştırması rev B").fill("Fikstür köken incelemesi");
+  await page.getByPlaceholder("Kontrollü yol, çizim kimliği, test kimliği veya URI").fill("TEST-TRACE-001");
+  await page.getByRole("button", { name: "İzlenebilirlik kaydı ekle" }).click();
+  await expect(page.getByText("Fikstür köken incelemesi")).toBeVisible();
+  await expect(page.getByText("Fiziksel olarak doğrulanmadı", { exact: true })).toBeVisible();
 });
 
 test("runs guarded quasi-static force, load-transfer, and actuation calculations", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Loads" }).click();
+  await page.getByRole("button", { name: "Yükler" }).click();
 
-  await expect(page.getByText("UPRIGHT CONTACT WRENCH", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approved export disabled" })).toBeDisabled();
+  await expect(page.getByText("TAŞIYICI TEMAS KUVVET-MOMENTİ", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Onaylı dışa aktarma kapalı" })).toBeDisabled();
 
-  await page.getByRole("button", { name: "Synthetic preset" }).click();
-  await page.getByRole("button", { name: "Solve", exact: true }).click();
+  await page.getByRole("button", { name: "Sentetik ön ayar" }).click();
+  await page.getByRole("button", { name: "Çöz", exact: true }).click();
   await expect(page.getByRole("cell", { name: "explicit_actuation_link" })).toBeVisible();
-  await expect(page.getByText("REFERENCE_BENCHMARKED", { exact: true })).toBeVisible();
-  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
+  await expect(page.getByText("Referansla karşılaştırıldı", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fiziksel olarak doğrulanmadı", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Calculate load transfer" }).click();
+  await page.getByRole("button", { name: "Yük transferini hesapla" }).click();
   await expect(page.getByText("FL", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Calculate motion ratio" }).click();
-  await expect(page.getByText("Motion ratio", { exact: true })).toBeVisible();
-  await expect(page.getByText("Wheel rate", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Hareket oranını hesapla" }).click();
+  await expect(page.getByText("Hareket oranı", { exact: true })).toBeVisible();
+  await expect(page.getByText("Tekerlek oranı", { exact: true })).toBeVisible();
 });
 
 test("runs a traceable quarter-car simulation and animates calculated samples", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Dynamics" }).click();
+  await page.getByRole("button", { name: "Dinamik" }).click();
 
-  await expect(page.getByText("MODEL SELECTION", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export unvalidated CSV" })).toBeDisabled();
-  await page.getByRole("button", { name: "Run simulation" }).click();
+  await expect(page.getByText("MODEL SEÇİMİ", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Doğrulanmamış CSV dışa aktar" })).toBeDisabled();
+  await page.getByRole("button", { name: "Simülasyonu çalıştır" }).click();
 
-  await expect(page.getByText("VERIFIED_NUMERICALLY", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("REFERENCE_BENCHMARKED", { exact: true })).toBeVisible();
-  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
-  await expect(page.getByText("NOT_APPROVED", { exact: true })).toBeVisible();
-  await expect(page.getByText("DISPLACEMENT RESPONSE", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sayısal olarak doğrulandı", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Referansla karşılaştırıldı", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fiziksel olarak doğrulanmadı", { exact: true })).toBeVisible();
+  await expect(page.getByText("Onaylanmadı", { exact: true })).toBeVisible();
+  await expect(page.getByText("YER DEĞİŞTİRME YANITI", { exact: true })).toBeVisible();
   await expect(page.getByTestId("quarter-car-animation")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export unvalidated CSV" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Doğrulanmamış CSV dışa aktar" })).toBeEnabled();
 
-  const timeSlider = page.getByLabel("Simulation time");
+  const timeSlider = page.getByLabel("Simülasyon zamanı");
   await timeSlider.fill("100");
   await expect(page.getByText("0.500 s", { exact: true })).toBeVisible();
 });
@@ -136,20 +136,20 @@ test("runs a traceable quarter-car simulation and animates calculated samples", 
 test("runs a deterministic bounded optimization and reports the candidate", async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
-  await page.getByRole("button", { name: "Optimization" }).click();
+  await page.getByRole("button", { name: "Optimizasyon" }).click();
 
-  await expect(page.getByText("MODEL & OBJECTIVES", { exact: true })).toBeVisible();
-  await page.getByLabel("Verified model").selectOption("bicycle");
-  await page.getByLabel("Weighted multi-objective + Pareto").uncheck();
+  await expect(page.getByText("MODEL VE HEDEFLER", { exact: true })).toBeVisible();
+  await page.getByLabel("Doğrulanmış model").selectOption("bicycle");
+  await page.getByLabel("Ağırlıklı çoklu hedef + Pareto").uncheck();
   await page.getByLabel("parameters.rearCorneringStiffnessNPerRad").uncheck();
-  await page.getByLabel("Generations").fill("50");
-  await page.getByRole("button", { name: "Run optimization" }).click();
+  await page.getByLabel("Nesiller").fill("50");
+  await page.getByRole("button", { name: "Optimizasyonu çalıştır" }).click();
 
-  await expect(page.getByText("VERIFIED_NUMERICALLY", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("BASELINE VS CANDIDATE", { exact: true })).toBeVisible();
-  await expect(page.getByText("LOCAL SENSITIVITY", { exact: true })).toBeVisible();
-  await expect(page.getByText("UNVALIDATED_PHYSICALLY", { exact: true })).toBeVisible();
-  await expect(page.getByText("NOT_APPROVED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sayısal olarak doğrulandı", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("REFERANS VE ADAY", { exact: true })).toBeVisible();
+  await expect(page.getByText("YEREL DUYARLILIK", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fiziksel olarak doğrulanmadı", { exact: true })).toBeVisible();
+  await expect(page.getByText("Onaylanmadı", { exact: true })).toBeVisible();
 });
 
 test("keeps candidate preview non-mutating until explicit apply", async ({ page }) => {
@@ -211,21 +211,21 @@ test("keeps candidate preview non-mutating until explicit apply", async ({ page 
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Optimization" }).click();
-  await page.getByLabel("Weighted multi-objective + Pareto").uncheck();
-  await page.getByRole("button", { name: "Run optimization" }).click();
-  await expect(page.getByRole("button", { name: "Apply to active project" })).toBeEnabled();
+  await page.getByRole("button", { name: "Optimizasyon" }).click();
+  await page.getByLabel("Ağırlıklı çoklu hedef + Pareto").uncheck();
+  await page.getByRole("button", { name: "Optimizasyonu çalıştır" }).click();
+  await expect(page.getByRole("button", { name: "Etkin projeye uygula" })).toBeEnabled();
 
-  await page.getByRole("button", { name: "Geometry" }).click();
-  await page.getByLabel("Selected hardpoint").selectOption("tie_rod_inboard");
+  await page.getByRole("button", { name: "Geometri" }).click();
+  await page.getByLabel("Seçili bağlantı noktası").selectOption("tie_rod_inboard");
   await expect(page.getByRole("spinbutton", { name: "Y mm" })).toHaveValue("290.00");
 
-  await page.getByRole("button", { name: "Optimization" }).click();
-  await page.getByLabel("Weighted multi-objective + Pareto").uncheck();
-  await page.getByRole("button", { name: "Run optimization" }).click();
-  await page.getByRole("button", { name: "Apply to active project" }).click();
-  await page.getByRole("button", { name: "Geometry" }).click();
-  await page.getByLabel("Selected hardpoint").selectOption("tie_rod_inboard");
+  await page.getByRole("button", { name: "Optimizasyon" }).click();
+  await page.getByLabel("Ağırlıklı çoklu hedef + Pareto").uncheck();
+  await page.getByRole("button", { name: "Optimizasyonu çalıştır" }).click();
+  await page.getByRole("button", { name: "Etkin projeye uygula" }).click();
+  await page.getByRole("button", { name: "Geometri" }).click();
+  await page.getByLabel("Seçili bağlantı noktası").selectOption("tie_rod_inboard");
   await expect(page.getByRole("spinbutton", { name: "Y mm" })).toHaveValue("300.00");
 });
 

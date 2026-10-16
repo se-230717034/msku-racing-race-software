@@ -3,12 +3,13 @@ import { AlertTriangle, CheckCircle2, ClipboardCheck, LockKeyhole, Plus } from "
 import { useMemo, useState } from "react";
 
 import { useWorkspace } from "../store/workspace";
+import { uiCorner, uiStatus } from "../lib/uiText";
 
 const evidenceLabels: Record<ValidationEvidence["kind"], string> = {
-  numerical_benchmark: "Numerical benchmark",
-  cad_comparison: "CAD / motion-study comparison",
-  physical_measurement: "Physical measurement",
-  input_provenance: "Input provenance",
+  numerical_benchmark: "Sayısal referans testi",
+  cad_comparison: "CAD / hareket analizi karşılaştırması",
+  physical_measurement: "Fiziksel ölçüm",
+  input_provenance: "Girdi kaynağı",
 };
 
 export function ValidationWorkspace() {
@@ -22,10 +23,10 @@ export function ValidationWorkspace() {
   const [reviewStatus, setReviewStatus] = useState<ValidationEvidence["status"]>("pending_review");
   const acceptedKinds = useMemo(() => new Set(project.validation.evidence.filter((item) => item.status === "accepted").map((item) => item.kind)), [project.validation.evidence]);
   const gaps = [
-    !acceptedKinds.has("input_provenance") && "Reviewed source/provenance record missing",
-    !acceptedKinds.has("cad_comparison") && "Independent CAD or motion-study comparison missing",
-    !acceptedKinds.has("physical_measurement") && "Physical rig/vehicle measurement correlation missing",
-    Object.values(project.vehicle.corners).some((corner) => corner.geometrySource !== "independent") && "One or more corners use synthetic or mirrored assumptions",
+    !acceptedKinds.has("input_provenance") && "İncelenmiş kaynak/köken kaydı eksik",
+    !acceptedKinds.has("cad_comparison") && "Bağımsız CAD veya hareket analizi karşılaştırması eksik",
+    !acceptedKinds.has("physical_measurement") && "Fiziksel test düzeneği/araç ölçüm korelasyonu eksik",
+    Object.values(project.vehicle.corners).some((corner) => corner.geometrySource !== "independent") && "Bir veya daha fazla köşede sentetik ya da ayna varsayımı kullanılıyor",
   ].filter(Boolean) as string[];
 
   const submit = () => {
@@ -44,45 +45,45 @@ export function ValidationWorkspace() {
 
   return <main className="validation-workspace">
     <header className="validation-header">
-      <span className="eyebrow">PHASE 6 · ENGINEERING SAFETY GATE</span>
-      <h1>Validation & evidence</h1>
-      <p>Evidence records are traceability inputs, not automatic proof. This software does not promote a project to physical validation or engineering approval.</p>
+      <span className="eyebrow">FAZ 6 · MÜHENDİSLİK GÜVENLİK KAPISI</span>
+      <h1>Doğrulama ve kanıt</h1>
+      <p>Kanıt kayıtları izlenebilirlik girdileridir; otomatik ispat değildir. Bu yazılım bir projeyi fiziksel olarak doğrulanmış veya mühendislik açısından onaylanmış duruma getirmez.</p>
     </header>
     <div className="validation-layout">
       <section className="validation-column">
         <div className="validation-status-grid">
-          <article><span>Numerical</span><strong>{project.validation.numerical}</strong><small>Solver/regression scope only</small></article>
-          <article><span>Reference</span><strong>{project.validation.reference}</strong><small>Published internal benchmarks</small></article>
-          <article className="warning"><span>Physical</span><strong>{project.validation.physical}</strong><small>Independent vehicle evidence required</small></article>
-          <article className="warning"><span>Approval</span><strong>{project.validation.engineeringApproval}</strong><small>Human engineering review required</small></article>
+          <article><span>Sayısal</span><strong>{uiStatus(project.validation.numerical)}</strong><small>Yalnızca çözücü/regresyon kapsamı</small></article>
+          <article><span>Referans</span><strong>{uiStatus(project.validation.reference)}</strong><small>Yayımlanmış iç referans testleri</small></article>
+          <article className="warning"><span>Fiziksel</span><strong>{uiStatus(project.validation.physical)}</strong><small>Bağımsız araç kanıtı gerekli</small></article>
+          <article className="warning"><span>Onay</span><strong>{uiStatus(project.validation.engineeringApproval)}</strong><small>İnsan mühendislik incelemesi gerekli</small></article>
         </div>
         <div className="validation-card">
-          <div className="section-heading"><span className="eyebrow">INPUT PROVENANCE</span></div>
-          <label className="text-field"><span>Project source label</span><input value={project.provenance.sourceLabel} onChange={(event) => updateProvenance(event.target.value)} /></label>
-          {project.provenance.migratedFromSchemaVersion && <p className="field-note">Migrated from schema {project.provenance.migratedFromSchemaVersion}: {project.provenance.migrationNote}</p>}
-          <table className="report-table"><thead><tr><th>Corner</th><th>Geometry source</th><th>Derivation</th></tr></thead><tbody>{Object.values(project.vehicle.corners).map((corner) => <tr key={corner.id}><td>{corner.label}</td><td>{corner.geometrySource}</td><td>{corner.derivedFrom ?? "independent definition"}</td></tr>)}</tbody></table>
+          <div className="section-heading"><span className="eyebrow">GİRDİ KAYNAĞI</span></div>
+          <label className="text-field"><span>Proje kaynak etiketi</span><input value={project.provenance.sourceLabel} onChange={(event) => updateProvenance(event.target.value)} /></label>
+          {project.provenance.migratedFromSchemaVersion && <p className="field-note">{project.provenance.migratedFromSchemaVersion} şemasından taşındı: {project.provenance.migrationNote}</p>}
+          <table className="report-table"><thead><tr><th>Köşe</th><th>Geometri kaynağı</th><th>Türetme</th></tr></thead><tbody>{Object.values(project.vehicle.corners).map((corner) => <tr key={corner.id}><td>{uiCorner(corner.id)}</td><td>{uiStatus(corner.geometrySource)}</td><td>{corner.derivedFrom ? uiCorner(corner.derivedFrom) : "bağımsız tanım"}</td></tr>)}</tbody></table>
         </div>
         <div className="validation-card">
-          <div className="section-heading"><span className="eyebrow">VALIDATION GAPS</span><span className={`status-chip ${gaps.length ? "error" : "ok"}`}>{gaps.length ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}{gaps.length} OPEN</span></div>
-          {gaps.length ? <ul className="validation-gaps">{gaps.map((gap) => <li key={gap}>{gap}</li>)}</ul> : <p className="diagnostic-empty">Evidence checklist is complete, but independent human review and sign-off are still required.</p>}
-          <button className="approval-disabled" type="button" disabled><LockKeyhole size={14} />Engineering approval unavailable in software</button>
+          <div className="section-heading"><span className="eyebrow">DOĞRULAMA EKSİKLERİ</span><span className={`status-chip ${gaps.length ? "error" : "ok"}`}>{gaps.length ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}{gaps.length} AÇIK</span></div>
+          {gaps.length ? <ul className="validation-gaps">{gaps.map((gap) => <li key={gap}>{gap}</li>)}</ul> : <p className="diagnostic-empty">Kanıt kontrol listesi tamamlandı; ancak bağımsız insan incelemesi ve onayı hâlâ gereklidir.</p>}
+          <button className="approval-disabled" type="button" disabled><LockKeyhole size={14} />Mühendislik onayı yazılım üzerinden verilemez</button>
         </div>
       </section>
 
       <section className="validation-column">
         <div className="validation-card">
-          <div className="section-heading"><span className="eyebrow">ADD EVIDENCE RECORD</span><ClipboardCheck size={15} /></div>
-          <label className="select-field"><span>Evidence type</span><select value={kind} onChange={(event) => setKind(event.target.value as ValidationEvidence["kind"])}>{Object.entries(evidenceLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-          <label className="text-field"><span>Record title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. CAD motion study comparison rev B" /></label>
-          <label className="text-field"><span>Independent source / file reference</span><input value={source} onChange={(event) => setSource(event.target.value)} placeholder="Controlled path, drawing ID, test ID, or URI" /></label>
-          <label className="select-field evidence-status"><span>Review state</span><select value={reviewStatus} onChange={(event) => setReviewStatus(event.target.value as ValidationEvidence["status"])}><option value="pending_review">Pending review</option><option value="accepted">Accepted evidence record</option><option value="rejected">Rejected</option></select></label>
-          <label className="text-field"><span>Method, discrepancy, and reviewer notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
-          <button className="wide-action" type="button" disabled={!title.trim() || !source.trim()} onClick={submit}><Plus size={13} />Add traceability record</button>
-          <p className="field-note">Accepted evidence remains a record only. It never changes {project.validation.physical} or {project.validation.engineeringApproval} automatically.</p>
+          <div className="section-heading"><span className="eyebrow">KANIT KAYDI EKLE</span><ClipboardCheck size={15} /></div>
+          <label className="select-field"><span>Kanıt türü</span><select value={kind} onChange={(event) => setKind(event.target.value as ValidationEvidence["kind"])}>{Object.entries(evidenceLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+          <label className="text-field"><span>Kayıt başlığı</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="ör. CAD hareket analizi karşılaştırması rev B" /></label>
+          <label className="text-field"><span>Bağımsız kaynak / dosya referansı</span><input value={source} onChange={(event) => setSource(event.target.value)} placeholder="Kontrollü yol, çizim kimliği, test kimliği veya URI" /></label>
+          <label className="select-field evidence-status"><span>İnceleme durumu</span><select value={reviewStatus} onChange={(event) => setReviewStatus(event.target.value as ValidationEvidence["status"])}><option value="pending_review">İnceleme bekliyor</option><option value="accepted">Kanıt kaydı kabul edildi</option><option value="rejected">Reddedildi</option></select></label>
+          <label className="text-field"><span>Yöntem, fark ve inceleyen notları</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
+          <button className="wide-action" type="button" disabled={!title.trim() || !source.trim()} onClick={submit}><Plus size={13} />İzlenebilirlik kaydı ekle</button>
+          <p className="field-note">Kabul edilmiş kanıt yalnızca kayıt olarak kalır. {uiStatus(project.validation.physical)} veya {uiStatus(project.validation.engineeringApproval)} durumlarını otomatik değiştirmez.</p>
         </div>
         <div className="validation-card grow">
-          <div className="section-heading"><span className="eyebrow">EVIDENCE REGISTER</span><span className="unit-chip">{project.validation.evidence.length} RECORDS</span></div>
-          {project.validation.evidence.length ? <ol className="evidence-list">{project.validation.evidence.map((item) => <li key={item.id}><div><strong>{item.title}</strong><span>{evidenceLabels[item.kind]} · {item.status.replace("_", " ")}</span></div><p>{item.source}</p><small>{item.recordedAt}{item.notes ? ` · ${item.notes}` : ""}</small></li>)}</ol> : <p className="diagnostic-empty">No project-specific CAD, measurement, benchmark, or provenance evidence has been recorded.</p>}
+          <div className="section-heading"><span className="eyebrow">KANIT KAYITLARI</span><span className="unit-chip">{project.validation.evidence.length} KAYIT</span></div>
+          {project.validation.evidence.length ? <ol className="evidence-list">{project.validation.evidence.map((item) => <li key={item.id}><div><strong>{item.title}</strong><span>{evidenceLabels[item.kind]} · {uiStatus(item.status)}</span></div><p>{item.source}</p><small>{item.recordedAt}{item.notes ? ` · ${item.notes}` : ""}</small></li>)}</ol> : <p className="diagnostic-empty">Projeye özel CAD, ölçüm, referans test veya kaynak kanıtı kaydedilmedi.</p>}
         </div>
       </section>
     </div>

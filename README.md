@@ -1,8 +1,8 @@
 # MSKU Racing Dynamics Studio
 
-Current application release: `0.6.0` · project schema: `2.0.0`.
+Current application release: `0.6.1` · project schema: `2.0.0`.
 
-An original, browser-based suspension and vehicle-dynamics engineering application for MSKU Racing. The current release adds a real four-corner FL/FR/RL/RR vehicle workspace and professional reporting/validation workflow to the double-wishbone geometry editor, constrained rigid-link kinematics, guarded quasi-static loads, benchmarked linear dynamics, and deterministic optimization models. It does **not** calculate component stress, compliance, nonlinear tyre behavior, or claim physical vehicle correlation.
+An original, browser-based suspension and vehicle-dynamics engineering application for MSKU Racing. Release `0.6.1` provides a Turkish user interface and production-ready Vercel routing while retaining the real four-corner FL/FR/RL/RR vehicle workspace, double-wishbone geometry editor, constrained rigid-link kinematics, guarded quasi-static loads, benchmarked linear dynamics, deterministic optimization, and professional reporting/validation workflow. It does **not** calculate component stress, compliance, nonlinear tyre behavior, or claim physical vehicle correlation.
 
 Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specification. The visible model status is `demonstration / unvalidated`.
 
@@ -87,6 +87,16 @@ Optional browser flow:
 npx playwright install chromium
 npm run test:e2e
 ```
+
+## Vercel deployment
+
+The repository includes a Vite SPA configuration, a same-origin FastAPI entry point at `api/index.py`, production-only Python requirements, and SPA/API rewrites in `vercel.json`.
+
+```bash
+vercel deploy --prod
+```
+
+The numerical API depends on NumPy and SciPy. Its uncompressed Python function is larger than Vercel's standard 500 MB Python limit, so the Vercel project must explicitly enable the platform's Large Functions support before the production deployment can complete. This keeps the verified numerical implementation intact rather than replacing it with fabricated or reduced calculations.
 
 ## Docker
 

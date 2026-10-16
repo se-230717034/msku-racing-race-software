@@ -1,0 +1,13 @@
+.git/**
+.python/**
+.venv/**
+node_modules/**
+apps/web/playwright-report/**
+apps/web/test-results/**
+packages/engineering/tests/**
+services/api/tests/**
+docs/**
+uv.lock
+pyproject.toml
+packages/engineering/pyproject.toml
+services/api/pyproject.toml

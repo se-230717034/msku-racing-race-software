@@ -178,15 +178,15 @@ const frontLeftDemoSuspension = (): Suspension => ({
   type: "double_wishbone",
   corner: "front_left",
   hardpoints: [
-    { id: "uca_front_inboard", label: "UCA front inboard", group: "upper_wishbone", position: { x: 0.18, y: 0.31, z: 0.46 } },
-    { id: "uca_rear_inboard", label: "UCA rear inboard", group: "upper_wishbone", position: { x: -0.16, y: 0.30, z: 0.45 } },
-    { id: "uca_outboard", label: "UCA outboard", group: "upper_wishbone", position: { x: 0.01, y: 0.64, z: 0.40 } },
-    { id: "lca_front_inboard", label: "LCA front inboard", group: "lower_wishbone", position: { x: 0.22, y: 0.27, z: 0.19 } },
-    { id: "lca_rear_inboard", label: "LCA rear inboard", group: "lower_wishbone", position: { x: -0.19, y: 0.26, z: 0.18 } },
-    { id: "lca_outboard", label: "LCA outboard", group: "lower_wishbone", position: { x: 0.0, y: 0.68, z: 0.17 } },
-    { id: "tie_rod_inboard", label: "Tie rod inboard", group: "steering", position: { x: -0.12, y: 0.29, z: 0.25 } },
-    { id: "tie_rod_outboard", label: "Tie rod outboard", group: "steering", position: { x: -0.09, y: 0.67, z: 0.26 } },
-    { id: "wheel_center", label: "Wheel centre", group: "wheel", position: { x: 0.0, y: 0.72, z: 0.285 } },
+    { id: "uca_front_inboard", label: "Üst salıncak ön iç", group: "upper_wishbone", position: { x: 0.18, y: 0.31, z: 0.46 } },
+    { id: "uca_rear_inboard", label: "Üst salıncak arka iç", group: "upper_wishbone", position: { x: -0.16, y: 0.30, z: 0.45 } },
+    { id: "uca_outboard", label: "Üst salıncak dış", group: "upper_wishbone", position: { x: 0.01, y: 0.64, z: 0.40 } },
+    { id: "lca_front_inboard", label: "Alt salıncak ön iç", group: "lower_wishbone", position: { x: 0.22, y: 0.27, z: 0.19 } },
+    { id: "lca_rear_inboard", label: "Alt salıncak arka iç", group: "lower_wishbone", position: { x: -0.19, y: 0.26, z: 0.18 } },
+    { id: "lca_outboard", label: "Alt salıncak dış", group: "lower_wishbone", position: { x: 0.0, y: 0.68, z: 0.17 } },
+    { id: "tie_rod_inboard", label: "Rot kolu iç", group: "steering", position: { x: -0.12, y: 0.29, z: 0.25 } },
+    { id: "tie_rod_outboard", label: "Rot kolu dış", group: "steering", position: { x: -0.09, y: 0.67, z: 0.26 } },
+    { id: "wheel_center", label: "Tekerlek merkezi", group: "wheel", position: { x: 0.0, y: 0.72, z: 0.285 } },
   ],
   wheel: { radius: 0.2286, width: 0.18, staticCamberRad: 0, staticToeRad: 0 },
 });
@@ -224,10 +224,10 @@ const demoCorners = (): Project["vehicle"]["corners"] => {
   const frontRight = cloneSuspensionForCorner(frontLeft, "front_right");
   const rearRight = cloneSuspensionForCorner(rearLeft, "rear_right");
   return {
-    front_left: { id: "front_left", label: "Front left", geometrySource: "synthetic_demo", provenanceNote: "Independent synthetic Phase 6 demonstration definition; not vehicle data.", suspension: frontLeft },
-    front_right: { id: "front_right", label: "Front right", geometrySource: "mirrored_assumption", derivedFrom: "front_left", provenanceNote: "Explicit mirror assumption from the synthetic front-left definition.", suspension: frontRight },
-    rear_left: { id: "rear_left", label: "Rear left", geometrySource: "synthetic_demo", provenanceNote: "Independent synthetic rear geometry; not copied from the front axle and not vehicle data.", suspension: rearLeft },
-    rear_right: { id: "rear_right", label: "Rear right", geometrySource: "mirrored_assumption", derivedFrom: "rear_left", provenanceNote: "Explicit mirror assumption from the synthetic rear-left definition.", suspension: rearRight },
+    front_left: { id: "front_left", label: "Ön sol", geometrySource: "synthetic_demo", provenanceNote: "Bağımsız sentetik Faz 6 gösterim tanımıdır; araç verisi değildir.", suspension: frontLeft },
+    front_right: { id: "front_right", label: "Ön sağ", geometrySource: "mirrored_assumption", derivedFrom: "front_left", provenanceNote: "Sentetik ön sol tanımından açık ayna varsayımıyla türetilmiştir.", suspension: frontRight },
+    rear_left: { id: "rear_left", label: "Arka sol", geometrySource: "synthetic_demo", provenanceNote: "Bağımsız sentetik arka geometridir; ön akstan kopyalanmamıştır ve araç verisi değildir.", suspension: rearLeft },
+    rear_right: { id: "rear_right", label: "Arka sağ", geometrySource: "mirrored_assumption", derivedFrom: "rear_left", provenanceNote: "Sentetik arka sol tanımından açık ayna varsayımıyla türetilmiştir.", suspension: rearRight },
   };
 };
 
@@ -236,8 +236,8 @@ export const createDemoProject = (projectId = "msku-demo-full-vehicle"): Project
   return ({
   schemaVersion: PROJECT_SCHEMA_VERSION,
   projectId,
-  name: "Full-vehicle demonstration project",
-  description: "Four-corner synthetic geometry for software demonstration only; not MSKU Racing vehicle data.",
+  name: "Tam araç gösterim projesi",
+  description: "Yalnızca yazılım gösterimi için dört köşeli sentetik geometridir; MSKU Racing araç verisi değildir.",
   createdAt: "2026-10-15T00:00:00.000Z",
   updatedAt: "2026-10-15T00:00:00.000Z",
   dataClassification: "demonstration",
@@ -262,11 +262,11 @@ export const createDemoProject = (projectId = "msku-demo-full-vehicle"): Project
       rollInertiaKgM2: 80,
       pitchInertiaKgM2: 120,
       yawInertiaKgM2: 150,
-      provenanceNote: "Synthetic demonstration values; replace with weighed/measured team data.",
+      provenanceNote: "Sentetik gösterim değerleridir; tartılmış veya ölçülmüş takım verisiyle değiştirin.",
     },
     corners,
   },
-  provenance: { sourceLabel: "Bundled synthetic Phase 6 demonstration vehicle" },
+  provenance: { sourceLabel: "Paketlenmiş sentetik Faz 6 gösterim aracı" },
   validation: {
     numerical: "PARTIALLY_VERIFIED",
     reference: "PARTIALLY_BENCHMARKED",
@@ -316,7 +316,7 @@ export const migrateLegacyProject = (input: unknown): Project => {
       id: activeId,
       label: activeId.replace("_", " "),
       geometrySource: "independent" as const,
-      provenanceNote: "Preserved exactly from imported project schema 1.0.0.",
+      provenanceNote: "İçe aktarılan 1.0.0 proje şemasından aynen korunmuştur.",
       suspension: activeSuspension,
     },
     [oppositeId]: {
@@ -324,7 +324,7 @@ export const migrateLegacyProject = (input: unknown): Project => {
       label: oppositeId.replace("_", " "),
       geometrySource: "mirrored_assumption" as const,
       derivedFrom: activeId,
-      provenanceNote: "Generated during migration as an explicit mirror assumption; not measured geometry.",
+      provenanceNote: "Geçiş sırasında açık ayna varsayımıyla üretilmiştir; ölçülmüş geometri değildir.",
       suspension: oppositeSuspension,
     },
   };
@@ -342,9 +342,9 @@ export const migrateLegacyProject = (input: unknown): Project => {
     suspension: activeSuspension,
     vehicle: { ...migrated.vehicle, corners },
     provenance: {
-      sourceLabel: "Imported legacy project",
+      sourceLabel: "İçe aktarılan eski proje",
       migratedFromSchemaVersion: "1.0.0",
-      migrationNote: "Original corner preserved; missing corners added as clearly labeled synthetic or mirrored assumptions.",
+      migrationNote: "Özgün köşe korundu; eksik köşeler açıkça etiketlenmiş sentetik veya aynalanmış varsayımlar olarak eklendi.",
     },
     validation: {
       numerical: "UNVERIFIED",
