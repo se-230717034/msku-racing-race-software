@@ -92,11 +92,13 @@ npm run test:e2e
 
 The repository includes a Vite SPA configuration, a same-origin FastAPI entry point at `api/index.py`, production-only Python requirements, and SPA/API rewrites in `vercel.json`.
 
+Production: [https://msku-racing-race-software.vercel.app](https://msku-racing-race-software.vercel.app)
+
 ```bash
 vercel deploy --prod
 ```
 
-The numerical API depends on NumPy and SciPy. Its uncompressed Python function is larger than Vercel's standard 500 MB Python limit, so the Vercel project must explicitly enable the platform's Large Functions support before the production deployment can complete. This keeps the verified numerical implementation intact rather than replacing it with fabricated or reduced calculations.
+The numerical API depends on NumPy and SciPy. Its uncompressed Python function is larger than Vercel's standard 500 MB Python limit, so the production project uses Vercel Large Functions support. This keeps the verified numerical implementation intact rather than replacing it with fabricated or reduced calculations.
 
 ## Docker
 

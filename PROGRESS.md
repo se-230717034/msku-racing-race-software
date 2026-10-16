@@ -155,5 +155,7 @@ Updated: 2026-10-16
 - [x] Release version synchronized across npm, Python packages, API health, UI footer, and reports
 - [x] Quality gates: ESLint, TypeScript, production build, Ruff, mypy, 37 Vitest tests, 110 Python tests, and 8 Chromium flows
 - [x] Vercel project created and connected to the GitHub repository
-- [ ] Production URL activation — requires explicit Vercel Large Functions opt-in because the NumPy/SciPy API bundle is 595.15 MB and the standard Python limit is 500 MB
+- [x] Vercel Large Functions enabled for the 595.15 MB NumPy/SciPy API bundle
+- [x] Public production deployment verified at `https://msku-racing-race-software.vercel.app`
+- [x] Live HTML language/title and `/api/v1/health` response (`0.6.1`) verified without authentication
 
