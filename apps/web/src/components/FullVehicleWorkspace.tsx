@@ -1,5 +1,5 @@
 import type { CornerId, Vec3 } from "@msku/contracts";
-import { Box, Camera, Eye, EyeOff, Play, SlidersHorizontal } from "lucide-react";
+import { Box, Camera, Eye, EyeOff, Layers3, Play, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 
 import { integratedYawRad } from "../domain/vehicle";
@@ -7,6 +7,7 @@ import { uiCorner, uiStatus } from "../lib/uiText";
 import { useKinematics } from "../store/kinematics";
 import {
   useWorkspace,
+  type CadViewMode,
   type CameraPreset,
   type VehicleViewMode,
 } from "../store/workspace";
@@ -30,6 +31,12 @@ const viewModes: Array<{ id: VehicleViewMode; label: string }> = [
   { id: "suspension", label: "Süspansiyon" },
   { id: "kinematics", label: "Kinematik oynatma" },
   { id: "dynamics", label: "Dinamik oynatma" },
+];
+
+const cadModes: Array<{ id: CadViewMode; label: string; ariaLabel: string }> = [
+  { id: "technical", label: "Teknik", ariaLabel: "Teknik görünüm" },
+  { id: "detailed", label: "Detaylı", ariaLabel: "Detaylı görünüm" },
+  { id: "hybrid", label: "Karma", ariaLabel: "Karma görünüm" },
 ];
 
 const visibilityLabels = {
@@ -62,6 +69,8 @@ export function FullVehicleWorkspace() {
   const setPreset = useWorkspace((state) => state.setCameraPreset);
   const viewMode = useWorkspace((state) => state.vehicleViewMode);
   const setViewMode = useWorkspace((state) => state.setVehicleViewMode);
+  const cadMode = useWorkspace((state) => state.cadViewMode);
+  const setCadMode = useWorkspace((state) => state.setCadViewMode);
   const visibility = useWorkspace((state) => state.visibility);
   const toggleVisibility = useWorkspace((state) => state.toggleVisibility);
   const setActiveCorner = useWorkspace((state) => state.setActiveCorner);
@@ -95,6 +104,18 @@ export function FullVehicleWorkspace() {
           <select aria-label="Araç görünüm modu" value={viewMode} onChange={(event) => setViewMode(event.target.value as VehicleViewMode)}>
             {viewModes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
+        </div>
+        <div className="toolbar-divider" />
+        <div className="toolbar-group cad-mode-control" aria-label="CAD görünüm biçimi">
+          <Layers3 size={14} />
+          {cadModes.map((item) => <button
+            key={item.id}
+            type="button"
+            aria-label={item.ariaLabel}
+            aria-pressed={cadMode === item.id}
+            className={cadMode === item.id ? "active" : ""}
+            onClick={() => setCadMode(item.id)}
+          >{item.label}</button>)}
         </div>
         <div className="toolbar-divider" />
         <div className="toolbar-group" aria-label="Tam araç kamera görünümleri">

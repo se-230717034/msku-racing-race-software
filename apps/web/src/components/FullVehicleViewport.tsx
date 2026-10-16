@@ -1,11 +1,11 @@
-import { GizmoHelper, GizmoViewport, Html, Line, OrbitControls } from "@react-three/drei";
+import { ContactShadows, GizmoHelper, GizmoViewport, Html, Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import type { CornerId, FullCarSample, KinematicPose, Project, Suspension, Vec3 } from "@msku/contracts";
 import { useEffect, useMemo, useRef } from "react";
 import { Quaternion, Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
-import { LINKS, staticWheelAxis, toThreePosition } from "../domain/geometry";
+import { staticWheelAxis, toThreePosition } from "../domain/geometry";
 import {
   CORNER_IDS,
   cornerIndex,
@@ -16,7 +16,8 @@ import {
 } from "../domain/vehicle";
 import { uiCorner, uiStatus } from "../lib/uiText";
 import { useKinematics } from "../store/kinematics";
-import { useWorkspace, type CameraPreset, type VehicleViewMode, type VisibilityState } from "../store/workspace";
+import { useWorkspace, type CadViewMode, type CameraPreset, type VehicleViewMode, type VisibilityState } from "../store/workspace";
+import { CadTube, ProceduralCadAssembly } from "./ProceduralCadAssembly";
 
 const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
   perspective: [3.0, 1.65, 2.55],
@@ -26,14 +27,6 @@ const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
   side: [0, 0.75, 3.8],
   top: [0.01, 4.2, 0],
 };
-
-const LINK_COLORS = {
-  upper: "#dce3ed",
-  lower: "#9da9b8",
-  steering: "#f43f5e",
-  upright: "#f8fafc",
-  wheel: "#fb7185",
-} as const;
 
 const VIEW_MODE_LABELS: Record<VehicleViewMode, string> = {
   full_vehicle: "TAM ARAÇ",
@@ -79,6 +72,7 @@ export function VehicleCornerAssembly({
   wheelZOffsetM = 0,
   steeringRad = 0,
   showMechanism = true,
+  cadMode,
 }: {
   project: Project;
   cornerId: CornerId;
@@ -87,6 +81,7 @@ export function VehicleCornerAssembly({
   wheelZOffsetM?: number;
   steeringRad?: number;
   showMechanism?: boolean;
+  cadMode: CadViewMode;
 }) {
   const corner = project.vehicle.corners[cornerId];
   const suspension: Suspension = corner.suspension;
@@ -120,35 +115,18 @@ export function VehicleCornerAssembly({
 
   return (
     <group name={`corner-${cornerId}`}>
-      {showMechanism && LINKS.map((link) => visibility[link.group] ? (
-        <Line
-          key={`${cornerId}-${link.id}`}
-          points={[vehiclePoint(link.start), vehiclePoint(link.end)]}
-          color={LINK_COLORS[link.group]}
-          lineWidth={2}
-        />
-      ) : null)}
-      {showMechanism && visibility.hardpoints && suspension.hardpoints.map((point) => (
-        <mesh key={`${cornerId}-${point.id}`} position={vehiclePoint(point.id)}>
-          <sphereGeometry args={[0.011, 14, 14]} />
-          <meshStandardMaterial color="#e7ebf1" />
-        </mesh>
-      ))}
-      {visibility.wheel && (
-        <mesh
-          name={`wheel-${cornerId}`}
-          position={toThreePosition(wheelPosition)}
-          quaternion={wheelQuaternion}
-        >
-          <torusGeometry args={[
-            Math.max(suspension.wheel.radius - suspension.wheel.width / 2, 0.01),
-            Math.max(suspension.wheel.width / 2, 0.005),
-            18,
-            52,
-          ]} />
-          <meshStandardMaterial color="#161b24" roughness={0.78} metalness={0.16} />
-        </mesh>
-      )}
+      <ProceduralCadAssembly
+        assemblyId={cornerId}
+        hardpointIds={suspension.hardpoints.map((point) => point.id)}
+        positionFor={vehiclePoint}
+        wheelPosition={toThreePosition(wheelPosition)}
+        wheelQuaternion={wheelQuaternion}
+        wheelRadius={suspension.wheel.radius}
+        wheelWidth={suspension.wheel.width}
+        visibility={visibility}
+        mode={cadMode}
+        showMechanism={showMechanism}
+      />
       {visibility.labels && (
         <Html position={toThreePosition({ ...wheelPosition, z: wheelPosition.z + suspension.wheel.radius + 0.07 })} center>
           <span className="scene-label">{cornerLabel(cornerId)} · {uiStatus(corner.geometrySource)}</span>
@@ -158,12 +136,13 @@ export function VehicleCornerAssembly({
   );
 }
 
-function ChassisReference({ project, heaveM, pitchRad, rollRad, visible }: {
+function ChassisReference({ project, heaveM, pitchRad, rollRad, visible, cadMode }: {
   project: Project;
   heaveM: number;
   pitchRad: number;
   rollRad: number;
   visible: boolean;
+  cadMode: CadViewMode;
 }) {
   if (!visible) return null;
   const halfLength = project.vehicle.wheelbaseM * 0.42;
@@ -177,12 +156,21 @@ function ChassisReference({ project, heaveM, pitchRad, rollRad, visible }: {
     { x: -halfLength, y: halfWidth, z: upperZ }, { x: -halfLength, y: -halfWidth, z: upperZ },
   ];
   const edges = [[0, 1], [0, 2], [1, 3], [2, 3], [4, 5], [4, 6], [5, 7], [6, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+  const showTechnical = cadMode !== "detailed";
+  const showDetailed = cadMode !== "technical";
   return (
     <group position={[0, heaveM, 0]} rotation={[rollRad, 0, -pitchRad]} name="reference-chassis-envelope">
       {edges.map(([start, end]) => (
-        <Line key={`${start}-${end}`} points={[toThreePosition(vertices[start]), toThreePosition(vertices[end])]} color="#7d8999" lineWidth={2} />
+        <group key={`${start}-${end}`}>
+          {showDetailed && <CadTube start={toThreePosition(vertices[start])} end={toThreePosition(vertices[end])} radius={0.014} color="#667180" metalness={0.78} roughness={0.3} />}
+          {showTechnical && <Line points={[toThreePosition(vertices[start]), toThreePosition(vertices[end])]} color="#8f9baa" lineWidth={cadMode === "technical" ? 2 : 1} transparent opacity={cadMode === "hybrid" ? 0.65 : 1} />}
+        </group>
       ))}
-      <mesh position={toThreePosition(project.vehicle.cgPositionM)} name="configured-cg">
+      {showDetailed && <mesh position={[0, lowerZ + 0.008, 0]} receiveShadow castShadow>
+        <boxGeometry args={[halfLength * 1.88, 0.022, halfWidth * 1.76]} />
+        <meshStandardMaterial color="#20262f" metalness={0.72} roughness={0.35} transparent opacity={0.82} />
+      </mesh>}
+      <mesh position={toThreePosition(project.vehicle.cgPositionM)} name="configured-cg" castShadow>
         <sphereGeometry args={[0.045, 20, 20]} />
         <meshStandardMaterial color="#f59e0b" emissive="#5f3500" />
       </mesh>
@@ -219,6 +207,7 @@ export function FullVehicleViewport({
   const preset = useWorkspace((state) => state.cameraPreset);
   const mode = useWorkspace((state) => state.vehicleViewMode);
   const visibility = useWorkspace((state) => state.visibility);
+  const cadMode = useWorkspace((state) => state.cadViewMode);
   const sweep = useKinematics((state) => state.sweep);
   const selectedIndex = useKinematics((state) => state.selectedIndex);
   const solvedCornerId = useKinematics((state) => state.solvedCornerId);
@@ -239,12 +228,15 @@ export function FullVehicleViewport({
       : null;
 
   return (
-    <div className="full-vehicle-viewport" data-testid="full-vehicle-viewport">
-      <Canvas camera={{ position: CAMERA_POSITIONS.perspective, fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]}>
+    <div className="full-vehicle-viewport" data-testid="full-vehicle-viewport" data-cad-mode={cadMode}>
+      <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={["#080a0e"]} />
-        <ambientLight intensity={0.78} />
-        <directionalLight position={[3, 4, 2]} intensity={2.3} />
-        <directionalLight position={[-2, 1, -3]} intensity={0.85} color="#ef233c" />
+        <fog attach="fog" args={["#080a0e", 5.5, 13]} />
+        <ambientLight intensity={0.3} />
+        <hemisphereLight args={["#dbe6ff", "#11131a", 1.1]} />
+        <directionalLight castShadow position={[3.5, 4.8, 2.8]} intensity={2.7} shadow-mapSize-width={1536} shadow-mapSize-height={1536} />
+        <directionalLight position={[-2.5, 1.4, -3]} intensity={1.05} color="#ef334d" />
+        <spotLight position={[0, 4.8, -3.2]} intensity={1.6} angle={0.48} penumbra={0.8} color="#a8c2ff" />
         {visibility.referencePlanes && <>
           <gridHelper args={[6, 60, "#303846", "#171c24"]} position={[0, 0, 0]} />
           <AxleReferences project={project} />
@@ -256,6 +248,7 @@ export function FullVehicleViewport({
             pitchRad={dynamics.pitchRad}
             rollRad={dynamics.rollRad}
             visible={bodyVisible}
+            cadMode={cadMode}
           />
           {corners.map((cornerId) => (
             <VehicleCornerAssembly
@@ -267,9 +260,11 @@ export function FullVehicleViewport({
               wheelZOffsetM={dynamics.unsprungDisplacementsM[cornerIndex(cornerId)]}
               steeringRad={steeringRad}
               showMechanism={showMechanism}
+              cadMode={cadMode}
             />
           ))}
         </group>
+        <ContactShadows position={[0, 0.002, 0]} scale={6} opacity={0.34} blur={2.6} far={2.3} resolution={512} />
         <VehicleCameraRig preset={preset} />
         <GizmoHelper alignment="bottom-right" margin={[74, 74]}>
           <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />
@@ -287,7 +282,7 @@ export function FullVehicleViewport({
           />;
         })}
       </div>
-      <div className="full-vehicle-badge">DÖRT KÖŞE MODELİ · {VIEW_MODE_LABELS[mode]}</div>
+      <div className="full-vehicle-badge">DÖRT KÖŞE MODELİ · {VIEW_MODE_LABELS[mode]} · {cadMode === "technical" ? "TEKNİK" : cadMode === "detailed" ? "DETAYLI" : "KARMA"}</div>
       <div className="reference-disclaimer">Şasi zarfı ve aks çizgileri yalnızca referanstır — sağlanmamış bağlantı veya çalıştırma geometrisi varsayılmaz.</div>
       {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7 serbestlik dereceli çözücü örneği · şasi yükselme/başvurma/yalpa + dört yaylanmayan kütle geçmişi · bağlantı kapanışı bu modelde bulunmadığı için süspansiyon kolları gizlendi.</div>}
       {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bisiklet modeli çözücüsü · sapma yönelimi hesaplanan sapma hızından trapez yöntemiyle tümleştirilir; ön tekerlek yönlendirmesi sağlanan direksiyon geçmişini kullanır.</div>}

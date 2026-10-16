@@ -50,6 +50,9 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
   not measured independent geometry; a solved corner is never reused as another corner's solution.
 - The full-vehicle chassis is a non-structural reference envelope. It does not imply tube layout,
   suspension attachment points, actuation geometry, stiffness, mass distribution, or crash structure.
+- Procedural tires, rims, brakes, hubs, calipers, uprights, tubes, and joints are inspection visuals
+  derived from wheel dimensions, hardpoints, and accepted poses. They are not manufacturing CAD,
+  do not establish packaging clearance, and carry no stress, mass-property, or fabrication evidence.
 - The 7DOF playback moves the body and four wheels from solver histories but hides suspension links
   because that model does not solve link closure. Bicycle display is limited to supplied steering and
   yaw rate integrated for heading.
@@ -58,8 +61,8 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
 - Validation evidence records do not constitute signatures or approval. The project schema remains
   `UNVALIDATED_PHYSICALLY` and `NOT_APPROVED`.
 - Browser local storage is device-local and has no revision history, access control, or collaboration.
-- No official MSKU Racing logo is bundled. The UI uses a text-only wordmark.
-- Hosted deployment is not configured because provider accounts and credentials were not provided.
+- The official MSKU Racing logo is bundled for application branding; it does not change model provenance.
+- The public Vercel deployment is configured, while browser-local project storage remains device-local.
 
 No structural stress or detailed nonlinear tyre force is calculated. Phases 2–6 are software-verified within their stated scopes but the vehicle is physically unvalidated. Do not use this release for design sign-off or safety decisions.
 

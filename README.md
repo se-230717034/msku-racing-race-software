@@ -29,9 +29,12 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 
 - Project schema `2.0.0` with four independently addressable corners, vehicle dimensions, CG, mass properties, provenance, evidence records, and safe `1.0.0` migration.
 - Full-vehicle Three.js/R3F assembly with distinct FL/FR/RL/RR wheels and suspensions, independent front/rear definitions, configurable wheelbase/tracks/CG, reference chassis/axles/planes, and explicit mirror/synthetic labels.
+- Procedural CAD-style tires, tread, rims, hubs, drilled brake discs, calipers, uprights, wishbone tubes, steering rods, and ball joints driven directly by the current hardpoints and accepted pose data.
+- Turkish `Teknik`, `Detaylı`, and `Karma` inspection modes shared by the Vehicle and Geometry screens, with physically based materials, multi-source lighting, shadows, and performance-conscious reusable corner assemblies.
 - Full vehicle, axle, individual-corner, chassis/CG, suspension, kinematics, and dynamics views with six camera presets and persistent visibility state.
 - Exact stored-input comparison for corner provenance, link lengths, alignment, and hardpoint deltas; calculated cross-corner comparison stays blocked until both corners have independent results.
 - Solver-gated visualization: a kinematic result affects only its solved corner; accepted 7DOF samples drive body heave/pitch/roll and four independent unsprung positions; bicycle steer/yaw visualization uses only returned histories and documented integration.
+- The procedural parts are visualization geometry, not manufacturing CAD or structural evidence. Unsolved dynamic link closure remains hidden rather than being animated heuristically.
 - Traceable engineering reports with metadata, inputs, units/frame, vector geometry diagrams, available result plots, solver diagnostics/provenance, warnings, limitations, validation state, and PDF/CSV/JSON output.
 - Validation/evidence register for numerical benchmarks, CAD comparisons, physical measurements, and input provenance; physical validation and engineering approval cannot be granted automatically.
 - Interactive Three.js/R3F corner view with orbit, pan, zoom, presets, selection, mirror view, and visibility controls.

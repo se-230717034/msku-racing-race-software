@@ -52,6 +52,22 @@ test("renders four distinct assemblies at the configured wheelbase and tracks", 
   await expect(page.getByText("Şasi zarfı ve aks çizgileri yalnızca referanstır", { exact: false })).toBeVisible();
 });
 
+test("switches the shared Turkish CAD view modes without changing engineering data", async ({ page }) => {
+  await page.goto("/");
+  const vehicleViewport = page.getByTestId("full-vehicle-viewport");
+  await expect(vehicleViewport).toHaveAttribute("data-cad-mode", "hybrid");
+  await page.getByRole("button", { name: "Teknik görünüm" }).click();
+  await expect(vehicleViewport).toHaveAttribute("data-cad-mode", "technical");
+
+  await page.getByRole("button", { name: "Geometri" }).click();
+  const suspensionViewport = page.getByTestId("suspension-viewport");
+  await expect(suspensionViewport).toHaveAttribute("data-cad-mode", "technical");
+  await page.getByRole("button", { name: "Detaylı görünüm" }).click();
+  await expect(suspensionViewport).toHaveAttribute("data-cad-mode", "detailed");
+  await page.getByRole("button", { name: "Karma görünüm" }).click();
+  await expect(suspensionViewport).toHaveAttribute("data-cad-mode", "hybrid");
+});
+
 test("keeps per-corner edits persistent and blocks unsupported playback", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Etkin araç köşesi").selectOption("rear_left");

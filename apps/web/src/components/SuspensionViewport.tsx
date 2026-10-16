@@ -1,20 +1,13 @@
-import { GizmoHelper, GizmoViewport, Line, OrbitControls } from "@react-three/drei";
-import { Canvas, type ThreeEvent, useThree } from "@react-three/fiber";
+import { ContactShadows, GizmoHelper, GizmoViewport, OrbitControls } from "@react-three/drei";
+import { Canvas, useThree } from "@react-three/fiber";
 import type { KinematicPose, Vec3 } from "@msku/contracts";
 import { useEffect, useMemo, useRef } from "react";
 import { Quaternion, Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
-import { LINKS, mirrorAcrossVehicleCentreline, pointMap, staticWheelAxis, toThreePosition } from "../domain/geometry";
+import { mirrorAcrossVehicleCentreline, pointMap, staticWheelAxis, toThreePosition } from "../domain/geometry";
 import { useWorkspace, type CameraPreset } from "../store/workspace";
-
-const LINK_COLORS = {
-  upper: "#e5e7eb",
-  lower: "#b8c0cc",
-  steering: "#f43f5e",
-  upright: "#f8fafc",
-  wheel: "#fb7185",
-} as const;
+import { ProceduralCadAssembly } from "./ProceduralCadAssembly";
 
 const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
   perspective: [1.15, 0.8, 1.35],
@@ -50,6 +43,7 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
   const selectedId = useWorkspace((state) => state.selectedHardpointId);
   const select = useWorkspace((state) => state.setSelectedHardpoint);
   const visibility = useWorkspace((state) => state.visibility);
+  const cadMode = useWorkspace((state) => state.cadViewMode);
   const points = useMemo(() => pointMap(project.suspension.hardpoints), [project.suspension.hardpoints]);
 
   const positionFor = (id: string): [number, number, number] => {
@@ -75,50 +69,20 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
 
   return (
     <group>
-      {LINKS.map((link) => {
-        if (!visibility[link.group]) return null;
-        return (
-          <Line
-            key={`${mirrored ? "mirror" : "primary"}-${link.id}`}
-            points={[positionFor(link.start), positionFor(link.end)]}
-            color={LINK_COLORS[link.group]}
-            lineWidth={mirrored ? 1 : 3}
-            transparent={mirrored}
-            opacity={mirrored ? 0.22 : 1}
-          />
-        );
-      })}
-
-      {visibility.hardpoints && project.suspension.hardpoints.map((point) => (
-        <mesh
-          key={`${mirrored ? "mirror" : "primary"}-${point.id}`}
-          position={positionFor(point.id)}
-          scale={selectedId === point.id && !mirrored ? 1.45 : 1}
-          onClick={mirrored ? undefined : (event: ThreeEvent<MouseEvent>) => {
-            event.stopPropagation();
-            select(point.id);
-          }}
-        >
-          <sphereGeometry args={[0.012, 20, 20]} />
-          <meshStandardMaterial
-            color={selectedId === point.id && !mirrored ? "#ff304f" : "#f8fafc"}
-            transparent={mirrored}
-            opacity={mirrored ? 0.25 : 1}
-          />
-        </mesh>
-      ))}
-
-      {visibility.wheel && (
-        <mesh position={positionFor("wheel_center")} quaternion={wheelQuaternion}>
-          <torusGeometry args={[
-            Math.max(project.suspension.wheel.radius - project.suspension.wheel.width / 2, 0.01),
-            Math.max(project.suspension.wheel.width / 2, 0.005),
-            22,
-            64,
-          ]} />
-          <meshStandardMaterial color="#151922" roughness={0.72} metalness={0.18} transparent opacity={mirrored ? 0.12 : 0.48} />
-        </mesh>
-      )}
+      <ProceduralCadAssembly
+        assemblyId={mirrored ? "ayna" : "etkin-kose"}
+        hardpointIds={project.suspension.hardpoints.map((point) => point.id)}
+        positionFor={positionFor}
+        wheelPosition={positionFor("wheel_center")}
+        wheelQuaternion={wheelQuaternion}
+        wheelRadius={project.suspension.wheel.radius}
+        wheelWidth={project.suspension.wheel.width}
+        visibility={visibility}
+        mode={cadMode}
+        selectedHardpointId={mirrored ? undefined : selectedId}
+        onSelectHardpoint={mirrored ? undefined : select}
+        opacity={mirrored ? 0.2 : 1}
+      />
     </group>
   );
 }
@@ -139,6 +103,7 @@ export function SuspensionViewport({
   }>;
 }) {
   const cameraPreset = useWorkspace((state) => state.cameraPreset);
+  const cadMode = useWorkspace((state) => state.cadViewMode);
   const mirror = useWorkspace((state) => state.visibility.mirror);
   const maximumForce = Math.max(
     ...forceVectors.map(({ force }) => Math.hypot(force.x, force.y, force.z)),
@@ -146,12 +111,15 @@ export function SuspensionViewport({
   );
 
   return (
-    <div className={`viewport ${mode}`} data-testid="suspension-viewport">
-      <Canvas camera={{ position: CAMERA_POSITIONS.perspective, fov: 38, near: 0.01, far: 100 }} dpr={[1, 2]}>
+    <div className={`viewport ${mode}`} data-testid="suspension-viewport" data-cad-mode={cadMode}>
+      <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 38, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={["#080a0e"]} />
-        <ambientLight intensity={0.72} />
-        <directionalLight position={[1.5, 2.5, 1]} intensity={2.2} color="#ffffff" />
-        <directionalLight position={[-1, 0.8, -1]} intensity={0.8} color="#ef233c" />
+        <fog attach="fog" args={["#080a0e", 2.5, 7]} />
+        <ambientLight intensity={0.32} />
+        <hemisphereLight args={["#d8e4ff", "#11131a", 1.05]} />
+        <directionalLight castShadow position={[1.8, 2.8, 1.6]} intensity={2.6} color="#ffffff" shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+        <directionalLight position={[-1.4, 1.1, -1.6]} intensity={1.15} color="#ef334d" />
+        <spotLight position={[0.2, 2.8, -2.1]} intensity={1.4} angle={0.5} penumbra={0.75} color="#9ebcff" />
         <gridHelper args={[2, 20, "#29303d", "#171b23"]} position={[0, 0, 0]} />
         <SuspensionModel pose={pose} hardpointOverrides={hardpointOverrides} />
         {maximumForce > 0 && forceVectors.map(({ id, origin, force }) => {
@@ -168,6 +136,7 @@ export function SuspensionViewport({
           );
         })}
         {mirror && <SuspensionModel mirrored pose={pose} hardpointOverrides={hardpointOverrides} />}
+        <ContactShadows position={[0, 0.002, -0.48]} scale={2.2} opacity={0.38} blur={2.4} far={1.4} resolution={512} />
         <CameraRig preset={cameraPreset} />
         <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
           <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />
@@ -178,6 +147,7 @@ export function SuspensionViewport({
         <span><i className="axis y" />Y sol</span>
         <span><i className="axis z" />Z yukarı</span>
         <span>İç birim: m · Düzenleyici: mm</span>
+        <span>CAD görünümü: {cadMode === "technical" ? "Teknik" : cadMode === "detailed" ? "Detaylı" : "Karma"}</span>
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>

@@ -10,6 +10,7 @@ describe("Phase 6 four-corner workspace", () => {
       activeModule: "vehicle",
       selectedHardpointId: "uca_outboard",
       vehicleViewMode: "full_vehicle",
+      cadViewMode: "hybrid",
     });
   });
 
@@ -29,8 +30,10 @@ describe("Phase 6 four-corner workspace", () => {
   it("does not mutate engineering data when changing camera or visibility", () => {
     const before = JSON.stringify(useWorkspace.getState().project);
     useWorkspace.getState().setCameraPreset("rear");
+    useWorkspace.getState().setCadViewMode("detailed");
     useWorkspace.getState().toggleVisibility("chassis");
     useWorkspace.getState().setVehicleViewMode("rear_axle");
     expect(JSON.stringify(useWorkspace.getState().project)).toBe(before);
+    expect(useWorkspace.getState().cadViewMode).toBe("detailed");
   });
 });

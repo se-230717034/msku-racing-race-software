@@ -12,6 +12,7 @@ import { create } from "zustand";
 export type ModuleId = "workspace" | "vehicle" | "geometry" | "kinematics" | "loads" | "dynamics" | "road" | "optimization" | "comparison" | "reports" | "validation";
 export type CameraPreset = "perspective" | "isometric" | "front" | "rear" | "side" | "top";
 export type VehicleViewMode = "full_vehicle" | "front_axle" | "rear_axle" | "active_corner" | "chassis_cg" | "suspension" | "kinematics" | "dynamics";
+export type CadViewMode = "technical" | "detailed" | "hybrid";
 
 export interface VisibilityState {
   upper: boolean;
@@ -32,6 +33,7 @@ interface WorkspaceState {
   selectedHardpointId: string;
   cameraPreset: CameraPreset;
   vehicleViewMode: VehicleViewMode;
+  cadViewMode: CadViewMode;
   visibility: VisibilityState;
   latestFullCarResult: FullCarSimulationResponse | null;
   latestBicycleResult: BicycleSimulationResponse | null;
@@ -39,6 +41,7 @@ interface WorkspaceState {
   setSelectedHardpoint: (id: string) => void;
   setCameraPreset: (preset: CameraPreset) => void;
   setVehicleViewMode: (mode: VehicleViewMode) => void;
+  setCadViewMode: (mode: CadViewMode) => void;
   setActiveCorner: (cornerId: CornerId) => void;
   toggleVisibility: (key: keyof VisibilityState) => void;
   updateHardpoint: (id: string, axis: keyof Vec3, metres: number) => void;
@@ -78,6 +81,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   selectedHardpointId: "uca_outboard",
   cameraPreset: "perspective",
   vehicleViewMode: "full_vehicle",
+  cadViewMode: "hybrid",
   latestFullCarResult: null,
   latestBicycleResult: null,
   visibility: {
@@ -96,6 +100,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   setSelectedHardpoint: (selectedHardpointId) => set({ selectedHardpointId }),
   setCameraPreset: (cameraPreset) => set({ cameraPreset }),
   setVehicleViewMode: (vehicleViewMode) => set({ vehicleViewMode }),
+  setCadViewMode: (cadViewMode) => set({ cadViewMode }),
   setActiveCorner: (activeCornerId) => set((state) => ({
     project: stamp({
       ...state.project,

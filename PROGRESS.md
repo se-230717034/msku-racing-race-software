@@ -154,9 +154,20 @@ Updated: 2026-10-16
 - [x] Vercel Vite SPA, FastAPI entry point, Python runtime requirements, and route rewrites
 - [x] Vercel bundle exclusions for local runtimes, development tests, reports, and unrelated frontend files
 - [x] Release version synchronized across npm, Python packages, API health, UI footer, and reports
-- [x] Quality gates: ESLint, TypeScript, production build, Ruff, mypy, 37 Vitest tests, 110 Python tests, and 8 Chromium flows
+- [x] Quality gates: ESLint, TypeScript, production build, Ruff, mypy, 37 Vitest tests, 110 Python tests, and 9 Chromium flows
 - [x] Vercel project created and connected to the GitHub repository
 - [x] Vercel Large Functions enabled for the 595.15 MB NumPy/SciPy API bundle
 - [x] Public production deployment verified at `https://msku-racing-race-software.vercel.app`
 - [x] Live HTML language/title and `/api/v1/health` response (`0.6.1`) verified without authentication
+
+## Release 0.6.1 — Procedural CAD visualization upgrade
+
+- [x] Reusable procedural tire, tread, rim, spoke, hub, brake disc, caliper, upright, wishbone, steering-rod, and joint assemblies
+- [x] `Teknik`, `Detaylı`, and `Karma` Turkish view modes shared across Vehicle and Geometry workspaces
+- [x] Hardpoint- and accepted-pose-driven part placement without changing engineering models or solver contracts
+- [x] Four-corner rendering retained with reusable low-segment geometry and a high-performance WebGL preference
+- [x] Physically based materials, multi-source lighting, cast/receive shadows, contact shadows, fog, and an upgraded reference chassis envelope
+- [x] Unsolved dynamic link closure remains suppressed; no heuristic suspension motion was introduced
+- [x] View-mode regression coverage confirms visual state changes do not mutate project engineering data
+- [x] Quality gates: ESLint, TypeScript, production build, 37 Vitest tests, and 9 Chromium flows
 
