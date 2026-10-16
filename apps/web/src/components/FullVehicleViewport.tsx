@@ -168,7 +168,7 @@ function ChassisReference({ project, heaveM, pitchRad, rollRad, visible, cadMode
       ))}
       {showDetailed && <mesh position={[0, lowerZ + 0.008, 0]} receiveShadow castShadow>
         <boxGeometry args={[halfLength * 1.88, 0.022, halfWidth * 1.76]} />
-        <meshStandardMaterial color="#20262f" metalness={0.72} roughness={0.35} transparent opacity={0.82} />
+        <meshStandardMaterial color="#20262f" metalness={0.34} roughness={0.58} transparent opacity={0.82} />
       </mesh>}
       <mesh position={toThreePosition(project.vehicle.cgPositionM)} name="configured-cg" castShadow>
         <sphereGeometry args={[0.045, 20, 20]} />
@@ -232,11 +232,11 @@ export function FullVehicleViewport({
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={["#080a0e"]} />
         <fog attach="fog" args={["#080a0e", 5.5, 13]} />
-        <ambientLight intensity={0.3} />
-        <hemisphereLight args={["#dbe6ff", "#11131a", 1.1]} />
-        <directionalLight castShadow position={[3.5, 4.8, 2.8]} intensity={2.7} shadow-mapSize-width={1536} shadow-mapSize-height={1536} />
-        <directionalLight position={[-2.5, 1.4, -3]} intensity={1.05} color="#ef334d" />
-        <spotLight position={[0, 4.8, -3.2]} intensity={1.6} angle={0.48} penumbra={0.8} color="#a8c2ff" />
+        <ambientLight intensity={0.44} />
+        <hemisphereLight args={["#e8edf4", "#15181c", 0.76]} />
+        <directionalLight castShadow position={[3.5, 4.8, 2.8]} intensity={1.9} color="#f4f6f8" shadow-mapSize-width={1536} shadow-mapSize-height={1536} />
+        <directionalLight position={[-2.5, 1.4, -3]} intensity={0.5} color="#9ba9b7" />
+        <spotLight position={[0, 4.8, -3.2]} intensity={0.78} angle={0.52} penumbra={0.84} color="#d8e1eb" />
         {visibility.referencePlanes && <>
           <gridHelper args={[6, 60, "#303846", "#171c24"]} position={[0, 0, 0]} />
           <AxleReferences project={project} />
@@ -264,7 +264,7 @@ export function FullVehicleViewport({
             />
           ))}
         </group>
-        <ContactShadows position={[0, 0.002, 0]} scale={6} opacity={0.34} blur={2.6} far={2.3} resolution={512} />
+        <ContactShadows position={[0, 0.002, 0]} scale={6} opacity={0.28} blur={3} far={2.3} resolution={512} />
         <VehicleCameraRig preset={preset} />
         <GizmoHelper alignment="bottom-right" margin={[74, 74]}>
           <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />

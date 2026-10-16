@@ -115,11 +115,11 @@ export function SuspensionViewport({
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 38, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={["#080a0e"]} />
         <fog attach="fog" args={["#080a0e", 2.5, 7]} />
-        <ambientLight intensity={0.32} />
-        <hemisphereLight args={["#d8e4ff", "#11131a", 1.05]} />
-        <directionalLight castShadow position={[1.8, 2.8, 1.6]} intensity={2.6} color="#ffffff" shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
-        <directionalLight position={[-1.4, 1.1, -1.6]} intensity={1.15} color="#ef334d" />
-        <spotLight position={[0.2, 2.8, -2.1]} intensity={1.4} angle={0.5} penumbra={0.75} color="#9ebcff" />
+        <ambientLight intensity={0.46} />
+        <hemisphereLight args={["#e7edf5", "#16191d", 0.74]} />
+        <directionalLight castShadow position={[1.8, 2.8, 1.6]} intensity={1.85} color="#f4f6f8" shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+        <directionalLight position={[-1.4, 1.1, -1.6]} intensity={0.48} color="#9aa9b8" />
+        <spotLight position={[0.2, 2.8, -2.1]} intensity={0.72} angle={0.55} penumbra={0.82} color="#d7e1eb" />
         <gridHelper args={[2, 20, "#29303d", "#171b23"]} position={[0, 0, 0]} />
         <SuspensionModel pose={pose} hardpointOverrides={hardpointOverrides} />
         {maximumForce > 0 && forceVectors.map(({ id, origin, force }) => {
@@ -136,7 +136,7 @@ export function SuspensionViewport({
           );
         })}
         {mirror && <SuspensionModel mirrored pose={pose} hardpointOverrides={hardpointOverrides} />}
-        <ContactShadows position={[0, 0.002, -0.48]} scale={2.2} opacity={0.38} blur={2.4} far={1.4} resolution={512} />
+        <ContactShadows position={[0, 0.002, -0.48]} scale={2.2} opacity={0.3} blur={2.8} far={1.4} resolution={512} />
         <CameraRig preset={cameraPreset} />
         <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
           <GizmoViewport axisColors={["#ef233c", "#6ee7b7", "#60a5fa"]} labelColor="#f8fafc" />
