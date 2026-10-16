@@ -57,6 +57,8 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
 - Upright webs, mounting lugs, rod ends, hub/bearing features, rotor holes, and caliper hardware are
   procedural visual details without supplied production drawings. Their placement follows the active
   render pose, but their local dimensions and clearances are not physically validated vehicle data.
+- `Mekanik Montaj` is a visibility/camera preset only. It exposes separately rendered suspension,
+  hub, rotor, and caliper meshes without adding constraints, solving packaging, or creating motion.
 - The 7DOF playback moves the body and four wheels from solver histories but hides suspension links
   because that model does not solve link closure. Bicycle display is limited to supplied steering and
   yaw rate integrated for heading.

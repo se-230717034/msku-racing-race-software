@@ -121,8 +121,24 @@ export function SuspensionViewport({
   const tireVisible = useWorkspace((state) => state.visibility.tire);
   const rimVisible = useWorkspace((state) => state.visibility.rim);
   const brakeVisible = useWorkspace((state) => state.visibility.brake);
+  const brakeDiscVisible = useWorkspace((state) => state.visibility.brakeDisc);
+  const caliperVisible = useWorkspace((state) => state.visibility.caliper);
+  const hubVisible = useWorkspace((state) => state.visibility.hub);
+  const uprightVisible = useWorkspace((state) => state.visibility.upright);
+  const upperVisible = useWorkspace((state) => state.visibility.upper);
+  const lowerVisible = useWorkspace((state) => state.visibility.lower);
+  const steeringVisible = useWorkspace((state) => state.visibility.steering);
   const referencePlanesVisible = useWorkspace((state) => state.visibility.referencePlanes);
   const representativeVisible = useWorkspace((state) => state.visibility.representativeActuation);
+  const mechanicalAssemblyActive = !tireVisible
+    && !rimVisible
+    && uprightVisible
+    && upperVisible
+    && lowerVisible
+    && steeringVisible
+    && brakeDiscVisible
+    && caliperVisible
+    && hubVisible;
   const sceneSurface = cadMode === "detailed"
     ? { background: "#d9dde0", fog: "#d9dde0", gridMajor: "#737b82", gridMinor: "#b7bdc2" }
     : { background: "#080a0e", fog: "#080a0e", gridMajor: "#29303d", gridMinor: "#171b23" };
@@ -138,8 +154,11 @@ export function SuspensionViewport({
       data-cad-mode={cadMode}
       data-tire-visible={wheelVisible && tireVisible}
       data-rim-visible={wheelVisible && rimVisible}
-      data-brake-visible={wheelVisible && brakeVisible}
+      data-brake-disc-visible={wheelVisible && brakeVisible && brakeDiscVisible}
+      data-caliper-visible={wheelVisible && brakeVisible && caliperVisible}
+      data-hub-visible={wheelVisible && hubVisible}
       data-reference-plane-visible={referencePlanesVisible}
+      data-mechanical-assembly-active={mechanicalAssemblyActive}
     >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
@@ -177,6 +196,7 @@ export function SuspensionViewport({
         <span><i className="axis z" />Z yukarı</span>
         <span>İç birim: m · Düzenleyici: mm</span>
         <span>CAD görünümü: {cadMode === "technical" ? "Teknik" : cadMode === "detailed" ? "Detaylı" : "Karma"}</span>
+        {mechanicalAssemblyActive && <span>MEKANİK MONTAJ · LASTİK/JANT GİZLİ</span>}
         <span>PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
         {representativeVisible && <span>TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz</span>}

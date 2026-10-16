@@ -17,6 +17,9 @@ describe("Phase 6 four-corner workspace", () => {
         tire: true,
         rim: true,
         brake: true,
+        brakeDisc: true,
+        caliper: true,
+        hub: true,
         chassis: false,
         referencePlanes: false,
         representativeActuation: false,
@@ -45,6 +48,8 @@ describe("Phase 6 four-corner workspace", () => {
     useWorkspace.getState().toggleVisibility("tire");
     useWorkspace.getState().toggleVisibility("rim");
     useWorkspace.getState().toggleVisibility("brake");
+    useWorkspace.getState().toggleVisibility("brakeDisc");
+    useWorkspace.getState().setVisibility({ tire: false, rim: false, caliper: false, hub: false });
     useWorkspace.getState().toggleVisibility("representativeActuation");
     useWorkspace.getState().setVehicleViewMode("rear_axle");
     expect(JSON.stringify(useWorkspace.getState().project)).toBe(before);
@@ -52,6 +57,9 @@ describe("Phase 6 four-corner workspace", () => {
     expect(useWorkspace.getState().visibility.tire).toBe(false);
     expect(useWorkspace.getState().visibility.rim).toBe(false);
     expect(useWorkspace.getState().visibility.brake).toBe(false);
+    expect(useWorkspace.getState().visibility.brakeDisc).toBe(false);
+    expect(useWorkspace.getState().visibility.caliper).toBe(false);
+    expect(useWorkspace.getState().visibility.hub).toBe(false);
     expect(useWorkspace.getState().visibility.representativeActuation).toBe(true);
   });
 });

@@ -172,6 +172,8 @@ Updated: 2026-10-16
 - [x] Reference-derived upright clevis plates, fasteners, bearing housing, low-occlusion pickup panels, and close CAD camera treatment
 - [x] Single-corner open-web upright carrier, bearing seat, hub flange, rotor hardware, caliper hardware, and rod-end/fastener detailing wired into the active Geometry render path
 - [x] Independent tire, rim, and brake visibility layers plus one-click assembly inspection; reference grid and pickup panel now default to hidden
+- [x] Independent brake-disc, caliper, and hub meshes/controls plus a deterministic `Mekanik Montaj` preset for exposed single-corner inspection
+- [x] Reduced rod-end and clevis visual envelopes while preserving every stored hardpoint and calculated pose
 - [x] Upright-focused three-quarter starting camera and explicit procedural/non-dimensionally-validated visual disclaimer
 - [x] View-mode regression coverage confirms visual state changes do not mutate project engineering data
 - [x] Quality gates: ESLint, TypeScript, production build, 37 Vitest tests, and 11 Chromium flows

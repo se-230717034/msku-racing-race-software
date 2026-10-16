@@ -12,14 +12,16 @@ const presets: Array<{ id: CameraPreset; label: string }> = [
 ];
 
 const visibilityLabels = {
-  upper: "üst kol",
-  lower: "alt kol",
-  steering: "direksiyon",
+  upper: "üst salıncak",
+  lower: "alt salıncak",
+  steering: "rot kolu",
   upright: "taşıyıcı",
   wheel: "tekerlek montajı",
   tire: "lastik",
   rim: "jant",
-  brake: "fren grubu",
+  brakeDisc: "fren diski",
+  caliper: "kaliper",
+  hub: "porya",
   hardpoints: "bağlantı noktaları",
   chassis: "şasi referansı",
   referencePlanes: "referans düzlemi",
@@ -37,18 +39,43 @@ export function GeometryToolbar() {
   const setPreset = useWorkspace((state) => state.setCameraPreset);
   const visibility = useWorkspace((state) => state.visibility);
   const toggle = useWorkspace((state) => state.toggleVisibility);
+  const setVisibility = useWorkspace((state) => state.setVisibility);
   const cadMode = useWorkspace((state) => state.cadViewMode);
   const setCadMode = useWorkspace((state) => state.setCadViewMode);
-  const inspectionOpen = !visibility.tire && !visibility.rim;
+  const mechanicalAssemblyActive = !visibility.tire
+    && !visibility.rim
+    && visibility.upright
+    && visibility.upper
+    && visibility.lower
+    && visibility.steering
+    && visibility.brakeDisc
+    && visibility.caliper
+    && visibility.hub;
 
-  const toggleAssemblyInspection = () => {
-    if (inspectionOpen) {
-      toggle("tire");
-      toggle("rim");
+  const toggleMechanicalAssembly = () => {
+    if (mechanicalAssemblyActive) {
+      setVisibility({ tire: true, rim: true });
       return;
     }
-    if (visibility.tire) toggle("tire");
-    if (visibility.rim) toggle("rim");
+    setVisibility({
+      wheel: true,
+      tire: false,
+      rim: false,
+      upright: true,
+      upper: true,
+      lower: true,
+      steering: true,
+      brake: true,
+      brakeDisc: true,
+      caliper: true,
+      hub: true,
+      hardpoints: false,
+      chassis: false,
+      referencePlanes: false,
+      representativeActuation: false,
+      mirror: false,
+    });
+    setPreset("perspective");
   };
 
   return (
@@ -79,18 +106,19 @@ export function GeometryToolbar() {
       </div>
       <div className="toolbar-divider" />
       <div className="toolbar-group" aria-label="Görünürlük kontrolleri">
-        {(["upper", "lower", "steering", "upright", "wheel", "tire", "rim", "brake", "hardpoints", "chassis", "referencePlanes", "representativeActuation"] as const).map((key) => (
+        {(["upper", "lower", "steering", "upright", "wheel", "tire", "rim", "brakeDisc", "caliper", "hub", "hardpoints", "chassis", "referencePlanes", "representativeActuation"] as const).map((key) => (
           <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggle(key)}>
             {visibility[key] ? <Eye size={13} /> : <EyeOff size={13} />}{visibilityLabels[key]}
           </button>
         ))}
         <button
           type="button"
-          className={inspectionOpen ? "active" : ""}
-          aria-label={inspectionOpen ? "Lastik ve jantı göster" : "Lastik ve jantı gizle"}
-          onClick={toggleAssemblyInspection}
+          className={mechanicalAssemblyActive ? "active" : ""}
+          aria-label="Mekanik Montaj"
+          aria-pressed={mechanicalAssemblyActive}
+          onClick={toggleMechanicalAssembly}
         >
-          {inspectionOpen ? <Eye size={13} /> : <EyeOff size={13} />}montaj inceleme
+          <Layers3 size={13} />Mekanik Montaj
         </button>
         <button type="button" className={visibility.mirror ? "active" : ""} onClick={() => toggle("mirror") }>
           <FlipHorizontal2 size={13} /> ayna

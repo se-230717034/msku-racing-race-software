@@ -37,7 +37,7 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - The procedural parts are visualization geometry, not manufacturing CAD or structural evidence. Unsolved dynamic link closure remains hidden rather than being animated heuristically. An optional, default-off pushrod/rocker/spring-damper overlay is explicitly marked as a static unsupported reference and never presented as calculated motion.
 - Traceable engineering reports with metadata, inputs, units/frame, vector geometry diagrams, available result plots, solver diagnostics/provenance, warnings, limitations, validation state, and PDF/CSV/JSON output.
 - Validation/evidence register for numerical benchmarks, CAD comparisons, physical measurements, and input provenance; physical validation and engineering approval cannot be granted automatically.
-- Interactive Three.js/R3F corner view with orbit, pan, zoom, upright-focused presets, selection, mirror view, separate tire/rim/brake visibility, and a one-click assembly-inspection mode. Reference planes and the pickup panel are hidden by default.
+- Interactive Three.js/R3F corner view with orbit, pan, zoom, upright-focused presets, selection, mirror view, and independent tire, rim, brake-disc, caliper, hub, upright, wishbone, and tie-rod visibility. The `Mekanik Montaj` preset hides tire/rim while retaining the complete exposed suspension/brake assembly; reference planes and the pickup panel are hidden by default.
 - Precise hardpoint and wheel-dimension editing using millimetres while storing SI metres.
 - Immediate structural and geometry diagnostics. Invalid models cannot be saved or exported.
 - Versioned JSON project import/export and browser-local save/load.

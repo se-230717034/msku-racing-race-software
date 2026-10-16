@@ -23,6 +23,9 @@ export interface VisibilityState {
   tire: boolean;
   rim: boolean;
   brake: boolean;
+  brakeDisc: boolean;
+  caliper: boolean;
+  hub: boolean;
   hardpoints: boolean;
   mirror: boolean;
   chassis: boolean;
@@ -48,6 +51,7 @@ interface WorkspaceState {
   setCadViewMode: (mode: CadViewMode) => void;
   setActiveCorner: (cornerId: CornerId) => void;
   toggleVisibility: (key: keyof VisibilityState) => void;
+  setVisibility: (values: Partial<VisibilityState>) => void;
   updateHardpoint: (id: string, axis: keyof Vec3, metres: number) => void;
   applyHardpointOverrides: (overrides: Record<string, Vec3>) => void;
   updateWheel: (field: keyof Project["suspension"]["wheel"], value: number) => void;
@@ -97,6 +101,9 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     tire: true,
     rim: true,
     brake: true,
+    brakeDisc: true,
+    caliper: true,
+    hub: true,
     hardpoints: true,
     mirror: false,
     chassis: false,
@@ -119,6 +126,8 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   })),
   toggleVisibility: (key) =>
     set((state) => ({ visibility: { ...state.visibility, [key]: !state.visibility[key] } })),
+  setVisibility: (values) =>
+    set((state) => ({ visibility: { ...state.visibility, ...values } })),
   updateHardpoint: (id, axis, metres) =>
     set((state) => ({
       project: stamp(replaceActiveSuspension(state.project, {

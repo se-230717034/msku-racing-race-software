@@ -124,8 +124,8 @@ function RodEndJoint({
     if (direction.lengthSq() <= 1e-12) return new Quaternion();
     return new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), direction.normalize());
   }, [position, toward]);
-  const eyeRadius = 0.0135 * scale;
-  const shankLength = 0.031 * scale;
+  const eyeRadius = 0.0105 * scale;
+  const shankLength = 0.026 * scale;
   return (
     <group position={position} quaternion={orientation} name="rod-end-mafsal">
       <mesh castShadow receiveShadow>
@@ -220,23 +220,23 @@ function MountingClevis({
   scale?: number;
   opacity: number;
 }) {
-  const plateOffset = 0.014 * scale;
+  const plateOffset = 0.0105 * scale;
   return (
     <group position={position} quaternion={wheelQuaternion} scale={scale}>
       {[-plateOffset, plateOffset].map((z) => (
         <mesh key={z} position={[0, 0, z]} castShadow receiveShadow>
-          <capsuleGeometry args={[0.017, 0.027, 8, 18]} />
+          <capsuleGeometry args={[0.0115, 0.023, 8, 18]} />
           <meshStandardMaterial color="#6b737a" metalness={0.26} roughness={0.64} transparent opacity={0.92 * opacity} />
           <Edges color="#30363c" threshold={20} />
         </mesh>
       ))}
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.008, 0.008, plateOffset * 2.65, 18]} />
+        <cylinderGeometry args={[0.0065, 0.0065, plateOffset * 2.65, 18]} />
         <meshStandardMaterial color="#252a2f" metalness={0.5} roughness={0.46} transparent opacity={opacity} />
       </mesh>
       {[-plateOffset * 1.42, plateOffset * 1.42].map((z) => (
         <mesh key={`fastener-${z}`} position={[0, 0, z]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.012, 0.012, 0.006, 6]} />
+          <cylinderGeometry args={[0.009, 0.009, 0.005, 6]} />
           <meshStandardMaterial color="#889198" metalness={0.48} roughness={0.46} transparent opacity={opacity} />
         </mesh>
       ))}
@@ -475,7 +475,7 @@ function HubAssembly({ rimRadius, width }: { rimRadius: number; width: number })
   const flangeRadius = rimRadius * 0.23;
   const faceZ = width * 0.32;
   return (
-    <group name="porya">
+    <group name="porya-meshi">
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[flangeRadius, flangeRadius * 0.9, width * 0.42, 28]} />
         <meshStandardMaterial color="#5c656e" metalness={0.5} roughness={0.44} />
@@ -511,7 +511,17 @@ function HubAssembly({ rimRadius, width }: { rimRadius: number; width: number })
   );
 }
 
-function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number }) {
+function BrakeAssembly({
+  rimRadius,
+  width,
+  showDisc,
+  showCaliper,
+}: {
+  rimRadius: number;
+  width: number;
+  showDisc: boolean;
+  showCaliper: boolean;
+}) {
   const discRadius = rimRadius * 0.72;
   const innerRadius = discRadius * 0.34;
   const discZ = -width * 0.16;
@@ -519,6 +529,7 @@ function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number 
   const faceOffset = discThickness * 0.52;
   return (
     <group name="fren-grubu">
+      {showDisc && <group name="fren-diski-meshi">
       <mesh name="fren-diski" position={[0, 0, discZ]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[discRadius, discRadius, discThickness, 48, 1, true]} />
         <meshStandardMaterial color="#777f87" metalness={0.5} roughness={0.48} side={DoubleSide} />
@@ -563,7 +574,8 @@ function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number 
           </mesh>
         );
       })}
-      <group position={[discRadius * 0.83, discRadius * 0.04, discZ]} rotation={[0, 0, -0.12]} name="fren-kaliperi">
+      </group>}
+      {showCaliper && <group position={[discRadius * 0.83, discRadius * 0.04, discZ]} rotation={[0, 0, -0.12]} name="fren-kaliperi-meshi">
         {[-discThickness * 0.82, discThickness * 0.82].map((z) => (
           <mesh key={z} position={[0, 0, z]} castShadow receiveShadow>
             <capsuleGeometry args={[discRadius * 0.105, discRadius * 0.22, 8, 16]} />
@@ -596,7 +608,7 @@ function BrakeAssembly({ rimRadius, width }: { rimRadius: number; width: number 
             <meshStandardMaterial color="#a1a7ac" metalness={0.48} roughness={0.46} />
           </mesh>
         ))}
-      </group>
+      </group>}
     </group>
   );
 }
@@ -609,7 +621,8 @@ export function ProceduralWheel({
   mode,
   showTire = true,
   showRim = true,
-  showBrake = true,
+  showBrakeDisc = true,
+  showCaliper = true,
   showHub = true,
   opacity = 1,
   name,
@@ -621,7 +634,8 @@ export function ProceduralWheel({
   mode: CadViewMode;
   showTire?: boolean;
   showRim?: boolean;
-  showBrake?: boolean;
+  showBrakeDisc?: boolean;
+  showCaliper?: boolean;
   showHub?: boolean;
   opacity?: number;
   name: string;
@@ -671,7 +685,14 @@ export function ProceduralWheel({
         {!technical && opacity >= 0.5 && <RimStructure rimRadius={rimRadius} width={rimWidth} />}
       </group>}
       {!technical && opacity >= 0.5 && <>
-        {showBrake && <BrakeAssembly rimRadius={rimRadius} width={rimWidth} />}
+        {(showBrakeDisc || showCaliper) && (
+          <BrakeAssembly
+            rimRadius={rimRadius}
+            width={rimWidth}
+            showDisc={showBrakeDisc}
+            showCaliper={showCaliper}
+          />
+        )}
         {showHub && <HubAssembly rimRadius={rimRadius} width={rimWidth} />}
       </>}
       {technical && showHub && <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -789,7 +810,12 @@ export function ProceduralCadAssembly({
           } : undefined}
         />
       ))}
-      {(visibility.upright || (visibility.wheel && (visibility.tire || visibility.rim || visibility.brake))) && (
+      {(visibility.upright || (visibility.wheel && (
+        visibility.tire
+        || visibility.rim
+        || visibility.hub
+        || (visibility.brake && (visibility.brakeDisc || visibility.caliper))
+      ))) && (
         <ProceduralWheel
           name={`wheel-${assemblyId}`}
           position={wheelPosition}
@@ -799,8 +825,9 @@ export function ProceduralCadAssembly({
           mode={mode}
           showTire={visibility.wheel && visibility.tire}
           showRim={visibility.wheel && visibility.rim}
-          showBrake={visibility.wheel && visibility.brake}
-          showHub={visibility.upright}
+          showBrakeDisc={visibility.wheel && visibility.brake && visibility.brakeDisc}
+          showCaliper={visibility.wheel && visibility.brake && visibility.caliper}
+          showHub={visibility.wheel && visibility.hub}
           opacity={opacity}
         />
       )}
