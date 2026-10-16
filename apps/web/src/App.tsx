@@ -138,8 +138,8 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark">M</div>
-          <div><strong>MSKU RACING</strong><span>DİNAMİK STÜDYOSU</span></div>
+          <img className="brand-logo" src="/msku-racing-logo.png" alt="MSKU Racing logosu" />
+          <div className="brand-copy"><strong>DİNAMİK STÜDYOSU</strong><span>MÜHENDİSLİK PLATFORMU</span></div>
         </div>
         <nav aria-label="Mühendislik modülleri">
           {modules.map((module) => {

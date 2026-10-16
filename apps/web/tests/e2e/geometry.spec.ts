@@ -4,6 +4,7 @@ test.describe.configure({ mode: "serial" });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByRole("img", { name: "MSKU Racing logosu" })).toBeVisible();
   await expect(page.getByText("DİNAMİK STÜDYOSU")).toBeVisible();
   await expect(page.getByTestId("full-vehicle-viewport")).toBeVisible();
   for (const corner of ["front-left", "front-right", "rear-left", "rear-right"]) {

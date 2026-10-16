@@ -149,6 +149,7 @@ Updated: 2026-10-16
 ## Release 0.6.1 — Turkish UI and production deployment
 
 - [x] Turkish navigation, workspaces, engineering panels, charts, validation states, reports, errors, and demo-data labels
+- [x] Official MSKU Racing logo integrated into the responsive application header and browser icon
 - [x] Centralized local-development and same-origin production API routing
 - [x] Vercel Vite SPA, FastAPI entry point, Python runtime requirements, and route rewrites
 - [x] Vercel bundle exclusions for local runtimes, development tests, reports, and unrelated frontend files

@@ -41,15 +41,18 @@ button { color: inherit; }
   z-index: 10;
 }
 
-.brand { display: flex; align-items: center; gap: 10px; min-width: 235px; }
-.brand-mark {
-  width: 31px; height: 31px; display: grid; place-items: center;
-  font-weight: 950; font-style: italic; font-size: 19px;
-  color: white; background: linear-gradient(135deg, var(--red-bright), #9f1026);
-  clip-path: polygon(0 0, 100% 0, 78% 100%, 0 100%);
+.brand { display: flex; align-items: center; gap: 10px; min-width: 292px; }
+.brand-logo {
+  width: 112px;
+  height: 39px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: #fff;
 }
-.brand strong { display: block; font-size: 12px; letter-spacing: 0.14em; line-height: 1; }
-.brand span { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; letter-spacing: 0.2em; }
+.brand-copy strong { display: block; font-size: 10px; letter-spacing: 0.11em; line-height: 1; }
+.brand-copy span { display: block; margin-top: 5px; color: var(--muted); font-size: 7px; letter-spacing: 0.14em; }
 
 .topbar nav { display: flex; min-width: 0; flex: 1; justify-content: center; }
 .topbar nav button {
@@ -344,12 +347,12 @@ button { color: inherit; }
 
 @media (max-width: 1120px) {
   .topbar nav button { padding: 0 7px; }.topbar nav button span { display: none; }
-  .brand { min-width: 210px; }.action-notice { display: none; }
+  .brand { min-width: 265px; }.action-notice { display: none; }
 }
 
 @media (max-width: 800px) {
   .app-shell { grid-template-rows: 54px auto minmax(0, 1fr) 25px; }
-  .topbar { padding: 0 12px; }.topbar nav { display: none; }.mobile-menu { display: block; margin-left: auto; }.api-state { min-width: 88px; }
+  .topbar { padding: 0 12px; }.topbar nav { display: none; }.brand { min-width: 0; }.brand-logo { width: 98px; height: 34px; }.brand-copy span { display: none; }.mobile-menu { display: block; margin-left: auto; }.api-state { min-width: 88px; }
   .projectbar { align-items: stretch; flex-direction: column; padding: 7px 10px 0; }.project-identity b { display: none; }.project-actions { height: 34px; margin-top: 5px; overflow-x: auto; }.project-actions button:first-child { border-left: 0; }
   .geometry-workspace { grid-template-columns: 1fr; grid-template-rows: 38px minmax(320px, 1fr) minmax(0, auto); overflow-y: auto; }.geometry-toolbar { grid-column: 1; }.viewport { min-height: 420px; }.inspector { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
   .vehicle-workspace { grid-template-columns: 1fr; grid-template-rows: 42px 520px auto; overflow-y: auto; }.vehicle-toolbar { grid-column: 1; }.vehicle-main { min-height: 520px; }.vehicle-inspector { overflow: visible; border-left: 0; border-top: 1px solid var(--line); }.solver-motion-note { top: 48px; left: 13px; right: auto; }.reference-disclaimer { bottom: 70px; }
