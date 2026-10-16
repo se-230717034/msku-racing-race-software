@@ -1,7 +1,8 @@
 import { Edges, Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { DoubleSide, Quaternion, Vector3 } from "three";
+import { ConvexGeometry } from "three-stdlib";
 
 import { LINKS } from "../domain/geometry";
 import type { CadViewMode, VisibilityState } from "../store/workspace";
@@ -10,10 +11,10 @@ export type ThreePosition = [number, number, number];
 export type ThreeQuaternion = [number, number, number, number];
 
 const LINK_COLORS = {
-  upper: "#8d969f",
-  lower: "#747e89",
-  steering: "#a72a3c",
-  upright: "#69737d",
+  upper: "#765273",
+  lower: "#3f5d86",
+  steering: "#737980",
+  upright: "#7d3e49",
   wheel: "#69737d",
 } as const;
 
@@ -151,6 +152,90 @@ function PivotBushing({
   );
 }
 
+function UprightCasting({
+  upper,
+  lower,
+  tie,
+  wheelCentre,
+  wheelQuaternion,
+  opacity,
+}: {
+  upper: ThreePosition;
+  lower: ThreePosition;
+  tie: ThreePosition;
+  wheelCentre: ThreePosition;
+  wheelQuaternion: ThreeQuaternion;
+  opacity: number;
+}) {
+  const geometry = useMemo(() => {
+    const wheelAxis = new Vector3(0, 0, 1).applyQuaternion(new Quaternion(...wheelQuaternion)).normalize();
+    const thickness = 0.012;
+    const anchors = [upper, lower, tie, wheelCentre].map((point) => new Vector3(...point));
+    const hullPoints = anchors.flatMap((point) => [
+      point.clone().addScaledVector(wheelAxis, thickness),
+      point.clone().addScaledVector(wheelAxis, -thickness),
+    ]);
+    return new ConvexGeometry(hullPoints);
+  }, [lower, tie, upper, wheelCentre, wheelQuaternion]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  return (
+    <mesh geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial
+        color="#71343e"
+        metalness={0.26}
+        roughness={0.62}
+        transparent
+        opacity={0.78 * opacity}
+      />
+      <Edges color="#351b20" threshold={18} />
+    </mesh>
+  );
+}
+
+function ChassisPickupReference({
+  points,
+  opacity,
+}: {
+  points: ThreePosition[];
+  opacity: number;
+}) {
+  const bounds = useMemo(() => {
+    const xs = points.map((point) => point[0]);
+    const ys = points.map((point) => point[1]);
+    const zs = points.map((point) => point[2]);
+    const minimumX = Math.min(...xs);
+    const maximumX = Math.max(...xs);
+    const minimumY = Math.min(...ys);
+    const maximumY = Math.max(...ys);
+    return {
+      position: [
+        (minimumX + maximumX) / 2,
+        (minimumY + maximumY) / 2,
+        zs.reduce((sum, value) => sum + value, 0) / zs.length,
+      ] as ThreePosition,
+      size: [Math.max(maximumX - minimumX + 0.13, 0.2), Math.max(maximumY - minimumY + 0.14, 0.28), 0.028] as ThreePosition,
+    };
+  }, [points]);
+
+  return (
+    <group name="sasi-pickup-referansi">
+      <mesh position={bounds.position} castShadow receiveShadow>
+        <boxGeometry args={bounds.size} />
+        <meshStandardMaterial color="#4f565d" metalness={0.08} roughness={0.78} transparent opacity={0.34 * opacity} />
+        <Edges color="#727b83" threshold={15} />
+      </mesh>
+      {points.map((point, index) => (
+        <mesh key={index} position={point} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.022, 0.022, 0.042, 20]} />
+          <meshStandardMaterial color="#353b41" metalness={0.22} roughness={0.66} transparent opacity={0.82 * opacity} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function MechanicalUpright({
   upper,
   lower,
@@ -168,10 +253,11 @@ function MechanicalUpright({
 }) {
   return (
     <group name="mekanik-upright">
-      <TubeBetween start={lower} end={upper} radius={0.018} color="#58616a" metalness={0.32} roughness={0.58} opacity={opacity} />
-      <TubeBetween start={upper} end={wheelCentre} radius={0.011} color="#626c75" metalness={0.32} roughness={0.58} opacity={opacity} />
-      <TubeBetween start={lower} end={wheelCentre} radius={0.013} color="#525b64" metalness={0.32} roughness={0.58} opacity={opacity} />
-      <TubeBetween start={tie} end={wheelCentre} radius={0.009} color="#626c75" metalness={0.32} roughness={0.58} opacity={opacity} />
+      <UprightCasting upper={upper} lower={lower} tie={tie} wheelCentre={wheelCentre} wheelQuaternion={wheelQuaternion} opacity={opacity} />
+      <TubeBetween start={lower} end={upper} radius={0.018} color="#743640" metalness={0.24} roughness={0.62} opacity={opacity} />
+      <TubeBetween start={upper} end={wheelCentre} radius={0.011} color="#81404b" metalness={0.24} roughness={0.62} opacity={opacity} />
+      <TubeBetween start={lower} end={wheelCentre} radius={0.013} color="#67313a" metalness={0.24} roughness={0.62} opacity={opacity} />
+      <TubeBetween start={tie} end={wheelCentre} radius={0.009} color="#81404b" metalness={0.24} roughness={0.62} opacity={opacity} />
       <BallJoint position={upper} toward={lower} opacity={opacity} />
       <BallJoint position={lower} toward={upper} opacity={opacity} />
       <BallJoint position={tie} toward={wheelCentre} scale={0.82} opacity={opacity} />
@@ -453,6 +539,13 @@ export function ProceduralCadAssembly({
   const upperOutboard = positionFor("uca_outboard");
   const lowerOutboard = positionFor("lca_outboard");
   const tieOutboard = positionFor("tie_rod_outboard");
+  const chassisPickupPoints = [
+    positionFor("uca_front_inboard"),
+    positionFor("uca_rear_inboard"),
+    positionFor("lca_front_inboard"),
+    positionFor("lca_rear_inboard"),
+    positionFor("tie_rod_inboard"),
+  ];
 
   return (
     <group name={`cad-assembly-${assemblyId}`}>
@@ -479,6 +572,7 @@ export function ProceduralCadAssembly({
         );
       })}
       {showMechanism && showDetailed && <>
+        {visibility.chassis && <ChassisPickupReference points={chassisPickupPoints} opacity={opacity} />}
         {(visibility.upright || visibility.wheel) && (
           <MechanicalUpright
             upper={upperOutboard}

@@ -81,7 +81,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   selectedHardpointId: "uca_outboard",
   cameraPreset: "perspective",
   vehicleViewMode: "full_vehicle",
-  cadViewMode: "hybrid",
+  cadViewMode: "detailed",
   latestFullCarResult: null,
   latestBicycleResult: null,
   visibility: {

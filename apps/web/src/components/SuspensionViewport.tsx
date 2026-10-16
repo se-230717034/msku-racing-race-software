@@ -10,8 +10,8 @@ import { useWorkspace, type CameraPreset } from "../store/workspace";
 import { ProceduralCadAssembly } from "./ProceduralCadAssembly";
 
 const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
-  perspective: [1.15, 0.8, 1.35],
-  isometric: [1.15, 0.8, 1.35],
+  perspective: [1.02, 0.68, 1.12],
+  isometric: [1.12, 0.82, 1.18],
   front: [1.8, 0.35, -0.5],
   rear: [-1.8, 0.35, -0.5],
   side: [0.0, 0.35, 1.8],
@@ -105,6 +105,10 @@ export function SuspensionViewport({
   const cameraPreset = useWorkspace((state) => state.cameraPreset);
   const cadMode = useWorkspace((state) => state.cadViewMode);
   const mirror = useWorkspace((state) => state.visibility.mirror);
+  const chassisVisible = useWorkspace((state) => state.visibility.chassis);
+  const sceneSurface = cadMode === "detailed"
+    ? { background: "#d9dde0", fog: "#d9dde0", gridMajor: "#737b82", gridMinor: "#b7bdc2" }
+    : { background: "#080a0e", fog: "#080a0e", gridMajor: "#29303d", gridMinor: "#171b23" };
   const maximumForce = Math.max(
     ...forceVectors.map(({ force }) => Math.hypot(force.x, force.y, force.z)),
     0,
@@ -112,15 +116,15 @@ export function SuspensionViewport({
 
   return (
     <div className={`viewport ${mode}`} data-testid="suspension-viewport" data-cad-mode={cadMode}>
-      <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 38, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
-        <color attach="background" args={["#080a0e"]} />
-        <fog attach="fog" args={["#080a0e", 2.5, 7]} />
+      <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
+        <color attach="background" args={[sceneSurface.background]} />
+        <fog attach="fog" args={[sceneSurface.fog, 2.5, 7]} />
         <ambientLight intensity={0.46} />
         <hemisphereLight args={["#e7edf5", "#16191d", 0.74]} />
         <directionalLight castShadow position={[1.8, 2.8, 1.6]} intensity={1.85} color="#f4f6f8" shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
         <directionalLight position={[-1.4, 1.1, -1.6]} intensity={0.48} color="#9aa9b8" />
         <spotLight position={[0.2, 2.8, -2.1]} intensity={0.72} angle={0.55} penumbra={0.82} color="#d7e1eb" />
-        <gridHelper args={[2, 20, "#29303d", "#171b23"]} position={[0, 0, 0]} />
+        <gridHelper args={[2, 20, sceneSurface.gridMajor, sceneSurface.gridMinor]} position={[0, 0, 0]} />
         <SuspensionModel pose={pose} hardpointOverrides={hardpointOverrides} />
         {maximumForce > 0 && forceVectors.map(({ id, origin, force }) => {
           const magnitude = Math.hypot(force.x, force.y, force.z);
@@ -148,6 +152,7 @@ export function SuspensionViewport({
         <span><i className="axis z" />Z yukarı</span>
         <span>İç birim: m · Düzenleyici: mm</span>
         <span>CAD görünümü: {cadMode === "technical" ? "Teknik" : cadMode === "detailed" ? "Detaylı" : "Karma"}</span>
+        {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>

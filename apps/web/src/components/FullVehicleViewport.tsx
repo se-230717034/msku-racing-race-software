@@ -20,8 +20,8 @@ import { useWorkspace, type CadViewMode, type CameraPreset, type VehicleViewMode
 import { CadTube, ProceduralCadAssembly } from "./ProceduralCadAssembly";
 
 const CAMERA_POSITIONS: Record<CameraPreset, [number, number, number]> = {
-  perspective: [3.0, 1.65, 2.55],
-  isometric: [3.0, 2.35, 3.0],
+  perspective: [3.05, 1.7, 2.3],
+  isometric: [3.0, 2.25, 2.75],
   front: [3.5, 0.65, 0],
   rear: [-3.5, 0.65, 0],
   side: [0, 0.75, 3.8],
@@ -208,6 +208,9 @@ export function FullVehicleViewport({
   const mode = useWorkspace((state) => state.vehicleViewMode);
   const visibility = useWorkspace((state) => state.visibility);
   const cadMode = useWorkspace((state) => state.cadViewMode);
+  const sceneSurface = cadMode === "detailed"
+    ? { background: "#d9dde0", fog: "#d9dde0", gridMajor: "#747c83", gridMinor: "#b8bec3" }
+    : { background: "#080a0e", fog: "#080a0e", gridMajor: "#303846", gridMinor: "#171c24" };
   const sweep = useKinematics((state) => state.sweep);
   const selectedIndex = useKinematics((state) => state.selectedIndex);
   const solvedCornerId = useKinematics((state) => state.solvedCornerId);
@@ -229,16 +232,16 @@ export function FullVehicleViewport({
 
   return (
     <div className="full-vehicle-viewport" data-testid="full-vehicle-viewport" data-cad-mode={cadMode}>
-      <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
-        <color attach="background" args={["#080a0e"]} />
-        <fog attach="fog" args={["#080a0e", 5.5, 13]} />
+      <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 36, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
+        <color attach="background" args={[sceneSurface.background]} />
+        <fog attach="fog" args={[sceneSurface.fog, 5.5, 13]} />
         <ambientLight intensity={0.44} />
         <hemisphereLight args={["#e8edf4", "#15181c", 0.76]} />
         <directionalLight castShadow position={[3.5, 4.8, 2.8]} intensity={1.9} color="#f4f6f8" shadow-mapSize-width={1536} shadow-mapSize-height={1536} />
         <directionalLight position={[-2.5, 1.4, -3]} intensity={0.5} color="#9ba9b7" />
         <spotLight position={[0, 4.8, -3.2]} intensity={0.78} angle={0.52} penumbra={0.84} color="#d8e1eb" />
         {visibility.referencePlanes && <>
-          <gridHelper args={[6, 60, "#303846", "#171c24"]} position={[0, 0, 0]} />
+          <gridHelper args={[6, 60, sceneSurface.gridMajor, sceneSurface.gridMinor]} position={[0, 0, 0]} />
           <AxleReferences project={project} />
         </>}
         <group rotation={[0, bicycleYawRad, 0]}>

@@ -18,6 +18,7 @@ const visibilityLabels = {
   upright: "taşıyıcı",
   wheel: "tekerlek",
   hardpoints: "bağlantı noktaları",
+  chassis: "şasi referansı",
 };
 
 const cadModes: Array<{ id: CadViewMode; label: string; ariaLabel: string }> = [
@@ -62,7 +63,7 @@ export function GeometryToolbar() {
       </div>
       <div className="toolbar-divider" />
       <div className="toolbar-group" aria-label="Görünürlük kontrolleri">
-        {(["upper", "lower", "steering", "upright", "wheel", "hardpoints"] as const).map((key) => (
+        {(["upper", "lower", "steering", "upright", "wheel", "hardpoints", "chassis"] as const).map((key) => (
           <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggle(key)}>
             {visibility[key] ? <Eye size={13} /> : <EyeOff size={13} />}{visibilityLabels[key]}
           </button>

@@ -55,7 +55,7 @@ test("renders four distinct assemblies at the configured wheelbase and tracks", 
 test("switches the shared Turkish CAD view modes without changing engineering data", async ({ page }) => {
   await page.goto("/");
   const vehicleViewport = page.getByTestId("full-vehicle-viewport");
-  await expect(vehicleViewport).toHaveAttribute("data-cad-mode", "hybrid");
+  await expect(vehicleViewport).toHaveAttribute("data-cad-mode", "detailed");
   await page.getByRole("button", { name: "Teknik görünüm" }).click();
   await expect(vehicleViewport).toHaveAttribute("data-cad-mode", "technical");
 
