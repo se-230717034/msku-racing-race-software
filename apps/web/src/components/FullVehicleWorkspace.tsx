@@ -45,6 +45,7 @@ const visibilityLabels = {
   chassis: "şasi",
   referencePlanes: "referans düzlemleri",
   labels: "etiketler",
+  representativeActuation: "temsili çalıştırma",
 };
 
 const cornerIds: CornerId[] = ["front_left", "front_right", "rear_left", "rear_right"];
@@ -124,7 +125,7 @@ export function FullVehicleWorkspace() {
         </div>
         <div className="toolbar-divider" />
         <div className="toolbar-group" aria-label="Tam araç görünürlüğü">
-          {(["wheel", "hardpoints", "chassis", "referencePlanes", "labels"] as const).map((key) => <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggleVisibility(key)}>{visibility[key] ? <Eye size={12} /> : <EyeOff size={12} />}{visibilityLabels[key]}</button>)}
+          {(["wheel", "hardpoints", "chassis", "referencePlanes", "labels", "representativeActuation"] as const).map((key) => <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggleVisibility(key)}>{visibility[key] ? <Eye size={12} /> : <EyeOff size={12} />}{visibilityLabels[key]}</button>)}
         </div>
       </header>
 

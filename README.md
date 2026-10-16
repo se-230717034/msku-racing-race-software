@@ -34,7 +34,7 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Full vehicle, axle, individual-corner, chassis/CG, suspension, kinematics, and dynamics views with six camera presets and persistent visibility state.
 - Exact stored-input comparison for corner provenance, link lengths, alignment, and hardpoint deltas; calculated cross-corner comparison stays blocked until both corners have independent results.
 - Solver-gated visualization: a kinematic result affects only its solved corner; accepted 7DOF samples drive body heave/pitch/roll and four independent unsprung positions; bicycle steer/yaw visualization uses only returned histories and documented integration.
-- The procedural parts are visualization geometry, not manufacturing CAD or structural evidence. Unsolved dynamic link closure remains hidden rather than being animated heuristically.
+- The procedural parts are visualization geometry, not manufacturing CAD or structural evidence. Unsolved dynamic link closure remains hidden rather than being animated heuristically. An optional, default-off pushrod/rocker/spring-damper overlay is explicitly marked as a static unsupported reference and never presented as calculated motion.
 - Traceable engineering reports with metadata, inputs, units/frame, vector geometry diagrams, available result plots, solver diagnostics/provenance, warnings, limitations, validation state, and PDF/CSV/JSON output.
 - Validation/evidence register for numerical benchmarks, CAD comparisons, physical measurements, and input provenance; physical validation and engineering approval cannot be granted automatically.
 - Interactive Three.js/R3F corner view with orbit, pan, zoom, presets, selection, mirror view, and visibility controls.

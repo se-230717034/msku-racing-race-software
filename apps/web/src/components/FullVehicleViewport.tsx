@@ -73,6 +73,7 @@ export function VehicleCornerAssembly({
   steeringRad = 0,
   showMechanism = true,
   cadMode,
+  showRepresentativeActuation = false,
 }: {
   project: Project;
   cornerId: CornerId;
@@ -82,6 +83,7 @@ export function VehicleCornerAssembly({
   steeringRad?: number;
   showMechanism?: boolean;
   cadMode: CadViewMode;
+  showRepresentativeActuation?: boolean;
 }) {
   const corner = project.vehicle.corners[cornerId];
   const suspension: Suspension = corner.suspension;
@@ -92,6 +94,12 @@ export function VehicleCornerAssembly({
 
   const vehiclePoint = (id: string): [number, number, number] => {
     const source = pose?.hardpoints[id] ?? points.get(id);
+    if (!source) throw new Error(`Corner ${cornerId} is missing ${id}.`);
+    return toThreePosition(cornerPointToVehicle(project, cornerId, source));
+  };
+
+  const staticVehiclePoint = (id: string): [number, number, number] => {
+    const source = points.get(id);
     if (!source) throw new Error(`Corner ${cornerId} is missing ${id}.`);
     return toThreePosition(cornerPointToVehicle(project, cornerId, source));
   };
@@ -119,6 +127,7 @@ export function VehicleCornerAssembly({
         assemblyId={cornerId}
         hardpointIds={suspension.hardpoints.map((point) => point.id)}
         positionFor={vehiclePoint}
+        staticPositionFor={staticVehiclePoint}
         wheelPosition={toThreePosition(wheelPosition)}
         wheelQuaternion={wheelQuaternion}
         wheelRadius={suspension.wheel.radius}
@@ -126,6 +135,7 @@ export function VehicleCornerAssembly({
         visibility={visibility}
         mode={cadMode}
         showMechanism={showMechanism}
+        showRepresentativeActuation={showRepresentativeActuation}
       />
       {visibility.labels && (
         <Html position={toThreePosition({ ...wheelPosition, z: wheelPosition.z + suspension.wheel.radius + 0.07 })} center>
@@ -168,7 +178,7 @@ function ChassisReference({ project, heaveM, pitchRad, rollRad, visible, cadMode
       ))}
       {showDetailed && <mesh position={[0, lowerZ + 0.008, 0]} receiveShadow castShadow>
         <boxGeometry args={[halfLength * 1.88, 0.022, halfWidth * 1.76]} />
-        <meshStandardMaterial color="#20262f" metalness={0.34} roughness={0.58} transparent opacity={0.82} />
+        <meshStandardMaterial color="#20262f" metalness={0.26} roughness={0.66} transparent opacity={0.18} depthWrite={false} />
       </mesh>}
       <mesh position={toThreePosition(project.vehicle.cgPositionM)} name="configured-cg" castShadow>
         <sphereGeometry args={[0.045, 20, 20]} />
@@ -264,6 +274,7 @@ export function FullVehicleViewport({
               steeringRad={steeringRad}
               showMechanism={showMechanism}
               cadMode={cadMode}
+              showRepresentativeActuation={showMechanism && visibility.representativeActuation && cornerId === project.activeCornerId}
             />
           ))}
         </group>
@@ -284,11 +295,19 @@ export function FullVehicleViewport({
             data-z={point.z + dynamics.unsprungDisplacementsM[cornerIndex(cornerId)]}
           />;
         })}
+        {showMechanism && visibility.representativeActuation && (
+          <span
+            data-testid="representative-actuation-layer"
+            data-status="UNSUPPORTED_STATIC_REFERENCE"
+            data-corner={project.activeCornerId}
+          />
+        )}
       </div>
       <div className="full-vehicle-badge">DÖRT KÖŞE MODELİ · {VIEW_MODE_LABELS[mode]} · {cadMode === "technical" ? "TEKNİK" : cadMode === "detailed" ? "DETAYLI" : "KARMA"}</div>
       <div className="reference-disclaimer">Şasi zarfı ve aks çizgileri yalnızca referanstır — sağlanmamış bağlantı veya çalıştırma geometrisi varsayılmaz.</div>
       {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7 serbestlik dereceli çözücü örneği · şasi yükselme/başvurma/yalpa + dört yaylanmayan kütle geçmişi · bağlantı kapanışı bu modelde bulunmadığı için süspansiyon kolları gizlendi.</div>}
       {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bisiklet modeli çözücüsü · sapma yönelimi hesaplanan sapma hızından trapez yöntemiyle tümleştirilir; ön tekerlek yönlendirmesi sağlanan direksiyon geçmişini kullanır.</div>}
+      {showMechanism && visibility.representativeActuation && <div className="representative-layer-note">TEMSİLİ PUSHROD · ROCKER · YAY/AMORTİSÖR — bağlantı verisi yok, hareketsiz ve mühendislik sonucu değildir</div>}
       {blockedReason && <div className="vehicle-blocked">{blockedReason}</div>}
     </div>
   );

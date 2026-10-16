@@ -103,11 +103,13 @@ button { color: inherit; }
 .corner-source b { color: #ff8798; font: 700 8px/1 ui-monospace, monospace; text-transform: uppercase; }
 .scene-label { display: block; min-width: max-content; padding: 4px 6px; border: 1px solid #343d4a; border-radius: 2px; color: #dce1e8; background: #0a0d12df; font: 700 8px/1 ui-monospace, monospace; pointer-events: none; }
 .scene-label.cg { border-color: #76501b; color: #ffd58b; }
+.scene-label.representative { border-color: #9a6b20; color: #ffe0a0; background: #2b2110e8; }
 .scene-manifest { display: none; }
-.full-vehicle-badge, .reference-disclaimer, .solver-motion-note, .vehicle-blocked { position: absolute; z-index: 2; padding: 6px 8px; border: 1px solid #3d2730; color: #df8796; background: #170d12df; font: 650 8px/1.35 ui-monospace, monospace; letter-spacing: .08em; pointer-events: none; }
+.full-vehicle-badge, .reference-disclaimer, .solver-motion-note, .vehicle-blocked, .representative-layer-note { position: absolute; z-index: 2; padding: 6px 8px; border: 1px solid #3d2730; color: #df8796; background: #170d12df; font: 650 8px/1.35 ui-monospace, monospace; letter-spacing: .08em; pointer-events: none; }
 .full-vehicle-badge { top: 13px; left: 13px; }
 .reference-disclaimer { left: 13px; bottom: 13px; max-width: 560px; border-color: #343b47; color: #8993a2; background: #0a0d12e6; letter-spacing: 0; }
 .solver-motion-note { top: 13px; right: 13px; max-width: 430px; border-color: #4c432a; color: #e4bd78; background: #19150de6; letter-spacing: 0; }
+.representative-layer-note { top: 45px; left: 13px; max-width: 560px; border-color: #8a621f; color: #f2c66f; background: #251c0de8; letter-spacing: 0; }
 .vehicle-blocked { inset: 50% auto auto 50%; width: min(520px, calc(100% - 40px)); transform: translate(-50%, -50%); padding: 13px; border-color: #713046; color: #ff9bab; background: #260f17ed; letter-spacing: 0; text-align: center; }
 .vehicle-playback { position: absolute; z-index: 3; right: 18px; bottom: 18px; width: min(520px, calc(100% - 36px)); display: grid; grid-template-columns: auto auto minmax(120px, 1fr) auto; align-items: center; gap: 9px; padding: 9px; border: 1px solid #353e4a; border-radius: 3px; background: #0b0e13eb; box-shadow: 0 10px 30px #0008; }
 .vehicle-playback span { color: #9ea7b5; font: 8px/1 ui-monospace, monospace; }

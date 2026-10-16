@@ -25,6 +25,7 @@ export interface VisibilityState {
   chassis: boolean;
   referencePlanes: boolean;
   labels: boolean;
+  representativeActuation: boolean;
 }
 
 interface WorkspaceState {
@@ -95,6 +96,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     chassis: true,
     referencePlanes: true,
     labels: true,
+    representativeActuation: false,
   },
   setActiveModule: (activeModule) => set({ activeModule }),
   setSelectedHardpoint: (selectedHardpointId) => set({ selectedHardpointId }),

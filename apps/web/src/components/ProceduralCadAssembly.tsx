@@ -1,4 +1,4 @@
-import { Edges, Line } from "@react-three/drei";
+import { Edges, Html, Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import { DoubleSide, Quaternion, Vector3 } from "three";
@@ -194,6 +194,35 @@ function UprightCasting({
   );
 }
 
+function MountingClevis({
+  position,
+  wheelQuaternion,
+  scale = 1,
+  opacity,
+}: {
+  position: ThreePosition;
+  wheelQuaternion: ThreeQuaternion;
+  scale?: number;
+  opacity: number;
+}) {
+  const plateOffset = 0.014 * scale;
+  return (
+    <group position={position} quaternion={wheelQuaternion} scale={scale}>
+      {[-plateOffset, plateOffset].map((z) => (
+        <mesh key={z} position={[0, 0, z]} castShadow receiveShadow>
+          <boxGeometry args={[0.044, 0.058, 0.006]} />
+          <meshStandardMaterial color="#69727a" metalness={0.3} roughness={0.6} transparent opacity={0.88 * opacity} />
+          <Edges color="#30363c" threshold={20} />
+        </mesh>
+      ))}
+      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.009, 0.009, plateOffset * 2.6, 18]} />
+        <meshStandardMaterial color="#252a2f" metalness={0.5} roughness={0.46} transparent opacity={opacity} />
+      </mesh>
+    </group>
+  );
+}
+
 function ChassisPickupReference({
   points,
   opacity,
@@ -223,7 +252,7 @@ function ChassisPickupReference({
     <group name="sasi-pickup-referansi">
       <mesh position={bounds.position} castShadow receiveShadow>
         <boxGeometry args={bounds.size} />
-        <meshStandardMaterial color="#4f565d" metalness={0.08} roughness={0.78} transparent opacity={0.34 * opacity} />
+        <meshStandardMaterial color="#4f565d" metalness={0.08} roughness={0.78} transparent opacity={0.14 * opacity} depthWrite={false} />
         <Edges color="#727b83" threshold={15} />
       </mesh>
       {points.map((point, index) => (
@@ -261,6 +290,9 @@ function MechanicalUpright({
       <BallJoint position={upper} toward={lower} opacity={opacity} />
       <BallJoint position={lower} toward={upper} opacity={opacity} />
       <BallJoint position={tie} toward={wheelCentre} scale={0.82} opacity={opacity} />
+      <MountingClevis position={upper} wheelQuaternion={wheelQuaternion} opacity={opacity} />
+      <MountingClevis position={lower} wheelQuaternion={wheelQuaternion} opacity={opacity} />
+      <MountingClevis position={tie} wheelQuaternion={wheelQuaternion} scale={0.72} opacity={opacity} />
       <group position={wheelCentre} quaternion={wheelQuaternion}>
         <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[0.052, 0.052, 0.054, 28]} />
@@ -272,6 +304,69 @@ function MechanicalUpright({
           <meshStandardMaterial color="#737d86" metalness={0.5} roughness={0.42} transparent={opacity < 1} opacity={opacity} />
         </mesh>
       </group>
+    </group>
+  );
+}
+
+function SpringBetween({ start, end }: { start: ThreePosition; end: ThreePosition }) {
+  const points = useMemo(() => {
+    const from = new Vector3(...start);
+    const to = new Vector3(...end);
+    const axis = to.clone().sub(from);
+    const length = axis.length();
+    if (length <= 1e-12) return [from, to];
+    const direction = axis.clone().normalize();
+    const reference = Math.abs(direction.y) < 0.85 ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0);
+    const firstNormal = new Vector3().crossVectors(direction, reference).normalize();
+    const secondNormal = new Vector3().crossVectors(direction, firstNormal).normalize();
+    const coilRadius = 0.022;
+    const turns = 8;
+    return Array.from({ length: 97 }, (_, index) => {
+      const t = index / 96;
+      const angle = t * turns * Math.PI * 2;
+      return from.clone()
+        .addScaledVector(axis, t)
+        .addScaledVector(firstNormal, Math.cos(angle) * coilRadius)
+        .addScaledVector(secondNormal, Math.sin(angle) * coilRadius);
+    });
+  }, [end, start]);
+
+  return <Line points={points} color="#c89436" lineWidth={2.2} transparent opacity={0.56} />;
+}
+
+function RepresentativeActuationLayer({ positionFor }: { positionFor: (id: string) => ThreePosition }) {
+  const inboardIds = ["uca_front_inboard", "uca_rear_inboard", "lca_front_inboard", "lca_rear_inboard"];
+  const inboards = inboardIds.map(positionFor);
+  const chassisCentre: ThreePosition = [
+    inboards.reduce((sum, point) => sum + point[0], 0) / inboards.length,
+    inboards.reduce((sum, point) => sum + point[1], 0) / inboards.length,
+    inboards.reduce((sum, point) => sum + point[2], 0) / inboards.length,
+  ];
+  const maximumHeight = Math.max(...inboards.map((point) => point[1]));
+  const rockerPivot: ThreePosition = [chassisCentre[0], maximumHeight + 0.18, chassisCentre[2]];
+  const pushrodRocker: ThreePosition = [rockerPivot[0] + 0.065, rockerPivot[1] - 0.025, rockerPivot[2] - 0.018];
+  const damperRocker: ThreePosition = [rockerPivot[0] - 0.055, rockerPivot[1] + 0.018, rockerPivot[2] + 0.008];
+  const damperChassis: ThreePosition = [rockerPivot[0] - 0.27, rockerPivot[1] + 0.105, rockerPivot[2] + 0.015];
+  const pushrodOutboard = positionFor("lca_outboard");
+
+  return (
+    <group name="temsili-calistirma-katmani">
+      <TubeBetween start={pushrodOutboard} end={pushrodRocker} radius={0.0065} color="#bd8a2f" metalness={0.16} roughness={0.7} opacity={0.42} />
+      <Line points={[pushrodOutboard, pushrodRocker]} color="#f1b94e" lineWidth={1.3} dashed dashSize={0.028} gapSize={0.018} transparent opacity={0.72} />
+      <TubeBetween start={rockerPivot} end={pushrodRocker} radius={0.012} color="#b47d2a" metalness={0.18} roughness={0.68} opacity={0.48} />
+      <TubeBetween start={rockerPivot} end={damperRocker} radius={0.012} color="#b47d2a" metalness={0.18} roughness={0.68} opacity={0.48} />
+      <TubeBetween start={pushrodRocker} end={damperRocker} radius={0.008} color="#96671f" metalness={0.16} roughness={0.72} opacity={0.42} />
+      <TubeBetween start={damperRocker} end={damperChassis} radius={0.013} color="#8c672e" metalness={0.18} roughness={0.7} opacity={0.38} />
+      <SpringBetween start={damperRocker} end={damperChassis} />
+      {[rockerPivot, pushrodRocker, damperRocker, damperChassis].map((position, index) => (
+        <mesh key={index} position={position} castShadow>
+          <sphereGeometry args={[index === 0 ? 0.018 : 0.013, 16, 12]} />
+          <meshStandardMaterial color="#c58c31" metalness={0.18} roughness={0.68} transparent opacity={0.52} />
+        </mesh>
+      ))}
+      <Html position={[rockerPivot[0], rockerPivot[1] + 0.095, rockerPivot[2]]} center>
+        <span className="scene-label representative">TEMSİLİ ÇALIŞTIRMA · BAĞLANTI VERİSİ YOK · HAREKETSİZ</span>
+      </Html>
     </group>
   );
 }
@@ -509,6 +604,7 @@ export function ProceduralCadAssembly({
   assemblyId,
   hardpointIds,
   positionFor,
+  staticPositionFor,
   wheelPosition,
   wheelQuaternion,
   wheelRadius,
@@ -516,6 +612,7 @@ export function ProceduralCadAssembly({
   visibility,
   mode,
   showMechanism = true,
+  showRepresentativeActuation = false,
   selectedHardpointId,
   onSelectHardpoint,
   opacity = 1,
@@ -523,6 +620,7 @@ export function ProceduralCadAssembly({
   assemblyId: string;
   hardpointIds: string[];
   positionFor: (id: string) => ThreePosition;
+  staticPositionFor?: (id: string) => ThreePosition;
   wheelPosition: ThreePosition;
   wheelQuaternion: ThreeQuaternion;
   wheelRadius: number;
@@ -530,6 +628,7 @@ export function ProceduralCadAssembly({
   visibility: VisibilityState;
   mode: CadViewMode;
   showMechanism?: boolean;
+  showRepresentativeActuation?: boolean;
   selectedHardpointId?: string;
   onSelectHardpoint?: (id: string) => void;
   opacity?: number;
@@ -593,6 +692,9 @@ export function ProceduralCadAssembly({
         </>}
         {visibility.steering && <BallJoint position={positionFor("tie_rod_inboard")} toward={tieOutboard} scale={0.75} opacity={opacity} />}
       </>}
+      {showMechanism && showRepresentativeActuation && (
+        <RepresentativeActuationLayer positionFor={staticPositionFor ?? positionFor} />
+      )}
       {showMechanism && visibility.hardpoints && hardpointIds.map((id) => (
         <HardpointMarker
           key={`${assemblyId}-${id}`}

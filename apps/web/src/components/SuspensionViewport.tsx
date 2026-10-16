@@ -54,6 +54,13 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
     return toThreePosition(value);
   };
 
+  const staticPositionFor = (id: string): [number, number, number] => {
+    const point = points.get(id);
+    if (!point) throw new Error(`Hardpoint ${id} is missing from the viewport model.`);
+    const stored = hardpointOverrides?.[id] ?? point.position;
+    return toThreePosition(mirrored ? mirrorAcrossVehicleCentreline(stored) : stored);
+  };
+
   const wheelQuaternion = useMemo((): [number, number, number, number] => {
     const configured = staticWheelAxis(
       project.suspension.corner,
@@ -73,6 +80,7 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
         assemblyId={mirrored ? "ayna" : "etkin-kose"}
         hardpointIds={project.suspension.hardpoints.map((point) => point.id)}
         positionFor={positionFor}
+        staticPositionFor={staticPositionFor}
         wheelPosition={positionFor("wheel_center")}
         wheelQuaternion={wheelQuaternion}
         wheelRadius={project.suspension.wheel.radius}
@@ -81,6 +89,7 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
         mode={cadMode}
         selectedHardpointId={mirrored ? undefined : selectedId}
         onSelectHardpoint={mirrored ? undefined : select}
+        showRepresentativeActuation={!mirrored && visibility.representativeActuation}
         opacity={mirrored ? 0.2 : 1}
       />
     </group>
@@ -106,6 +115,7 @@ export function SuspensionViewport({
   const cadMode = useWorkspace((state) => state.cadViewMode);
   const mirror = useWorkspace((state) => state.visibility.mirror);
   const chassisVisible = useWorkspace((state) => state.visibility.chassis);
+  const representativeVisible = useWorkspace((state) => state.visibility.representativeActuation);
   const sceneSurface = cadMode === "detailed"
     ? { background: "#d9dde0", fog: "#d9dde0", gridMajor: "#737b82", gridMinor: "#b7bdc2" }
     : { background: "#080a0e", fog: "#080a0e", gridMajor: "#29303d", gridMinor: "#171b23" };
@@ -153,6 +163,7 @@ export function SuspensionViewport({
         <span>İç birim: m · Düzenleyici: mm</span>
         <span>CAD görünümü: {cadMode === "technical" ? "Teknik" : cadMode === "detailed" ? "Detaylı" : "Karma"}</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
+        {representativeVisible && <span>TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>

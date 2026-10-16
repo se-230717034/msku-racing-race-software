@@ -68,6 +68,18 @@ test("switches the shared Turkish CAD view modes without changing engineering da
   await expect(suspensionViewport).toHaveAttribute("data-cad-mode", "hybrid");
 });
 
+test("keeps unsupported actuation in an explicit static representative layer", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /temsili çalıştırma/i }).click();
+  const layer = page.getByTestId("representative-actuation-layer");
+  await expect(layer).toHaveAttribute("data-status", "UNSUPPORTED_STATIC_REFERENCE");
+  await expect(layer).toHaveAttribute("data-corner", "front_left");
+  await expect(page.getByText("TEMSİLİ PUSHROD", { exact: false })).toBeVisible();
+
+  await page.getByRole("button", { name: "Geometri" }).click();
+  await expect(page.getByText("TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz", { exact: true })).toBeVisible();
+});
+
 test("keeps per-corner edits persistent and blocks unsupported playback", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Etkin araç köşesi").selectOption("rear_left");

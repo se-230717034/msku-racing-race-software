@@ -7,6 +7,7 @@ The current build contains Phase 0, the Phase 1 vertical slice, Phase 2/2.5 rigi
 - Geometry diagnostics catch important degenerate and ordering failures but do not yet prove mechanism mobility or detect every collision/packaging problem.
 - Direct 3D point dragging is not implemented; precise editing is performed in the coordinate inspector.
 - Only a double-wishbone corner with steering tie rod is represented. Optional actuation coordinates can be stored, but integrated rocker/pushrod kinematic closure is not implemented.
+- The optional amber pushrod, rocker, spring, and damper layer is a static visual reference derived from display offsets. It is disabled by default, does not close kinematically, does not produce engineering values, and must not be interpreted as vehicle geometry.
 - Motion ratio is supported only from an explicit spring-length versus wheel-travel series with CAD/measurement provenance. The bundled values are labeled synthetic test data.
 - Steering-rack sweep is not implemented. Toe changes caused by wheel travel are calculated; commanded steering is not.
 - Roll-centre height is a geometric front-view result. It assumes the unsupplied opposite corner is a symmetric mirror and uses an ideal rigid circular wheel's lowest point. It is suppressed for unsupported pivot axes and unstable projected intersections; it is not a force-based roll centre.
