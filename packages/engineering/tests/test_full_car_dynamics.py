@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from math import cos, pi
 
+import msku_engineering.full_car_dynamics as full_car_module
 import numpy as np
 import pytest
 from msku_engineering import (
@@ -249,3 +250,45 @@ def test_contact_loss_and_invalid_corner_order_suppress_results() -> None:
     )
     assert invalid.calculation_status == "FAILED"
     assert invalid.samples == ()
+
+
+def test_dense_output_contact_loss_is_rejected_at_reported_samples(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A safe accepted-step endpoint must not hide contact loss in dense output."""
+
+    class FakeSolution:
+        success = True
+        message = "synthetic dense-output regression fixture"
+        nfev = 2
+        njev = 0
+        nlu = 0
+        t = np.asarray([0.0, 1.0])
+        y = np.zeros((14, 2))
+
+        @staticmethod
+        def sol(time_s: float) -> np.ndarray:
+            state = np.zeros(14)
+            state[3] = 0.001 * np.sin(np.pi * time_s)
+            return state
+
+    monkeypatch.setattr(full_car_module, "solve_ivp", lambda *args, **kwargs: FakeSolution())
+    result = simulate_full_car(
+        symmetric_parameters(static_load=100.0),
+        zero_roads(),
+        settings=DynamicsSettings(
+            duration_s=1.0,
+            output_samples=5,
+            relative_tolerance=1.0e-8,
+            absolute_tolerance=1.0e-10,
+            maximum_step_s=1.0,
+        ),
+    )
+
+    assert result.calculation_status == "FAILED"
+    assert result.samples == ()
+    assert result.diagnostics.contact_accepted is False
+    assert result.diagnostics.contact_loss_corner == "front_left"
+    assert result.diagnostics.minimum_total_contact_force_n == pytest.approx(-80.0)
+    assert "reported time 0.5 s" in result.diagnostics.message
+    assert result.warnings == ("TIRE_CONTACT_LOSS_AT_REPORTED_SAMPLE_UNSUPPORTED",)

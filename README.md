@@ -57,12 +57,15 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Dynamics workspace with editable parameters, road data, solver controls, calculated response plots, sample-synchronized Three.js playback, provenance, limitations, and unvalidated CSV export.
 - Independent eigenvalue/modal-decay tests, step and tolerance convergence, DOP853/Radau/BDF comparison, road interpolation, energy, contact, API, contract, and browser regression tests.
 - Linear 7DOF full-car ride model with body heave/pitch/roll, four unsprung masses, four independent roads, assembled physical matrices, seven natural modes, per-corner contact guarding, energy diagnostics, and calculated UI plots.
+- The 7DOF contact guard is evaluated at accepted integration states and every reported dense-output sample; an unsupported negative normal force suppresses the complete reported result instead of leaking an invalid interpolation.
 - Constant-speed linear planar bicycle model derived from Newton-Euler balance with explicit axle cornering stiffnesses, stability/understeer diagnostics, analytical steady-state gains, domain-limit rejection, and calculated UI plots.
 - Deterministic bounded differential-evolution framework with explicit objective normalization, weighted multi-objective search, seeded Pareto exploration, feasibility rejection, baseline comparison, and local finite-difference sensitivity.
 - Verified adapters for hardpoint coordinates, supported quarter/full-car spring-damper parameters, and bicycle cornering stiffness/speed; unsupported metrics are rejected rather than fabricated.
 - Optimization workspace with variable/bound controls, convergence/Pareto plots, candidate diagnostics, non-mutating geometry preview, and explicit apply.
+- Versioned Vehicle Parameter Manifest records configuration, SI units, source type, measurement state, uncertainty, applicable modules, evidence references, and deterministic content hash. Bundled defaults remain explicitly `SYNTHETIC`.
+- Independent `declared`, `numerically verified`, `reference benchmarked`, and `physically correlated` axes require accepted evidence of their own type; numerical tests and solver success cannot promote physical correlation.
 
-See [PROGRESS.md](./PROGRESS.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+See [PROGRESS.md](./PROGRESS.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 

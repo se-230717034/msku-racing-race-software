@@ -473,6 +473,48 @@ def quarter_car_request() -> dict[str, object]:
     }
 
 
+def parameter_manifest() -> dict[str, object]:
+    return {
+        "schemaVersion": "1.0.0",
+        "manifestId": "api-regression-manifest",
+        "revision": 3,
+        "vehicleId": "fs-2026",
+        "configurationId": "synthetic-api-fixture",
+        "configurationLabel": "Synthetic API fixture",
+        "createdAt": "2026-10-16T00:00:00Z",
+        "updatedAt": "2026-10-16T00:00:00Z",
+        "parameters": [
+            {
+                "key": "quarter_car.sprung_mass",
+                "value": 75.0,
+                "unit": "kg",
+                "measurementStatus": "SYNTHETIC",
+                "source": {
+                    "kind": "synthetic_assumption",
+                    "label": "API regression fixture; not vehicle data",
+                },
+                "applicableModules": ["quarter_car"],
+                "evidenceIds": ["input-declaration"],
+            }
+        ],
+        "verification": {
+            "declared": {"status": "DECLARED", "evidenceIds": ["input-declaration"]},
+            "numerical": {"status": "UNVERIFIED", "evidenceIds": []},
+            "reference": {"status": "NOT_BENCHMARKED", "evidenceIds": []},
+            "physical": {"status": "UNVALIDATED_PHYSICALLY", "evidenceIds": []},
+            "evidence": [
+                {
+                    "id": "input-declaration",
+                    "kind": "input_declaration",
+                    "title": "Synthetic fixture declaration",
+                    "source": "services/api/tests/test_api.py",
+                    "reviewStatus": "accepted",
+                }
+            ],
+        },
+    }
+
+
 @pytest.mark.anyio
 async def test_quarter_car_api_returns_calculated_samples_and_provenance() -> None:
     async with api_client() as client:
@@ -499,6 +541,42 @@ async def test_quarter_car_api_returns_calculated_samples_and_provenance() -> No
     )
     assert payload["diagnostics"]["solverSuccess"] is True
     assert payload["diagnostics"]["contactAccepted"] is True
+    assert payload["parameterManifest"] is None
+    assert "VEHICLE_PARAMETER_MANIFEST_NOT_PROVIDED" in payload["warnings"]
+    assert payload["verificationAxes"]["declared"]["status"] == "DECLARED"
+    assert payload["verificationAxes"]["numerical"]["status"] == "VERIFIED_NUMERICALLY"
+    assert payload["verificationAxes"]["reference"]["status"] == "REFERENCE_BENCHMARKED"
+    assert payload["verificationAxes"]["physical"] == {
+        "status": "UNVALIDATED_PHYSICALLY",
+        "evidenceIds": [],
+    }
+
+
+@pytest.mark.anyio
+async def test_parameter_manifest_is_traceable_without_physical_promotion() -> None:
+    request = quarter_car_request()
+    request["parameterManifest"] = parameter_manifest()
+    async with api_client() as client:
+        response = await client.post("/api/v1/dynamics/quarter-car/simulate", json=request)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["parameterManifest"]["manifestId"] == "api-regression-manifest"
+    assert payload["parameterManifest"]["revision"] == 3
+    assert len(payload["parameterManifest"]["manifestSha256"]) == 64
+    assert "VEHICLE_PARAMETER_MANIFEST_CONTAINS_SYNTHETIC_ASSUMPTIONS" in payload["warnings"]
+    assert payload["verificationAxes"]["physical"]["status"] == "UNVALIDATED_PHYSICALLY"
+    assert not payload["verificationAxes"]["physical"]["evidenceIds"]
+
+
+@pytest.mark.anyio
+async def test_synthetic_manifest_parameter_cannot_claim_measurement() -> None:
+    request = quarter_car_request()
+    manifest = parameter_manifest()
+    manifest["parameters"][0]["measurementStatus"] = "MEASURED"  # type: ignore[index]
+    request["parameterManifest"] = manifest
+    async with api_client() as client:
+        response = await client.post("/api/v1/dynamics/quarter-car/simulate", json=request)
+    assert response.status_code == 422
 
 
 @pytest.mark.anyio

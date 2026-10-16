@@ -44,6 +44,7 @@ from msku_engineering import (
     solve_sweep,
     solve_upright_equilibrium,
     validate_corner,
+    vehicle_parameter_manifest_sha256,
 )
 from starlette.concurrency import run_in_threadpool
 
@@ -57,6 +58,7 @@ from .models import (
     BicycleSimulationResponse,
     DamperForceRequest,
     DamperForceResponse,
+    DeclaredVerificationAxis,
     DiagnosticResponse,
     DynamicsDiagnosticsResponse,
     DynamicsInputProvenanceResponse,
@@ -68,6 +70,8 @@ from .models import (
     FullCarSampleResponse,
     FullCarSimulationRequest,
     FullCarSimulationResponse,
+    IndependentVerification,
+    IndependentVerificationEvidence,
     InputProvenanceResponse,
     KinematicMetricsResponse,
     KinematicPoseResponse,
@@ -75,17 +79,20 @@ from .models import (
     KinematicsSweepResponse,
     KinematicStateResponse,
     MemberForceResponse,
+    NumericalVerificationAxis,
     OptimizationCandidateResponse,
     OptimizationConvergenceResponse,
     OptimizationDiagnosticsResponse,
     OptimizationProvenanceResponse,
     OptimizationSensitivityResponse,
     Phase3ValidationStatusResponse,
+    PhysicalVerificationAxis,
     Project,
     ProjectValidationResponse,
     QuarterCarSampleResponse,
     QuarterCarSimulationRequest,
     QuarterCarSimulationResponse,
+    ReferenceVerificationAxis,
     RoadProfileInput,
     SolverDiagnosticsResponse,
     SolverMetadataResponse,
@@ -96,6 +103,8 @@ from .models import (
     Vec3,
     VehicleLoadTransferRequest,
     VehicleLoadTransferResponse,
+    VehicleParameterManifestModel,
+    VehicleParameterManifestSummary,
     WheelLoadsResponse,
 )
 from .optimization_adapter import build_optimization_adapter
@@ -168,18 +177,106 @@ def _project_input_sha256(project: Project) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _request_input_sha256(
-    request: (
-        QuarterCarSimulationRequest
-        | FullCarSimulationRequest
-        | BicycleSimulationRequest
-        | EngineeringOptimizationRequest
-    ),
-) -> str:
+def _request_input_sha256(request: Any) -> str:
     canonical = json.dumps(
         request.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _manifest_summary(
+    manifest: VehicleParameterManifestModel | None,
+) -> VehicleParameterManifestSummary | None:
+    if manifest is None:
+        return None
+    return VehicleParameterManifestSummary(
+        manifestId=manifest.manifestId,
+        revision=manifest.revision,
+        vehicleId=manifest.vehicleId,
+        configurationId=manifest.configurationId,
+        configurationLabel=manifest.configurationLabel,
+        manifestSha256=vehicle_parameter_manifest_sha256(manifest.to_domain()),
+    )
+
+
+def _manifest_warnings(manifest: VehicleParameterManifestModel | None) -> list[str]:
+    if manifest is None:
+        return ["VEHICLE_PARAMETER_MANIFEST_NOT_PROVIDED"]
+    warnings: list[str] = []
+    if any(item.measurementStatus == "SYNTHETIC" for item in manifest.parameters):
+        warnings.append("VEHICLE_PARAMETER_MANIFEST_CONTAINS_SYNTHETIC_ASSUMPTIONS")
+    if any(item.measurementStatus == "DECLARED_UNMEASURED" for item in manifest.parameters):
+        warnings.append("VEHICLE_PARAMETER_MANIFEST_CONTAINS_UNMEASURED_VALUES")
+    return warnings
+
+
+def _result_manifest_warnings(
+    calculation_status: str, manifest: VehicleParameterManifestModel | None
+) -> list[str]:
+    """Keep primary failure diagnostics stable for backward-compatible clients."""
+    if calculation_status == "FAILED":
+        return []
+    return _manifest_warnings(manifest)
+
+
+def _verification_axes(
+    calculation_status: str,
+    solver_version: str,
+    input_sha256: str,
+) -> IndependentVerification:
+    input_id = f"input-{input_sha256[:16]}"
+    numerical_id = f"numerical-{solver_version}-{input_sha256[:12]}"
+    reference_id = f"reference-{solver_version}"
+    evidence = [
+        IndependentVerificationEvidence(
+            id=input_id,
+            kind="input_declaration",
+            title="Canonical API input declaration",
+            source=f"sha256:{input_sha256}",
+            reviewStatus="accepted",
+            artifactSha256=input_sha256,
+            notes="Declares the evaluated input only; it is not measurement evidence.",
+        ),
+        IndependentVerificationEvidence(
+            id=reference_id,
+            kind="reference_benchmark",
+            title="Internal analytical/reference regression suite",
+            source=f"solver:{solver_version}",
+            reviewStatus="accepted",
+            notes="Benchmarks the solver implementation, not this vehicle configuration.",
+        ),
+    ]
+    numerical_status = "FAILED"
+    numerical_evidence: list[str] = []
+    if calculation_status == "VERIFIED_NUMERICALLY":
+        numerical_status = "VERIFIED_NUMERICALLY"
+        numerical_evidence = [numerical_id]
+        evidence.append(
+            IndependentVerificationEvidence(
+                id=numerical_id,
+                kind="numerical_benchmark",
+                title="Runtime numerical acceptance diagnostics",
+                source=f"solver:{solver_version};input:{input_sha256}",
+                reviewStatus="accepted",
+                notes="Residual/domain/integration acceptance only; no physical promotion.",
+            )
+        )
+    elif calculation_status == "NOT_COMPUTABLE":
+        numerical_status = "UNVERIFIED"
+    return IndependentVerification(
+        declared=DeclaredVerificationAxis(status="DECLARED", evidenceIds=[input_id]),
+        numerical=NumericalVerificationAxis(
+            status=numerical_status,  # type: ignore[arg-type]
+            evidenceIds=numerical_evidence,
+        ),
+        reference=ReferenceVerificationAxis(
+            status="REFERENCE_BENCHMARKED", evidenceIds=[reference_id]
+        ),
+        physical=PhysicalVerificationAxis(
+            status="UNVALIDATED_PHYSICALLY", evidenceIds=[]
+        ),
+        evidence=evidence,
+    )
 
 
 def _road_profile(value: RoadProfileInput) -> RoadProfile:
@@ -340,11 +437,16 @@ async def kinematics_sweep(request: KinematicsSweepRequest) -> KinematicsSweepRe
             gradientMethod="second_order_nonuniform_finite_difference",
         ),
         inputProvenance=_project_provenance(project),
+        parameterManifest=_manifest_summary(project.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _project_input_sha256(project)
+        ),
         warnings=[
             *(item.code for item in geometry_diagnostics if item.severity == "warning"),
             "RIGID_LINK_IDEAL_JOINT_MODEL",
             "ROLL_CENTER_REQUIRES_SYMMETRIC_MIRRORED_OPPOSITE_CORNER",
             "PHYSICAL_VALIDATION_EVIDENCE_NOT_ATTACHED",
+            *_result_manifest_warnings(result.calculation_status, project.parameterManifest),
         ],
         residualToleranceM=result.residual_tolerance_m,
         states=states,
@@ -446,6 +548,10 @@ async def upright_equilibrium(request: UprightEquilibriumRequest) -> UprightEqui
         solverVersion=result.solver_version,
         units={"force": "N", "moment": "N*m", "length": "m"},
         inputProvenance=_project_provenance(project),
+        parameterManifest=_manifest_summary(project.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _project_input_sha256(project)
+        ),
         pose=KinematicPoseResponse(
             hardpoints={
                 point_id: _vec3(value) for point_id, value in state.pose.hardpoints.items()
@@ -481,6 +587,7 @@ async def upright_equilibrium(request: UprightEquilibriumRequest) -> UprightEqui
             *result.warnings,
             "EXTERNAL_WRENCH_APPLICATION_POINT_WAS_EXPLICITLY_SUPPLIED",
             "PHYSICAL_VALIDATION_EVIDENCE_NOT_ATTACHED",
+            *_result_manifest_warnings(result.calculation_status, project.parameterManifest),
         ],
     )
 
@@ -534,7 +641,14 @@ async def vehicle_load_transfer(
         rearLateralTransferN=result.rear_lateral_transfer_n,
         totalWeightN=result.total_weight_n,
         forceResidualN=result.force_residual_n,
-        warnings=list(result.warnings),
+        warnings=[
+            *result.warnings,
+            *_result_manifest_warnings(result.calculation_status, request.parameterManifest),
+        ],
+        parameterManifest=_manifest_summary(request.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _request_input_sha256(request)
+        ),
     )
 
 
@@ -573,7 +687,14 @@ async def actuation_series(request: ActuationSeriesRequest) -> ActuationSeriesRe
             )
             for item in result.samples
         ],
-        warnings=list(result.warnings),
+        warnings=[
+            *result.warnings,
+            *_result_manifest_warnings(result.calculation_status, request.parameterManifest),
+        ],
+        parameterManifest=_manifest_summary(request.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _request_input_sha256(request)
+        ),
     )
 
 
@@ -589,6 +710,10 @@ async def damper_force(request: DamperForceRequest) -> DamperForceResponse:
         calculationStatus=result.calculation_status,
         forceN=result.force_n,
         warning=result.warning,
+        parameterManifest=_manifest_summary(request.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, QUASI_STATIC_SOLVER_VERSION, _request_input_sha256(request)
+        ),
     )
 
 
@@ -658,6 +783,10 @@ async def quarter_car_simulation(
             sourceLabel=request.sourceLabel,
             inputSha256=_request_input_sha256(request),
         ),
+        parameterManifest=_manifest_summary(request.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _request_input_sha256(request)
+        ),
         naturalFrequenciesHz=(
             list(result.natural_frequencies_hz)
             if result.natural_frequencies_hz is not None
@@ -694,7 +823,10 @@ async def quarter_car_simulation(
             "NO_GRAVITY_OR_PRELOAD_REAPPLIED",
             "NO_SUSPENSION_GEOMETRY_COMPLIANCE_OR_TIRE_ENVELOPING",
         ],
-        warnings=list(result.warnings),
+        warnings=[
+            *result.warnings,
+            *_result_manifest_warnings(result.calculation_status, request.parameterManifest),
+        ],
         samples=[
             QuarterCarSampleResponse(
                 timeS=item.time_s,
@@ -785,6 +917,10 @@ async def full_car_simulation(
             sourceLabel=request.sourceLabel,
             inputSha256=_request_input_sha256(request),
         ),
+        parameterManifest=_manifest_summary(request.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _request_input_sha256(request)
+        ),
         naturalFrequenciesHz=(
             list(result.natural_frequencies_hz)
             if result.natural_frequencies_hz is not None
@@ -825,7 +961,10 @@ async def full_car_simulation(
             "LINEAR_BILATERAL_TIRES",
             "NO_SUSPENSION_KINEMATIC_OR_COMPLIANCE_COUPLING",
         ],
-        warnings=list(result.warnings),
+        warnings=[
+            *result.warnings,
+            *_result_manifest_warnings(result.calculation_status, request.parameterManifest),
+        ],
         samples=[
             FullCarSampleResponse(
                 timeS=item.time_s,
@@ -920,6 +1059,10 @@ async def bicycle_simulation(
             sourceLabel=request.sourceLabel,
             inputSha256=_request_input_sha256(request),
         ),
+        parameterManifest=_manifest_summary(request.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _request_input_sha256(request)
+        ),
         diagnostics=BicycleDiagnosticsResponse(
             solverSuccess=diagnostics.solver_success,
             finiteStates=diagnostics.finite_states,
@@ -962,7 +1105,10 @@ async def bicycle_simulation(
             "LINEAR_AXLE_CORNERING_STIFFNESSES",
             "NO_LOAD_TRANSFER_COMBINED_SLIP_ROLL_OR_AERO",
         ],
-        warnings=list(result.warnings),
+        warnings=[
+            *result.warnings,
+            *_result_manifest_warnings(result.calculation_status, request.parameterManifest),
+        ],
         samples=[
             BicycleSampleResponse(
                 timeS=item.time_s,
@@ -1032,6 +1178,7 @@ async def engineering_optimization(
             raise RuntimeError("Validated kinematics optimization payload is missing")
         classification = project.dataClassification
         source_label = project.name
+        parameter_manifest = request.parameterManifest or project.parameterManifest
     else:
         dynamics_payload = {
             "quarter_car": request.quarterCar,
@@ -1042,6 +1189,7 @@ async def engineering_optimization(
             raise RuntimeError("Validated dynamics optimization payload is missing")
         classification = dynamics_payload.dataClassification
         source_label = dynamics_payload.sourceLabel
+        parameter_manifest = request.parameterManifest or dynamics_payload.parameterManifest
     diagnostics = result.diagnostics
     return EngineeringOptimizationResponse(
         schemaVersion="1.0.0",
@@ -1101,7 +1249,14 @@ async def engineering_optimization(
             dataClassification=classification,
             sourceLabel=source_label,
         ),
-        warnings=list(result.warnings),
+        warnings=[
+            *result.warnings,
+            *_result_manifest_warnings(result.calculation_status, parameter_manifest),
+        ],
+        parameterManifest=_manifest_summary(parameter_manifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _request_input_sha256(request)
+        ),
     )
 
 
@@ -1123,6 +1278,8 @@ async def capabilities() -> dict[str, Any]:
             "deterministic_bounded_engineering_optimization",
             "normalized_weighted_multi_objective_and_pareto",
             "baseline_comparison_and_local_sensitivity",
+            "versioned_vehicle_parameter_manifest",
+            "independent_declared_numerical_reference_and_physical_axes",
         ],
         "notImplemented": [
             "rocker_kinematic_closure",
@@ -1137,10 +1294,13 @@ async def capabilities() -> dict[str, Any]:
         "bicycleSolverVersion": BICYCLE_SOLVER_VERSION,
         "optimizationSolverVersion": OPTIMIZATION_SOLVER_VERSION,
         "qualityStates": [
+            "DECLARED",
             "VERIFIED_NUMERICALLY",
             "REFERENCE_BENCHMARKED",
+            "PHYSICALLY_CORRELATED_REQUIRES_ACCEPTED_EXTERNAL_EVIDENCE",
             "UNVALIDATED_PHYSICALLY",
             "FAILED",
             "NOT_COMPUTABLE",
         ],
+        "vehicleParameterManifestSchemaVersion": "1.0.0",
     }

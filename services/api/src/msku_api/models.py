@@ -3,11 +3,228 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
+from msku_engineering.manifest import (
+    ParameterSource as DomainParameterSource,
+)
+from msku_engineering.manifest import (
+    ParameterUncertainty as DomainParameterUncertainty,
+)
+from msku_engineering.manifest import (
+    VehicleParameter as DomainVehicleParameter,
+)
+from msku_engineering.manifest import (
+    VehicleParameterManifest as DomainVehicleParameterManifest,
+)
+from msku_engineering.manifest import VerificationAxes as DomainVerificationAxes
+from msku_engineering.manifest import VerificationEvidence as DomainVerificationEvidence
+from msku_engineering.manifest import (
+    validate_vehicle_parameter_manifest,
+    validate_verification_axes,
+)
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+
+EngineeringModuleName = Literal[
+    "geometry",
+    "kinematics",
+    "quasi_static",
+    "quarter_car",
+    "full_car_7dof",
+    "bicycle",
+    "optimization",
+]
+
+
+class ParameterUncertaintyModel(StrictModel):
+    value: float = Field(ge=0)
+    unit: str = Field(min_length=1, max_length=40)
+    kind: Literal["standard", "expanded", "bound"]
+    coverageFactor: float | None = Field(default=None, gt=0)
+    confidence: float | None = Field(default=None, gt=0, le=1)
+
+    def to_domain(self) -> DomainParameterUncertainty:
+        return DomainParameterUncertainty(
+            self.value, self.unit, self.kind, self.coverageFactor, self.confidence
+        )
+
+
+class ParameterSourceModel(StrictModel):
+    kind: Literal[
+        "synthetic_assumption",
+        "cad",
+        "physical_measurement",
+        "manufacturer_data",
+        "derived",
+        "legacy_import",
+    ]
+    label: str = Field(min_length=1, max_length=300)
+    reference: str | None = Field(default=None, max_length=500)
+    recordedAt: datetime | None = None
+    notes: str = Field(default="", max_length=1000)
+
+    def to_domain(self) -> DomainParameterSource:
+        return DomainParameterSource(
+            self.kind,
+            self.label,
+            self.reference,
+            self.recordedAt.isoformat() if self.recordedAt is not None else None,
+            self.notes,
+        )
+
+
+class VehicleParameterRecord(StrictModel):
+    key: str = Field(min_length=1, max_length=200)
+    value: float | list[float]
+    unit: str = Field(min_length=1, max_length=40)
+    measurementStatus: Literal[
+        "SYNTHETIC", "DECLARED_UNMEASURED", "MEASURED", "DERIVED_FROM_MEASURED"
+    ]
+    source: ParameterSourceModel
+    applicableModules: list[EngineeringModuleName] = Field(min_length=1)
+    uncertainty: ParameterUncertaintyModel | None = None
+    evidenceIds: list[str] = Field(default_factory=list)
+
+    def to_domain(self) -> DomainVehicleParameter:
+        value = tuple(self.value) if isinstance(self.value, list) else self.value
+        return DomainVehicleParameter(
+            self.key,
+            value,
+            self.unit,
+            self.measurementStatus,
+            self.source.to_domain(),
+            tuple(self.applicableModules),
+            self.uncertainty.to_domain() if self.uncertainty is not None else None,
+            tuple(self.evidenceIds),
+        )
+
+
+class IndependentVerificationEvidence(StrictModel):
+    id: str = Field(min_length=1, max_length=160)
+    kind: Literal[
+        "input_declaration",
+        "numerical_benchmark",
+        "reference_benchmark",
+        "physical_correlation",
+    ]
+    title: str = Field(min_length=1, max_length=200)
+    source: str = Field(min_length=1, max_length=500)
+    recordedAt: datetime | None = None
+    reviewStatus: Literal["pending_review", "accepted", "rejected"]
+    notes: str = Field(default="", max_length=1000)
+    artifactSha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    def to_domain(self) -> DomainVerificationEvidence:
+        return DomainVerificationEvidence(
+            self.id,
+            self.kind,
+            self.title,
+            self.source,
+            self.recordedAt.isoformat() if self.recordedAt is not None else "not-recorded",
+            self.reviewStatus,
+            self.notes,
+            self.artifactSha256,
+        )
+
+
+class DeclaredVerificationAxis(StrictModel):
+    status: Literal["DECLARED", "NOT_DECLARED"]
+    evidenceIds: list[str] = Field(default_factory=list)
+
+
+class NumericalVerificationAxis(StrictModel):
+    status: Literal["VERIFIED_NUMERICALLY", "PARTIALLY_VERIFIED", "UNVERIFIED", "FAILED"]
+    evidenceIds: list[str] = Field(default_factory=list)
+
+
+class ReferenceVerificationAxis(StrictModel):
+    status: Literal[
+        "REFERENCE_BENCHMARKED", "PARTIALLY_BENCHMARKED", "NOT_BENCHMARKED"
+    ]
+    evidenceIds: list[str] = Field(default_factory=list)
+
+
+class PhysicalVerificationAxis(StrictModel):
+    status: Literal[
+        "PHYSICALLY_CORRELATED", "PARTIALLY_CORRELATED", "UNVALIDATED_PHYSICALLY"
+    ]
+    evidenceIds: list[str] = Field(default_factory=list)
+
+
+class IndependentVerification(StrictModel):
+    declared: DeclaredVerificationAxis
+    numerical: NumericalVerificationAxis
+    reference: ReferenceVerificationAxis
+    physical: PhysicalVerificationAxis
+    evidence: list[IndependentVerificationEvidence] = Field(default_factory=list)
+
+    def to_domain_axes(self) -> DomainVerificationAxes:
+        return DomainVerificationAxes(
+            self.declared.status,
+            tuple(self.declared.evidenceIds),
+            self.numerical.status,
+            tuple(self.numerical.evidenceIds),
+            self.reference.status,
+            tuple(self.reference.evidenceIds),
+            self.physical.status,
+            tuple(self.physical.evidenceIds),
+        )
+
+    @model_validator(mode="after")
+    def axis_evidence_is_independent(self) -> IndependentVerification:
+        errors = validate_verification_axes(
+            self.to_domain_axes(), tuple(item.to_domain() for item in self.evidence)
+        )
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
+
+
+class VehicleParameterManifestModel(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    manifestId: str = Field(min_length=1, max_length=160)
+    revision: int = Field(ge=1)
+    vehicleId: str = Field(min_length=1, max_length=160)
+    configurationId: str = Field(min_length=1, max_length=160)
+    configurationLabel: str = Field(min_length=1, max_length=300)
+    createdAt: datetime
+    updatedAt: datetime
+    parameters: list[VehicleParameterRecord] = Field(min_length=1)
+    verification: IndependentVerification
+
+    def to_domain(self) -> DomainVehicleParameterManifest:
+        return DomainVehicleParameterManifest(
+            "1.0.0",
+            self.manifestId,
+            self.revision,
+            self.vehicleId,
+            self.configurationId,
+            self.configurationLabel,
+            self.createdAt.isoformat(),
+            self.updatedAt.isoformat(),
+            tuple(item.to_domain() for item in self.parameters),
+            self.verification.to_domain_axes(),
+            tuple(item.to_domain() for item in self.verification.evidence),
+        )
+
+    @model_validator(mode="after")
+    def provenance_and_axes_are_consistent(self) -> VehicleParameterManifestModel:
+        errors = validate_vehicle_parameter_manifest(self.to_domain())
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
+
+
+class VehicleParameterManifestSummary(StrictModel):
+    manifestId: str
+    revision: int
+    vehicleId: str
+    configurationId: str
+    configurationLabel: str
+    manifestSha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class Vec3(StrictModel):
@@ -162,6 +379,8 @@ class Project(StrictModel):
     vehicle: VehicleDefinition | None = None
     provenance: ProjectProvenance | None = None
     validation: ProjectValidation | None = None
+    parameterManifest: VehicleParameterManifestModel | None = None
+    verification: IndependentVerification | None = None
 
     @model_validator(mode="after")
     def phase_six_fields_are_consistent(self) -> Project:
@@ -300,6 +519,8 @@ class KinematicsSweepResponse(StrictModel):
     validationStatus: ValidationStatusResponse
     solver: SolverMetadataResponse
     inputProvenance: InputProvenanceResponse
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
     warnings: list[str]
     residualToleranceM: float
     states: list[KinematicStateResponse]
@@ -371,6 +592,8 @@ class UprightEquilibriumResponse(StrictModel):
     solverVersion: str
     units: dict[str, str]
     inputProvenance: InputProvenanceResponse
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
     pose: KinematicPoseResponse
     memberForces: list[MemberForceResponse]
     diagnostics: EquilibriumDiagnosticsResponse
@@ -389,6 +612,7 @@ class VehicleLoadTransferRequest(StrictModel):
     gravityMps2: float = 9.80665
     frontRollStiffnessNmPerRad: float | None = None
     rearRollStiffnessNmPerRad: float | None = None
+    parameterManifest: VehicleParameterManifestModel | None = None
 
 
 class AxleLoadsResponse(StrictModel):
@@ -418,6 +642,8 @@ class VehicleLoadTransferResponse(StrictModel):
     totalWeightN: float | None
     forceResidualN: float | None
     warnings: list[str]
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
 
 
 class ActuationSeriesRequest(StrictModel):
@@ -427,6 +653,7 @@ class ActuationSeriesRequest(StrictModel):
     springRateNPerM: float
     preloadN: float = 0.0
     compressionOnly: bool = True
+    parameterManifest: VehicleParameterManifestModel | None = None
 
     @model_validator(mode="after")
     def arrays_have_equal_length(self) -> ActuationSeriesRequest:
@@ -454,12 +681,15 @@ class ActuationSeriesResponse(StrictModel):
     units: dict[str, str]
     samples: list[SpringSampleResponse]
     warnings: list[str]
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
 
 
 class DamperForceRequest(StrictModel):
     velocityMps: float | None = None
     compressionCoefficientNsPerM: float
     reboundCoefficientNsPerM: float
+    parameterManifest: VehicleParameterManifestModel | None = None
 
 
 class DamperForceResponse(StrictModel):
@@ -468,6 +698,8 @@ class DamperForceResponse(StrictModel):
     forceN: float | None
     warning: str | None
     physicalStatus: Literal["UNVALIDATED_PHYSICALLY"] = "UNVALIDATED_PHYSICALLY"
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
 
 
 class QuarterCarParametersInput(StrictModel):
@@ -513,6 +745,7 @@ class QuarterCarSimulationRequest(StrictModel):
     road: RoadProfileInput
     initialState: QuarterCarInitialStateInput = Field(default_factory=QuarterCarInitialStateInput)
     settings: DynamicsSettingsInput = Field(default_factory=DynamicsSettingsInput)
+    parameterManifest: VehicleParameterManifestModel | None = None
 
 
 class DynamicsInputProvenanceResponse(StrictModel):
@@ -578,6 +811,8 @@ class QuarterCarSimulationResponse(StrictModel):
     assumptions: list[str]
     warnings: list[str]
     samples: list[QuarterCarSampleResponse]
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
 
 
 class FullCarCornerParametersInput(StrictModel):
@@ -620,6 +855,7 @@ class FullCarSimulationRequest(StrictModel):
     roadProfiles: list[RoadProfileInput] = Field(min_length=4, max_length=4)
     initialState: FullCarInitialStateInput = Field(default_factory=FullCarInitialStateInput)
     settings: DynamicsSettingsInput = Field(default_factory=DynamicsSettingsInput)
+    parameterManifest: VehicleParameterManifestModel | None = None
 
 
 class FullCarSampleResponse(StrictModel):
@@ -689,6 +925,8 @@ class FullCarSimulationResponse(StrictModel):
     assumptions: list[str]
     warnings: list[str]
     samples: list[FullCarSampleResponse]
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
 
 
 class BicycleParametersInput(StrictModel):
@@ -730,6 +968,7 @@ class BicycleSimulationRequest(StrictModel):
     initialState: BicycleInitialStateInput = Field(default_factory=BicycleInitialStateInput)
     domainLimits: BicycleDomainLimitsInput = Field(default_factory=BicycleDomainLimitsInput)
     settings: DynamicsSettingsInput = Field(default_factory=DynamicsSettingsInput)
+    parameterManifest: VehicleParameterManifestModel | None = None
 
 
 class BicycleSampleResponse(StrictModel):
@@ -785,6 +1024,8 @@ class BicycleSimulationResponse(StrictModel):
     assumptions: list[str]
     warnings: list[str]
     samples: list[BicycleSampleResponse]
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
 
 
 class OptimizationDesignVariableInput(StrictModel):
@@ -841,6 +1082,7 @@ class EngineeringOptimizationRequest(StrictModel):
     quarterCar: QuarterCarSimulationRequest | None = None
     fullCar: FullCarSimulationRequest | None = None
     bicycle: BicycleSimulationRequest | None = None
+    parameterManifest: VehicleParameterManifestModel | None = None
 
     @model_validator(mode="after")
     def required_model_payload_exists(self) -> EngineeringOptimizationRequest:
@@ -913,3 +1155,5 @@ class EngineeringOptimizationResponse(StrictModel):
     diagnostics: OptimizationDiagnosticsResponse
     provenance: OptimizationProvenanceResponse
     warnings: list[str]
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None

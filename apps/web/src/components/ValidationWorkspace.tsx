@@ -21,6 +21,8 @@ export function ValidationWorkspace() {
   const [source, setSource] = useState("");
   const [notes, setNotes] = useState("");
   const [reviewStatus, setReviewStatus] = useState<ValidationEvidence["status"]>("pending_review");
+  const verification = project.verification;
+  const manifest = project.parameterManifest;
   const acceptedKinds = useMemo(() => new Set(project.validation.evidence.filter((item) => item.status === "accepted").map((item) => item.kind)), [project.validation.evidence]);
   const gaps = [
     !acceptedKinds.has("input_provenance") && "İncelenmiş kaynak/köken kaydı eksik",
@@ -52,10 +54,22 @@ export function ValidationWorkspace() {
     <div className="validation-layout">
       <section className="validation-column">
         <div className="validation-status-grid">
-          <article><span>Sayısal</span><strong>{uiStatus(project.validation.numerical)}</strong><small>Yalnızca çözücü/regresyon kapsamı</small></article>
-          <article><span>Referans</span><strong>{uiStatus(project.validation.reference)}</strong><small>Yayımlanmış iç referans testleri</small></article>
-          <article className="warning"><span>Fiziksel</span><strong>{uiStatus(project.validation.physical)}</strong><small>Bağımsız araç kanıtı gerekli</small></article>
+          <article><span>Beyan</span><strong>{uiStatus(verification?.declared.status ?? "NOT_DECLARED")}</strong><small>{verification?.declared.evidenceIds.length ?? 0} ayrı kanıt bağı</small></article>
+          <article><span>Sayısal</span><strong>{uiStatus(verification?.numerical.status ?? project.validation.numerical)}</strong><small>Yalnızca çözücü/regresyon kapsamı</small></article>
+          <article><span>Referans</span><strong>{uiStatus(verification?.reference.status ?? project.validation.reference)}</strong><small>İç referans testleri; araç korelasyonu değildir</small></article>
+          <article className="warning"><span>Fiziksel korelasyon</span><strong>{uiStatus(verification?.physical.status ?? project.validation.physical)}</strong><small>Bağımsız ölçüm kanıtı gerekli</small></article>
           <article className="warning"><span>Onay</span><strong>{uiStatus(project.validation.engineeringApproval)}</strong><small>İnsan mühendislik incelemesi gerekli</small></article>
+        </div>
+        <div className="validation-card">
+          <div className="section-heading"><span className="eyebrow">ARAÇ PARAMETRE MANİFESTOSU</span><span className="unit-chip">{manifest ? `REV ${manifest.revision}` : "YOK"}</span></div>
+          {manifest ? <dl className="solver-diagnostics compact">
+            <div><dt>Konfigürasyon</dt><dd>{manifest.configurationLabel}</dd></div>
+            <div><dt>Manifest</dt><dd>{manifest.manifestId}</dd></div>
+            <div><dt>Parametre</dt><dd>{manifest.parameters.length}</dd></div>
+            <div><dt>Sentetik</dt><dd>{manifest.parameters.filter((item) => item.measurementStatus === "SYNTHETIC").length}</dd></div>
+            <div><dt>Ölçülmüş</dt><dd>{manifest.parameters.filter((item) => item.measurementStatus === "MEASURED").length}</dd></div>
+          </dl> : <p className="solver-failure">Sürümlenmiş araç parametre manifestosu bağlı değil.</p>}
+          <p className="field-note">Sentetik veya beyan edilmiş değerler, fiziksel ölçüm olarak değerlendirilmez.</p>
         </div>
         <div className="validation-card">
           <div className="section-heading"><span className="eyebrow">GİRDİ KAYNAĞI</span></div>

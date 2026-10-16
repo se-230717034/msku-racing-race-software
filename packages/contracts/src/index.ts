@@ -69,6 +69,164 @@ export const validationEvidenceSchema = z.object({
   notes: z.string().max(1000),
 });
 
+export const engineeringModuleSchema = z.enum([
+  "geometry",
+  "kinematics",
+  "quasi_static",
+  "quarter_car",
+  "full_car_7dof",
+  "bicycle",
+  "optimization",
+]);
+
+export const independentVerificationEvidenceSchema = z.object({
+  id: z.string().min(1).max(160),
+  kind: z.enum([
+    "input_declaration",
+    "numerical_benchmark",
+    "reference_benchmark",
+    "physical_correlation",
+  ]),
+  title: z.string().min(1).max(200),
+  source: z.string().min(1).max(500),
+  recordedAt: z.string().datetime().nullable().optional(),
+  reviewStatus: z.enum(["pending_review", "accepted", "rejected"]),
+  notes: z.string().max(1000).default(""),
+  artifactSha256: z.string().regex(/^[0-9a-f]{64}$/).nullable().optional(),
+});
+
+const verificationAxisSchema = <T extends z.ZodTypeAny>(status: T) => z.object({
+  status,
+  evidenceIds: z.array(z.string()).default([]),
+});
+
+export const independentVerificationSchema = z.object({
+  declared: verificationAxisSchema(z.enum(["DECLARED", "NOT_DECLARED"])),
+  numerical: verificationAxisSchema(z.enum([
+    "VERIFIED_NUMERICALLY", "PARTIALLY_VERIFIED", "UNVERIFIED", "FAILED",
+  ])),
+  reference: verificationAxisSchema(z.enum([
+    "REFERENCE_BENCHMARKED", "PARTIALLY_BENCHMARKED", "NOT_BENCHMARKED",
+  ])),
+  physical: verificationAxisSchema(z.enum([
+    "PHYSICALLY_CORRELATED", "PARTIALLY_CORRELATED", "UNVALIDATED_PHYSICALLY",
+  ])),
+  evidence: z.array(independentVerificationEvidenceSchema).default([]),
+}).superRefine((verification, context) => {
+  const evidence = new Map(verification.evidence.map((item) => [item.id, item]));
+  if (evidence.size !== verification.evidence.length) {
+    context.addIssue({ code: "custom", message: "Verification evidence identifiers must be unique." });
+  }
+  const requirements = [
+    {
+      active: verification.declared.status === "DECLARED",
+      ids: verification.declared.evidenceIds,
+      kind: "input_declaration",
+      axis: "declared",
+    },
+    {
+      active: ["VERIFIED_NUMERICALLY", "PARTIALLY_VERIFIED"].includes(verification.numerical.status),
+      ids: verification.numerical.evidenceIds,
+      kind: "numerical_benchmark",
+      axis: "numerical",
+    },
+    {
+      active: ["REFERENCE_BENCHMARKED", "PARTIALLY_BENCHMARKED"].includes(verification.reference.status),
+      ids: verification.reference.evidenceIds,
+      kind: "reference_benchmark",
+      axis: "reference",
+    },
+    {
+      active: ["PHYSICALLY_CORRELATED", "PARTIALLY_CORRELATED"].includes(verification.physical.status),
+      ids: verification.physical.evidenceIds,
+      kind: "physical_correlation",
+      axis: "physical",
+    },
+  ] as const;
+  for (const requirement of requirements) {
+    if (requirement.active && requirement.ids.length === 0) {
+      context.addIssue({ code: "custom", message: `The ${requirement.axis} state requires accepted evidence.` });
+    }
+    for (const id of requirement.ids) {
+      const item = evidence.get(id);
+      if (!item || item.reviewStatus !== "accepted" || item.kind !== requirement.kind) {
+        context.addIssue({ code: "custom", message: `Invalid evidence ${id} for ${requirement.axis} verification.` });
+      }
+    }
+  }
+});
+
+export const vehicleParameterManifestSchema = z.object({
+  schemaVersion: z.literal("1.0.0"),
+  manifestId: z.string().min(1).max(160),
+  revision: z.number().int().min(1),
+  vehicleId: z.string().min(1).max(160),
+  configurationId: z.string().min(1).max(160),
+  configurationLabel: z.string().min(1).max(300),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  parameters: z.array(z.object({
+    key: z.string().min(1).max(200),
+    value: z.union([z.number().finite(), z.array(z.number().finite()).min(1)]),
+    unit: z.string().min(1).max(40),
+    measurementStatus: z.enum([
+      "SYNTHETIC", "DECLARED_UNMEASURED", "MEASURED", "DERIVED_FROM_MEASURED",
+    ]),
+    source: z.object({
+      kind: z.enum([
+        "synthetic_assumption", "cad", "physical_measurement", "manufacturer_data",
+        "derived", "legacy_import",
+      ]),
+      label: z.string().min(1).max(300),
+      reference: z.string().max(500).nullable().optional(),
+      recordedAt: z.string().datetime().nullable().optional(),
+      notes: z.string().max(1000).default(""),
+    }),
+    applicableModules: z.array(engineeringModuleSchema).min(1),
+    uncertainty: z.object({
+      value: z.number().finite().nonnegative(),
+      unit: z.string().min(1).max(40),
+      kind: z.enum(["standard", "expanded", "bound"]),
+      coverageFactor: z.number().finite().positive().nullable().optional(),
+      confidence: z.number().finite().positive().max(1).nullable().optional(),
+    }).nullable().optional(),
+    evidenceIds: z.array(z.string()).default([]),
+  })).min(1),
+  verification: independentVerificationSchema,
+}).superRefine((manifest, context) => {
+  const keys = new Set<string>();
+  const evidenceIds = new Set(manifest.verification.evidence.map((item) => item.id));
+  for (const parameter of manifest.parameters) {
+    if (keys.has(parameter.key)) {
+      context.addIssue({ code: "custom", message: `Duplicate parameter key ${parameter.key}.` });
+    }
+    keys.add(parameter.key);
+    if (parameter.source.kind === "synthetic_assumption" && parameter.measurementStatus !== "SYNTHETIC") {
+      context.addIssue({ code: "custom", message: `Synthetic parameter ${parameter.key} cannot be presented as measured.` });
+    }
+    if (parameter.measurementStatus === "MEASURED" && parameter.source.kind !== "physical_measurement") {
+      context.addIssue({ code: "custom", message: `Measured parameter ${parameter.key} requires a physical measurement source.` });
+    }
+    if (parameter.uncertainty && parameter.uncertainty.unit !== parameter.unit) {
+      context.addIssue({ code: "custom", message: `Uncertainty unit for ${parameter.key} must match its unit.` });
+    }
+    for (const evidenceId of parameter.evidenceIds) {
+      if (!evidenceIds.has(evidenceId)) {
+        context.addIssue({ code: "custom", message: `Parameter ${parameter.key} references missing evidence ${evidenceId}.` });
+      }
+    }
+  }
+});
+
+export const vehicleParameterManifestSummarySchema = z.object({
+  manifestId: z.string().min(1),
+  revision: z.number().int().min(1),
+  vehicleId: z.string().min(1),
+  configurationId: z.string().min(1),
+  configurationLabel: z.string().min(1),
+  manifestSha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
 const canonicalJson = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") {
@@ -133,6 +291,8 @@ export const projectSchema = z.object({
     engineeringApproval: z.literal("NOT_APPROVED"),
     evidence: z.array(validationEvidenceSchema),
   }),
+  parameterManifest: vehicleParameterManifestSchema.optional(),
+  verification: independentVerificationSchema.optional(),
 }).superRefine((project, context) => {
   const active = project.vehicle.corners[project.activeCornerId];
   if (active.id !== project.activeCornerId || active.suspension.corner !== project.activeCornerId) {
@@ -159,6 +319,10 @@ export type CornerId = z.infer<typeof cornerIdSchema>;
 export type Suspension = z.infer<typeof suspensionSchema>;
 export type VehicleCorner = z.infer<typeof vehicleCornerSchema>;
 export type ValidationEvidence = z.infer<typeof validationEvidenceSchema>;
+export type IndependentVerificationEvidence = z.infer<typeof independentVerificationEvidenceSchema>;
+export type IndependentVerification = z.infer<typeof independentVerificationSchema>;
+export type VehicleParameterManifest = z.infer<typeof vehicleParameterManifestSchema>;
+export type VehicleParameterManifestSummary = z.infer<typeof vehicleParameterManifestSummarySchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type ModelStatus = Project["modelStatus"];
 
@@ -233,6 +397,22 @@ const demoCorners = (): Project["vehicle"]["corners"] => {
 
 export const createDemoProject = (projectId = "msku-demo-full-vehicle"): Project => {
   const corners = demoCorners();
+  const declarationEvidence = {
+    id: "demo-input-declaration",
+    kind: "input_declaration" as const,
+    title: "Paketlenmiş sentetik gösterim girdisi",
+    source: "@msku/contracts createDemoProject",
+    recordedAt: "2026-10-15T00:00:00.000Z",
+    reviewStatus: "accepted" as const,
+    notes: "Bu kayıt bir ölçüm kanıtı değildir; yalnız sentetik girdiyi beyan eder.",
+  };
+  const verification = {
+    declared: { status: "DECLARED" as const, evidenceIds: [declarationEvidence.id] },
+    numerical: { status: "UNVERIFIED" as const, evidenceIds: [] },
+    reference: { status: "NOT_BENCHMARKED" as const, evidenceIds: [] },
+    physical: { status: "UNVALIDATED_PHYSICALLY" as const, evidenceIds: [] },
+    evidence: [declarationEvidence],
+  };
   return ({
   schemaVersion: PROJECT_SCHEMA_VERSION,
   projectId,
@@ -274,6 +454,41 @@ export const createDemoProject = (projectId = "msku-demo-full-vehicle"): Project
     engineeringApproval: "NOT_APPROVED",
     evidence: [],
   },
+  parameterManifest: {
+    schemaVersion: "1.0.0",
+    manifestId: `${projectId}-parameters`,
+    revision: 1,
+    vehicleId: projectId,
+    configurationId: "synthetic-demo-default",
+    configurationLabel: "Sentetik gösterim varsayılanı",
+    createdAt: "2026-10-15T00:00:00.000Z",
+    updatedAt: "2026-10-15T00:00:00.000Z",
+    parameters: [
+      ["vehicle.mass.total", 324, "kg", ["quasi_static", "bicycle"]],
+      ["vehicle.mass.sprung", 276, "kg", ["quarter_car", "full_car_7dof"]],
+      ["vehicle.inertia.roll", 80, "kg*m^2", ["full_car_7dof"]],
+      ["vehicle.inertia.pitch", 120, "kg*m^2", ["full_car_7dof"]],
+      ["vehicle.inertia.yaw", 150, "kg*m^2", ["bicycle"]],
+      ["vehicle.wheelbase", 1.6, "m", ["quasi_static", "bicycle"]],
+      ["vehicle.track.front", 1.44, "m", ["quasi_static"]],
+      ["vehicle.track.rear", 1.4, "m", ["quasi_static"]],
+      ["vehicle.cg.position", [0, 0, 0.29], "m", ["quasi_static", "bicycle"]],
+    ].map(([key, value, unit, applicableModules]) => ({
+      key: key as string,
+      value: value as number | number[],
+      unit: unit as string,
+      measurementStatus: "SYNTHETIC" as const,
+      source: {
+        kind: "synthetic_assumption" as const,
+        label: "Paketlenmiş Faz 6 gösterim değeri; MSKU Racing ölçümü değildir.",
+        notes: "Gerçek araç analizi öncesinde izlenebilir ölçümle değiştirilmelidir.",
+      },
+      applicableModules: applicableModules as z.infer<typeof engineeringModuleSchema>[],
+      evidenceIds: [declarationEvidence.id],
+    })),
+    verification,
+  },
+  verification,
   });
 };
 
@@ -457,6 +672,8 @@ export const uprightEquilibriumResponseSchema = z.object({
   solverVersion: z.string(),
   units: z.object({ force: z.literal("N"), moment: z.literal("N*m"), length: z.literal("m") }),
   inputProvenance: inputProvenanceSchema,
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
   pose: kinematicPoseSchema,
   memberForces: z.array(memberForceSchema),
   diagnostics: z.object({
@@ -494,6 +711,8 @@ export const vehicleLoadTransferResponseSchema = z.object({
   totalWeightN: z.number().finite().nullable(),
   forceResidualN: z.number().finite().nullable(),
   warnings: z.array(z.string()),
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
 });
 
 export const actuationSeriesResponseSchema = z.object({
@@ -519,6 +738,8 @@ export const actuationSeriesResponseSchema = z.object({
     wheelRateNPerM: z.number().finite(),
   })),
   warnings: z.array(z.string()),
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
 });
 
 export const quarterCarParametersSchema = z.object({
@@ -560,6 +781,7 @@ export const quarterCarSimulationRequestSchema = z.object({
     maximumStepS: z.number().finite().positive(),
     method: z.enum(["DOP853", "Radau", "BDF"]),
   }),
+  parameterManifest: vehicleParameterManifestSchema.optional(),
 });
 
 export const quarterCarSampleSchema = z.object({
@@ -602,6 +824,8 @@ export const quarterCarSimulationResponseSchema = z.object({
     sourceLabel: z.string().min(1),
     inputSha256: z.string().regex(/^[0-9a-f]{64}$/),
   }),
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
   naturalFrequenciesHz: z.array(z.number().finite().positive()).length(2).nullable(),
   diagnostics: z.object({
     solverSuccess: z.boolean(),
@@ -672,6 +896,7 @@ export const fullCarSimulationRequestSchema = z.object({
     unsprungVelocitiesMps: z.array(z.number().finite()).length(4),
   }),
   settings: dynamicsSettingsSchema,
+  parameterManifest: vehicleParameterManifestSchema.optional(),
 });
 
 export const fullCarSampleSchema = z.object({
@@ -712,6 +937,8 @@ export const fullCarSimulationResponseSchema = z.object({
     sourceLabel: z.string().min(1),
     inputSha256: z.string().regex(/^[0-9a-f]{64}$/),
   }),
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
   naturalFrequenciesHz: z.array(z.number().finite().positive()).length(7).nullable(),
   cornerOrder: z.tuple([
     z.literal("front_left"), z.literal("front_right"),
@@ -779,6 +1006,7 @@ export const bicycleSimulationRequestSchema = z.object({
     maximumAbsTireSlipRad: z.number().finite().positive(),
   }),
   settings: dynamicsSettingsSchema,
+  parameterManifest: vehicleParameterManifestSchema.optional(),
 });
 
 export const bicycleSampleSchema = z.object({
@@ -806,6 +1034,8 @@ export const bicycleSimulationResponseSchema = z.object({
     sourceLabel: z.string().min(1),
     inputSha256: z.string().regex(/^[0-9a-f]{64}$/),
   }),
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
   diagnostics: z.object({
     solverSuccess: z.boolean(),
     finiteStates: z.boolean(),
@@ -887,6 +1117,7 @@ export const engineeringOptimizationRequestSchema = z.object({
   quarterCar: quarterCarSimulationRequestSchema.nullable(),
   fullCar: fullCarSimulationRequestSchema.nullable(),
   bicycle: bicycleSimulationRequestSchema.nullable(),
+  parameterManifest: vehicleParameterManifestSchema.optional(),
 }).superRefine((value, context) => {
   const payload = {
     kinematics: value.project,
@@ -951,6 +1182,8 @@ export const engineeringOptimizationResponseSchema = z.object({
     sourceLabel: z.string().min(1),
   }),
   warnings: z.array(z.string()),
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
 });
 
 export const solverMetadataSchema = z.object({
@@ -979,6 +1212,8 @@ export const kinematicsSweepResponseSchema = z.object({
   validationStatus: validationStatusSchema,
   solver: solverMetadataSchema,
   inputProvenance: inputProvenanceSchema,
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
   warnings: z.array(z.string()),
   residualToleranceM: z.number().finite().positive(),
   states: z.array(kinematicStateSchema).min(1),

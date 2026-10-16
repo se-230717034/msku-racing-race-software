@@ -42,6 +42,17 @@ from .kinematics import (
     solve_pose,
     solve_sweep,
 )
+from .manifest import (
+    ParameterSource,
+    ParameterUncertainty,
+    VehicleParameter,
+    VehicleParameterManifest,
+    VerificationAxes,
+    VerificationEvidence,
+    validate_vehicle_parameter_manifest,
+    validate_verification_axes,
+    vehicle_parameter_manifest_sha256,
+)
 from .optimization import (
     OPTIMIZATION_SOLVER_VERSION,
     Candidate,
@@ -178,4 +189,13 @@ __all__ = [
     "assemble_full_car_matrices",
     "full_car_natural_frequencies",
     "simulate_full_car",
+    "ParameterSource",
+    "ParameterUncertainty",
+    "VehicleParameter",
+    "VehicleParameterManifest",
+    "VerificationAxes",
+    "VerificationEvidence",
+    "validate_vehicle_parameter_manifest",
+    "validate_verification_axes",
+    "vehicle_parameter_manifest_sha256",
 ]

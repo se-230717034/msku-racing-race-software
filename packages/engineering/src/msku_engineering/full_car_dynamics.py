@@ -551,6 +551,7 @@ def simulate_full_car(
     dissipated_powers: list[float] = []
     road_powers: list[float] = []
     output_contacts: list[float] = []
+    output_contact_loss_time: float | None = None
     for index, time_s in enumerate(output_times):
         state = states[:, index]
         coordinates = state[:7]
@@ -601,7 +602,14 @@ def simulate_full_car(
             )
             for i, corner in enumerate(parameters.corners)
         )
-        output_contacts.extend(value for value in output_total_contacts if value is not None)
+        for corner_index, value in enumerate(output_total_contacts):
+            if value is None:
+                continue
+            output_contacts.append(value)
+            if minimum_contact is None or value < minimum_contact:
+                minimum_contact = value
+                contact_corner = CORNER_NAMES[corner_index]
+                output_contact_loss_time = float(time_s)
         energy = 0.5 * float(velocities @ mass @ velocities)
         energy += 0.5 * sum(
             corner.suspension_stiffness_n_per_m * suspension_travels[i] ** 2
@@ -645,10 +653,29 @@ def simulate_full_car(
             )
         )
 
-    if output_contacts:
-        output_minimum = min(output_contacts)
-        if minimum_contact is None or output_minimum < minimum_contact:
-            minimum_contact = output_minimum
+    if output_contacts and minimum_contact is not None and minimum_contact < -1.0e-8:
+        time_description = (
+            f" at reported time {output_contact_loss_time:.9g} s"
+            if output_contact_loss_time is not None
+            else ""
+        )
+        return _failed(
+            settings,
+            "The bilateral tire model predicts negative total normal force"
+            f"{time_description}.",
+            "TIRE_CONTACT_LOSS_AT_REPORTED_SAMPLE_UNSUPPORTED",
+            frequencies=frequencies,
+            nfev=nfev,
+            njev=njev,
+            nlu=nlu,
+            steps=tuple(accepted_steps),
+            finite=True,
+            contact=False,
+            minimum_contact=minimum_contact,
+            contact_corner=contact_corner,
+            mass_condition=mass_condition,
+            stiffness_condition=stiffness_condition,
+        )
     initial_energy = energies[0]
     final_energy = energies[-1]
     any_step = any(road.kind == "step" for road in roads.profiles)

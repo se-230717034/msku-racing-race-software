@@ -12,6 +12,8 @@ describe("Phase 6 engineering report", () => {
     expect(report.limitations.join(" ")).toContain("Fiziksel araç korelasyonu");
     expect(report.limitations.join(" ")).toContain("mirrored_assumption");
     expect(report.approval.status).toBe("NOT_APPROVED");
+    expect(report.project.parameterManifest?.parameters.every((item) => item.measurementStatus === "SYNTHETIC")).toBe(true);
+    expect(report.project.verification?.physical.status).toBe("UNVALIDATED_PHYSICALLY");
   });
 
   it("generates traceable CSV and a structurally valid PDF payload", () => {
@@ -19,11 +21,14 @@ describe("Phase 6 engineering report", () => {
     const csv = engineeringReportCsv(report);
     expect(csv).toContain("wheelbase");
     expect(csv).toContain("front_left");
+    expect(csv).toContain("parameter_manifest");
+    expect(csv).toContain("vehicle_parameter");
     expect(csv).toContain("NOT_APPROVED");
     const pdf = engineeringReportPdf(report);
     const text = new TextDecoder().decode(pdf);
     expect(text.startsWith("%PDF-1.4")).toBe(true);
     expect(text).toContain("UNVALIDATED_PHYSICALLY");
+    expect(text).toContain("synthetic-demo-default");
     expect(text).toContain("startxref");
   });
 });

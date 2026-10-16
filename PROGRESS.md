@@ -2,6 +2,22 @@
 
 Updated: 2026-10-16
 
+## Engineering safety hardening — audit priorities 1–3
+
+- [x] 7DOF tire-contact acceptance evaluated at every reported dense-output sample as well as accepted integration states
+- [x] Negative reported normal force returns `FAILED`, identifies time/corner/minimum force, and suppresses all samples
+- [x] Regression case proves rejection when accepted integration endpoints are valid but a dense-output midpoint is invalid
+- [x] Common Vehicle Parameter Manifest `1.0.0` across geometry, kinematics, quasi-static, quarter-car, 7DOF, bicycle, and optimization modules
+- [x] Per-parameter SI unit, source, measurement status, uncertainty, applicable-module list, evidence references, and configuration revision
+- [x] Synthetic assumptions cannot be represented as measured inputs; missing uncertainty remains explicitly unknown
+- [x] Deterministic manifest SHA-256 for configuration traceability
+- [x] Independent declared, numerical, reference, and physical verification axes with type-matched accepted evidence
+- [x] Numerical/reference evidence cannot promote the physical-correlation axis
+- [x] Backward-compatible optional API fields and Turkish validation/manifest panels
+- [x] Regression gates: 86 engineering tests + 32 API tests (118 Python total), 42 Vitest tests, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Attach controlled MSKU Racing measurement/CAD artifacts and uncertainties to a real vehicle manifest
+- [ ] Correlate model outputs with rig/track measurements before promoting `physically correlated`
+
 ## Phase 0 — Foundation
 
 - [x] Monorepo structure for web, API, engineering core, and contracts

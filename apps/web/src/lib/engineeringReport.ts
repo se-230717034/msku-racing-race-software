@@ -1,6 +1,7 @@
 import type {
   BicycleSimulationResponse,
   FullCarSimulationResponse,
+  IndependentVerification,
   KinematicsSweepResponse,
   Project,
 } from "@msku/contracts";
@@ -24,6 +25,7 @@ export interface EngineeringReport {
     approvalStatus: string;
     inputSha256: string;
     warnings: string[];
+    verificationAxes: IndependentVerification | null;
   }>;
   limitations: string[];
   approval: {
@@ -50,6 +52,7 @@ export const buildEngineeringReport = (
     approvalStatus: results.kinematics.validationStatus.engineeringApproval,
     inputSha256: results.kinematics.inputProvenance.projectInputSha256,
     warnings: results.kinematics.warnings,
+    verificationAxes: results.kinematics.verificationAxes ?? null,
   });
   for (const result of [results.fullCar, results.bicycle]) {
     if (!result) continue;
@@ -61,6 +64,7 @@ export const buildEngineeringReport = (
       approvalStatus: result.validationStatus.engineeringApproval,
       inputSha256: result.inputProvenance.inputSha256,
       warnings: result.warnings,
+      verificationAxes: result.verificationAxes ?? null,
     });
   }
   const assumedCorners = Object.values(project.vehicle.corners)
@@ -122,6 +126,27 @@ export const engineeringReportCsv = (report: EngineeringReport): string => {
   for (const result of report.resultInventory) rows.push([
     "result", "", result.model, "", "", "", result.inputSha256, "sha256", result.solverVersion, result.numericalStatus,
   ]);
+  if (report.project.parameterManifest) {
+    const manifest = report.project.parameterManifest;
+    rows.push(["parameter_manifest", "", manifest.configurationId, "", "", "", manifest.revision, "revision", manifest.manifestId, manifest.verification.physical.status]);
+    for (const parameter of manifest.parameters) rows.push([
+      "vehicle_parameter", "", parameter.key, "", "", "",
+      Array.isArray(parameter.value) ? parameter.value.join(";") : parameter.value,
+      parameter.unit, parameter.source.label, parameter.measurementStatus,
+    ]);
+  }
+  for (const result of report.resultInventory) {
+    if (!result.verificationAxes) continue;
+    for (const [axis, state] of Object.entries({
+      declared: result.verificationAxes.declared,
+      numerical: result.verificationAxes.numerical,
+      reference: result.verificationAxes.reference,
+      physical: result.verificationAxes.physical,
+    })) rows.push([
+      "verification_axis", "", `${result.model}:${axis}`, "", "", "",
+      state.evidenceIds.join(";"), "evidence_ids", result.solverVersion, state.status,
+    ]);
+  }
   rows.push(["approval", "", "engineering_approval", "", "", "", report.approval.reason, "", "", report.approval.status]);
   return rows.map((row) => row.map(csvCell).join(",")).join("\n");
 };
@@ -148,11 +173,22 @@ export const engineeringReportPdf = (report: EngineeringReport): Uint8Array => {
     `Referans doğrulaması: ${report.project.validation.reference}`,
     `Fiziksel doğrulama: ${report.project.validation.physical}`,
     `Mühendislik onayı: ${report.project.validation.engineeringApproval}`,
+    ...(report.project.verification ? [
+      `Bağımsız beyan ekseni: ${report.project.verification.declared.status}`,
+      `Bağımsız sayısal eksen: ${report.project.verification.numerical.status}`,
+      `Bağımsız referans ekseni: ${report.project.verification.reference.status}`,
+      `Bağımsız fiziksel eksen: ${report.project.verification.physical.status}`,
+    ] : ["Bağımsız doğrulama eksenleri: eski proje kaydında sağlanmadı"]),
     `Eksen takımı: ${report.coordinateFrame}`,
     `Kaynak: ${report.project.provenance.sourceLabel}`,
     `Dingil mesafesi: ${report.project.vehicle.wheelbaseM} m`,
     `İz genişlikleri: ön ${report.project.vehicle.frontTrackM} m / arka ${report.project.vehicle.rearTrackM} m`,
     `Ağırlık merkezi: (${report.project.vehicle.cgPositionM.x}, ${report.project.vehicle.cgPositionM.y}, ${report.project.vehicle.cgPositionM.z}) m`,
+    ...(report.project.parameterManifest ? [
+      `Parametre manifestosu: ${report.project.parameterManifest.manifestId} / revizyon ${report.project.parameterManifest.revision}`,
+      `Araç/konfigürasyon: ${report.project.parameterManifest.vehicleId} / ${report.project.parameterManifest.configurationId}`,
+      `Manifest fiziksel durumu: ${report.project.parameterManifest.verification.physical.status}`,
+    ] : ["Parametre manifestosu: sağlanmadı"]),
     "",
     "KÖŞE TANIMLARI",
     ...Object.values(report.project.vehicle.corners).flatMap((corner) => [
@@ -165,12 +201,15 @@ export const engineeringReportPdf = (report: EngineeringReport): Uint8Array => {
     ...(report.resultInventory.length ? report.resultInventory.flatMap((result) => [
       `${result.model} / çözücü ${result.solverVersion}`,
       `  sayısal=${result.numericalStatus}; fiziksel=${result.physicalStatus}; onay=${result.approvalStatus}`,
+      ...(result.verificationAxes ? [
+        `  eksenler: beyan=${result.verificationAxes.declared.status}; sayısal=${result.verificationAxes.numerical.status}; referans=${result.verificationAxes.reference.status}; fiziksel=${result.verificationAxes.physical.status}`,
+      ] : ["  bağımsız doğrulama eksenleri sağlanmadı"]),
       `  girdi SHA-256=${result.inputSha256}`,
       ...result.warnings.map((warning) => `  uyarı: ${warning}`),
     ]) : ["Bu rapora kabul edilmiş çözücü sonucu eklenmedi."]),
     "",
     "DOĞRULAMA KANITLARI",
-    ...(report.project.validation.evidence.length ? report.project.validation.evidence.map((item) => `${item.kind}: ${item.title} / ${item.status} / ${item.source}`) : ["Projeye özel kanıt kaydı sağlanmadı."]),
+    ...(report.project.verification?.evidence.length ? report.project.verification.evidence.map((item) => `${item.kind}: ${item.title} / ${item.reviewStatus} / ${item.source}`) : report.project.validation.evidence.length ? report.project.validation.evidence.map((item) => `${item.kind}: ${item.title} / ${item.status} / ${item.source}`) : ["Projeye özel kanıt kaydı sağlanmadı."]),
     "",
     "SINIRLAMALAR",
     ...report.limitations.map((item) => `- ${item}`),
