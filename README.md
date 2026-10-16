@@ -1,4 +1,21 @@
-# MSKU Racing Dynamics Studio
+<div align="center">
+  <img src="images/msku-racing-logo.png" alt="MSKU Racing Logo" width="320" />
+
+  # MSKU Racing Dynamics Studio
+
+  **Browser-Based Suspension & Vehicle Dynamics Engineering Platform**
+
+  ![Release](https://img.shields.io/badge/Release-0.6.1-0B2345)
+  ![Project Schema](https://img.shields.io/badge/Project_Schema-2.0.0-0B2345)
+  ![UI](https://img.shields.io/badge/Interface-Türkçe-C8102E)
+  ![Validation](https://img.shields.io/badge/Vehicle_Model-Unvalidated-orange)
+
+  **[Open Live Application](https://msku-racing-race-software.vercel.app)** · **[Engineering Progress](./PROGRESS.md)** · **[Limitations](./docs/LIMITATIONS.md)**
+</div>
+
+---
+
+## Overview
 
 Current application release: `0.6.1` · project schema: `2.0.0`.
 
@@ -121,4 +138,3 @@ docs                  Architecture, model, validation, and deployment records
 ## Data responsibility
 
 Do not treat the demo coordinates as vehicle data. Before any engineering decision, replace them with measured/CAD-derived hardpoints, compare the sweep against an independent reference, and complete the checklist in [docs/TEAM_DATA_CHECKLIST.md](./docs/TEAM_DATA_CHECKLIST.md).
-
