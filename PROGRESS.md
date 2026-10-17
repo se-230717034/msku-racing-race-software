@@ -6,7 +6,7 @@ Updated: 2026-10-17
 
 - [x] Six supplied GLB files extracted to `apps/web/public/models/` and audited for nodes, meshes, materials, bounds, axes, and pivots
 - [x] Coilover GLB eye centres audited; rendering is gated on explicit FL/FR/RL/RR actuation hardpoints and suppressed rather than floated when mounting or solved rocker-motion data is absent
-- [x] GLB view adds a low-opacity hardpoint-derived pickup carrier panel so wishbone/tie-rod inboard joints do not appear unsupported; panel is labeled non-CAD visual reference
+- [x] Synthetic grey pickup-carrier rods removed from the default GLB scene; the non-CAD chassis/pickup reference panel is available only through its explicit visibility control
 - [x] Tire/rim, rotor/caliper, hub, and upright models connected to the active render path without duplicate brake parts
 - [x] FL/FR/RL/RR placement uses each corner's own hardpoints, wheel dimensions, handedness, and accepted wheel-axis pose
 - [x] Imported upright frame follows the current upper/lower outboard axis and accepted wheel orientation

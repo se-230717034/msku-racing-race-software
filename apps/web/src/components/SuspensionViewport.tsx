@@ -229,7 +229,7 @@ export function SuspensionViewport({
         {coiloverStatus === "DECLARED_STATIC_GEOMETRY" && <span>GLB COILOVER · İKİ GÖZ TANIMLI UÇ NOKTALARINA BAĞLI · yalnızca statik geometri</span>}
         {coiloverStatus === "MISSING_ACTUATION_HARDPOINTS" && <span>GLB COILOVER GİZLENDİ · UPRIGHT/ROCKER/ŞASİ MONTAJ HARDPOINT VERİSİ YOK</span>}
         {coiloverStatus === "UNSOLVED_KINEMATIC_CLOSURE" && <span>GLB COILOVER GİZLENDİ · ROCKER HAREKETİ VE DAMPER BOYU ÇÖZÜLMEDİ</span>}
-        {visualModelSource === "glb" && <span>PICKUP TAŞIYICI PANELİ · SADECE GÖRSEL REFERANS · ŞASİ CAD'İ DEĞİL</span>}
+        {visualModelSource === "glb" && chassisVisible && <span>ŞASİ/PICKUP REFERANS PANELİ · ŞASİ CAD'İ DEĞİL</span>}
         {representativeVisible && <span>TEMSİLİ PUSHROD/ROCKER · veri yok · hareketsiz</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}

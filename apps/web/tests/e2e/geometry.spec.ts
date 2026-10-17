@@ -79,6 +79,12 @@ test("loads the six GLB assets and retains the procedural fallback", async ({ pa
   await expect(vehicleViewport).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
   await expect(vehicleViewport).toHaveAttribute("data-coilover-status", "MISSING_ACTUATION_HARDPOINTS");
   await expect(vehicleViewport).toHaveAttribute("data-coilover-count", "0");
+  await expect(vehicleViewport).toHaveAttribute("data-coilover-mounted-corners", "");
+  await expect(vehicleViewport).toHaveAttribute(
+    "data-coilover-missing-corners",
+    "front_left,front_right,rear_left,rear_right",
+  );
+  await expect(page.getByText("COILOVER MONTAJ DENETİMİ · FL:EKSİK · FR:EKSİK · RL:EKSİK · RR:EKSİK", { exact: true })).toBeVisible();
   for (const file of ["wheel.glb", "brake.glb", "hub.glb", "upright.glb", "suspension.glb", "coilover.glb"]) {
     const response = await page.request.get(`/models/${file}`);
     expect(response.ok(), `${file} should be served`).toBe(true);

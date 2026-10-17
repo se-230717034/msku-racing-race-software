@@ -249,11 +249,9 @@ function MountingClevis({
 function ChassisPickupReference({
   points,
   opacity,
-  compact = false,
 }: {
   points: ThreePosition[];
   opacity: number;
-  compact?: boolean;
 }) {
   const bounds = useMemo(() => {
     const xs = points.map((point) => point[0]);
@@ -272,34 +270,20 @@ function ChassisPickupReference({
       size: [Math.max(maximumX - minimumX + 0.13, 0.2), Math.max(maximumY - minimumY + 0.14, 0.28), 0.028] as ThreePosition,
     };
   }, [points]);
-  const midpoint = (first: ThreePosition, second: ThreePosition): ThreePosition => [
-    (first[0] + second[0]) / 2,
-    (first[1] + second[1]) / 2,
-    (first[2] + second[2]) / 2,
-  ];
-  const upperMidpoint = midpoint(points[0], points[1]);
-  const lowerMidpoint = midpoint(points[2], points[3]);
-
   return (
     <group
-      name={compact ? "pickup-tasiyici-gorsel-referansi" : "sasi-pickup-referansi"}
-      userData={{ visualStatus: compact ? "VISUAL_PICKUP_SUPPORT_NOT_CHASSIS_CAD" : "REFERENCE_CHASSIS_ENVELOPE" }}
+      name="sasi-pickup-referansi"
+      userData={{ visualStatus: "REFERENCE_CHASSIS_ENVELOPE" }}
     >
-      {!compact && <mesh position={bounds.position} castShadow receiveShadow>
+      <mesh position={bounds.position} castShadow receiveShadow>
         <boxGeometry args={bounds.size} />
         <meshStandardMaterial color="#4f565d" metalness={0.08} roughness={0.78} transparent opacity={0.14 * opacity} depthWrite={false} />
         <Edges color="#727b83" threshold={15} />
-      </mesh>}
-      {compact && <>
-        <TubeBetween start={points[0]} end={points[1]} radius={0.0065} color="#596269" metalness={0.18} roughness={0.72} opacity={0.72 * opacity} />
-        <TubeBetween start={points[2]} end={points[3]} radius={0.0075} color="#596269" metalness={0.18} roughness={0.72} opacity={0.72 * opacity} />
-        <TubeBetween start={upperMidpoint} end={lowerMidpoint} radius={0.006} color="#596269" metalness={0.18} roughness={0.72} opacity={0.62 * opacity} />
-        <Line points={[points[4], lowerMidpoint]} color="#758089" lineWidth={1} dashed dashSize={0.02} gapSize={0.014} transparent opacity={0.58 * opacity} />
-      </>}
+      </mesh>
       {points.map((point, index) => (
         <mesh key={index} position={point} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[compact ? 0.014 : 0.022, compact ? 0.014 : 0.022, compact ? 0.03 : 0.042, 20]} />
-          <meshStandardMaterial color="#353b41" metalness={0.22} roughness={0.66} transparent opacity={(compact ? 0.68 : 0.82) * opacity} />
+          <cylinderGeometry args={[0.022, 0.022, 0.042, 20]} />
+          <meshStandardMaterial color="#353b41" metalness={0.22} roughness={0.66} transparent opacity={0.82 * opacity} />
         </mesh>
       ))}
     </group>
@@ -838,11 +822,10 @@ export function ProceduralCadAssembly({
         );
       })}
       {showMechanism && showDetailed && <>
-        {(visibility.chassis || useImportedParts) && (
+        {visibility.chassis && (
           <ChassisPickupReference
             points={chassisPickupPoints}
             opacity={opacity}
-            compact={!visibility.chassis}
           />
         )}
         {visibility.upright && !useImportedParts && (

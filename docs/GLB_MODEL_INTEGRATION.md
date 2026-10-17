@@ -29,7 +29,7 @@ The bundled demonstration wheel is radius 0.2286 m and width 0.18 m. Therefore `
 - The bundled demonstration project has no actuation geometry. Therefore no coilover is placed at FL, FR, RL, or RR; the UI reports `MISSING_ACTUATION_HARDPOINTS` instead of inventing a mounting location.
 - A declared coilover is also suppressed during a solved wheel-travel pose until coupled rocker rotation and damper length are available. This prevents a static damper from visually disconnecting during kinematic playback.
 - A mechanically mounted coilover requires corner-specific `uprightPickup`, `rockerPushrodPickup`, `rockerSpringPickup`, `rockerAxisStart`, `rockerAxisEnd`, and `springChassisPickup`; a separately located damper also requires `damper.rockerPickup` and `damper.chassisPickup`. None of these points exist in the bundled demonstration geometry.
-- A low-opacity carrier panel is generated from the existing UCA/LCA/tie-rod inboard hardpoints so the inboard joints can be inspected without floating visually. It is explicitly labeled as a visual pickup reference rather than chassis CAD.
+- No rods or carrier structure are inferred between the existing UCA/LCA/tie-rod inboard hardpoints. An explicitly selected chassis/pickup reference panel may show their envelope, but it is labeled as non-CAD visual context.
 - Upright orientation is constructed from the live upper/lower outboard axis plus the accepted wheel axis.
 - FL, FR, RL, and RR each use their own project geometry. Right-hand assemblies receive an explicit handedness mirror in addition to their corner-specific wheel-axis orientation.
 - Accepted kinematic poses update the active corner exactly through the existing `positionFor` and `wheelQuaternion` render inputs.
