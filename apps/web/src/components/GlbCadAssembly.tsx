@@ -413,6 +413,12 @@ export function GlbCadAssembly({
   kinematicPose?: KinematicPose;
   opacity?: number;
 }) {
+  // Keep the public component contract intact while the direct-acting visual
+  // layout is decoupled from the existing pushrod/rocker physics solver.
+  void actuation;
+  void staticWheelCenter;
+  void actuationPointFor;
+  void kinematicPose;
   const upper = positionFor("uca_outboard");
   const lower = positionFor("lca_outboard");
   // Reference-style direct-acting damper: lower eye on the moving lower control
