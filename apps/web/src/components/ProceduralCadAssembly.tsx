@@ -920,7 +920,7 @@ export function ProceduralCadAssembly({
           <RodEndJoint position={tieOutboard} toward={wheelPosition} scale={0.82} opacity={opacity} />
         </>}
       </>}
-      {showMechanism && visibility.coilover && actuationKinematics?.status === "SOLVED" && actuationPointFor && (
+      {showMechanism && !useImportedParts && visibility.coilover && actuationKinematics?.status === "SOLVED" && actuationPointFor && (
         <SolvedActuationMechanism solution={actuationKinematics} pointFor={actuationPointFor} chassisAnchors={chassisPickupPoints} opacity={opacity} />
       )}
       {showMechanism && showRepresentativeActuation && !actuation && !useImportedParts && (
