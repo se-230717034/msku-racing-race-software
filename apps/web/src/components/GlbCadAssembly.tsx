@@ -381,11 +381,23 @@ export function GlbCadAssembly({
     actuationPointFor,
     kinematicPose,
   );
-  const outboardLower = positionFor("lca_outboard");
   const outboardUpper = positionFor("uca_outboard");
+  const inboardFront = positionFor("uca_front_inboard");
+  const inboardRear = positionFor("uca_rear_inboard");
+  const inboardMidpoint: ThreePosition = [
+    (inboardFront[0] + inboardRear[0]) / 2,
+    (inboardFront[1] + inboardRear[1]) / 2,
+    (inboardFront[2] + inboardRear[2]) / 2,
+  ];
+  // Move the upright demo damper toward the chassis, away from the tire envelope.
+  // Both eye points use the same horizontal position to keep the spring upright.
+  const inboardFraction = 0.38;
+  const damperX = outboardUpper[0] + (inboardMidpoint[0] - outboardUpper[0]) * inboardFraction;
+  const damperZ = outboardUpper[2] + (inboardMidpoint[2] - outboardUpper[2]) * inboardFraction;
+  const damperBottomY = outboardUpper[1] + 0.025;
   const coiloverPlacement: CoiloverPlacement = {
-    start: [outboardLower[0], outboardUpper[1] + 0.025, outboardLower[2]],
-    end: [outboardUpper[0], outboardUpper[1] + Math.max(wheelRadius * 0.95, 0.27), outboardUpper[2]],
+    start: [damperX, damperBottomY, damperZ],
+    end: [damperX, damperBottomY + Math.max(wheelRadius * 0.95, 0.27), damperZ],
   };
   // Retain the solved result for future selectable pushrod layouts.
   void solvedCoiloverPlacement;
