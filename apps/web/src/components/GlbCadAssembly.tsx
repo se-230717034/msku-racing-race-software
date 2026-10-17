@@ -327,6 +327,25 @@ function DemoMountEye({ position, opacity }: { position: ThreePosition; opacity:
   );
 }
 
+function DemoDamperClevis({ position, toward, opacity }: { position: ThreePosition; toward: ThreePosition; opacity: number }) {
+  const direction = new Vector3(...toward).sub(new Vector3(...position)).normalize();
+  const quaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), direction);
+  return (
+    <group position={position} quaternion={quaternion} name="demo-damper-clevis">
+      {[-0.019, 0.019].map((x) => (
+        <mesh key={x} position={[x, 0, 0]} castShadow>
+          <boxGeometry args={[0.008, 0.055, 0.033]} />
+          <meshStandardMaterial color="#65717a" metalness={0.55} roughness={0.43} transparent={opacity < 1} opacity={opacity} />
+        </mesh>
+      ))}
+      <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.008, 0.008, 0.052, 16]} />
+        <meshStandardMaterial color="#252d33" metalness={0.62} roughness={0.38} transparent={opacity < 1} opacity={opacity} />
+      </mesh>
+    </group>
+  );
+}
+
 function ImportedSuspensionReference({
   positionFor,
   mirrored,
@@ -480,6 +499,11 @@ export function GlbCadAssembly({
           <DemoMountStrut start={upperRear} end={upperEye} opacity={opacity} />
           <DemoMountEye position={lowerEye} opacity={opacity} />
           <DemoMountEye position={upperEye} opacity={opacity} />
+          <DemoDamperClevis position={lowerEye} toward={upperEye} opacity={opacity} />
+          <DemoDamperClevis position={upperEye} toward={lowerEye} opacity={opacity} />
+          {[lowerOutboard, lowerInboard, upperFront, upperRear].map((anchor, index) => (
+            <DemoMountEye key={index} position={anchor} opacity={opacity} />
+          ))}
         </group>
       )}
       {visibility.coilover && (
