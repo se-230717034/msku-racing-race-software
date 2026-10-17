@@ -290,7 +290,8 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
       name="glb-coilover-katmani"
       userData={{ visualStatus: "SOLVED_ACTUATION_GEOMETRY", kinematicClosure: true, mechanicallyMounted: true }}
     >
-      <group scale={scale}>
+      {/* Keep the imported coilover's radial dimensions fixed while matching the solved eye-to-eye length. */}
+      <group scale={[1, scale, 1]}>
         <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
       </group>
     </group>
