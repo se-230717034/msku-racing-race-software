@@ -434,6 +434,35 @@ async def test_actuation_series_and_velocity_explicit_damper_api() -> None:
         assert missing.json()["forceN"] is None
 
 
+@pytest.mark.anyio
+async def test_coilover_series_api_combines_spring_damper_and_motion_ratio() -> None:
+    async with api_client() as client:
+        response = await client.post(
+            "/api/v1/quasi-static/coilover-series",
+            json={
+                "wheelTravelM": [-0.01, 0.0, 0.01],
+                "wheelVelocityMps": [0.4, 0.4, 0.4],
+                "coiloverLengthM": [0.205, 0.2, 0.195],
+                "referenceCoiloverLengthM": 0.2,
+                "springRateNPerM": 10000.0,
+                "preloadN": 100.0,
+                "compressionCoefficientNsPerM": 1000.0,
+                "reboundCoefficientNsPerM": 1500.0,
+                "minimumCoiloverLengthM": 0.18,
+                "maximumCoiloverLengthM": 0.22,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["calculationStatus"] == "VERIFIED_NUMERICALLY"
+        assert payload["solverVersion"] == "3.1.0"
+        assert payload["validationStatus"]["physical"] == "UNVALIDATED_PHYSICALLY"
+        assert payload["samples"][1]["motionRatio"] == pytest.approx(0.5)
+        assert payload["samples"][1]["damperForceN"] == pytest.approx(-200.0)
+        assert payload["samples"][1]["totalAxialForceN"] == pytest.approx(300.0)
+        assert payload["samples"][1]["wheelForceN"] == pytest.approx(-150.0)
+
+
 def quarter_car_request() -> dict[str, object]:
     return {
         "dataClassification": "demonstration",

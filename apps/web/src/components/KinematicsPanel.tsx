@@ -1,4 +1,9 @@
-import type { KinematicState, KinematicsSweepResponse } from "@msku/contracts";
+import type {
+  CoiloverSample,
+  CoiloverSeriesResponse,
+  KinematicState,
+  KinematicsSweepResponse,
+} from "@msku/contracts";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { uiStatus } from "../lib/uiText";
 
@@ -19,9 +24,15 @@ function Metric({ label, value, unit }: { label: string; value: string; unit: st
 export function KinematicsPanel({
   state,
   sweep,
+  coiloverSample,
+  coiloverSeries,
+  coiloverError,
 }: {
   state: KinematicState | undefined;
   sweep: KinematicsSweepResponse;
+  coiloverSample?: CoiloverSample;
+  coiloverSeries?: CoiloverSeriesResponse;
+  coiloverError?: string;
 }) {
   const metrics = state?.metrics;
   const diagnostics = state?.diagnostics;
@@ -50,6 +61,32 @@ export function KinematicsPanel({
           <Metric label="İz genişliği değişimi" value={format(metrics == null ? null : metrics.trackChangeM * 1000)} unit="mm" />
           <Metric label="Yalpa merkezi yüksekliği" value={format(metrics?.rollCenterHeightM == null ? null : metrics.rollCenterHeightM * 1000)} unit="mm" />
         </div>
+      </section>
+
+      <section className="inspector-section" data-testid="coilover-physics-panel">
+        <div className="section-heading">
+          <span className="eyebrow">COILOVER YAY–SÖNÜMLEYİCİ</span>
+          <span className={coiloverSeries?.calculationStatus === "VERIFIED_NUMERICALLY" ? "status-chip ok" : "status-chip error"}>
+            {coiloverSeries?.calculationStatus === "VERIFIED_NUMERICALLY" ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+            {coiloverSeries?.calculationStatus === "VERIFIED_NUMERICALLY" ? "sayısal çözüm" : "hesaplanamadı"}
+          </span>
+        </div>
+        {coiloverSample ? (
+          <div className="result-grid">
+            <Metric label="Coilover boyu" value={format(coiloverSample.coiloverLengthM * 1000, 2)} unit="mm" />
+            <Metric label="Yay sıkışması" value={format(coiloverSample.coiloverCompressionM * 1000, 2)} unit="mm" />
+            <Metric label="Hareket oranı" value={format(coiloverSample.motionRatio, 4)} unit="m/m" />
+            <Metric label="Coilover hızı" value={format(coiloverSample.coiloverCompressionVelocityMps, 3)} unit="m/s" />
+            <Metric label="Yay kuvveti" value={format(coiloverSample.springForceN, 1)} unit="N" />
+            <Metric label="Damper kuvveti" value={format(coiloverSample.damperForceN, 1)} unit="N" />
+            <Metric label="Toplam eksenel kuvvet" value={format(coiloverSample.totalAxialForceN, 1)} unit="N" />
+            <Metric label="Tekerlek kuvveti" value={format(coiloverSample.wheelForceN, 1)} unit="N" />
+            <Metric label="Kalan sıkışma stroku" value={format(coiloverSample.remainingCompressionTravelM == null ? null : coiloverSample.remainingCompressionTravelM * 1000, 2)} unit="mm" />
+            <Metric label="Kalan açılma stroku" value={format(coiloverSample.remainingReboundTravelM == null ? null : coiloverSample.remainingReboundTravelM * 1000, 2)} unit="mm" />
+          </div>
+        ) : <p className="diagnostic-empty">{coiloverError ?? "Aktüasyon ve damper parametreleri gerekli."}</p>}
+        <p className="model-caveat">Damper kuvveti yalnızca açıkça girilen tekerlek hızından hesaplanır; kaydırıcı zamanlamasından hız türetilmez.</p>
+        {coiloverSeries && <p className="model-caveat">Çözücü v{coiloverSeries.solverVersion} · fiziksel korelasyon yok.</p>}
       </section>
 
       <section className="inspector-section">

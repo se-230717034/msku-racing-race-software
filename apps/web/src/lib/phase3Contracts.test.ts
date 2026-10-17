@@ -1,5 +1,6 @@
 import {
   actuationSeriesResponseSchema,
+  coiloverSeriesResponseSchema,
   createDemoProject,
   projectSchema,
   uprightEquilibriumResponseSchema,
@@ -18,6 +19,12 @@ describe("Phase 3 versioned contracts", () => {
   it("accepts explicit actuation geometry and keeps the packaged project demonstrative", () => {
     const packaged = projectSchema.parse(createDemoProject());
     expect(packaged.suspension.actuation?.type).toBe("pushrod");
+    expect(packaged.suspension.actuation?.springRateNPerM).toBe(30_000);
+    expect(packaged.suspension.actuation?.springPreloadN).toBe(350);
+    expect(packaged.suspension.actuation?.damper?.compressionCoefficientNsPerM).toBe(1_200);
+    expect(packaged.suspension.actuation?.damper?.reboundCoefficientNsPerM).toBe(1_800);
+    expect(packaged.suspension.actuation?.minimumLengthM).toBeLessThan(packaged.suspension.actuation!.springFreeLengthM);
+    expect(packaged.suspension.actuation?.maximumLengthM).toBeGreaterThan(packaged.suspension.actuation!.springFreeLengthM);
     expect(packaged.dataClassification).toBe("demonstration");
     const project = createDemoProject();
     project.suspension.actuation = {
@@ -34,6 +41,42 @@ describe("Phase 3 versioned contracts", () => {
     };
     project.vehicle.corners[project.activeCornerId].suspension = project.suspension;
     expect(projectSchema.parse(project).suspension.actuation?.type).toBe("pushrod");
+  });
+
+  it("parses the combined coilover physics response without physical approval", () => {
+    const parsed = coiloverSeriesResponseSchema.parse({
+      schemaVersion: "1.0.0",
+      calculationStatus: "VERIFIED_NUMERICALLY",
+      validationStatus: quality,
+      solverVersion: "3.1.0",
+      units: {
+        length: "m",
+        velocity: "m/s",
+        force: "N",
+        springRate: "N/m",
+        damping: "N*s/m",
+        energy: "J",
+        motionRatio: "m/m",
+      },
+      samples: [{
+        wheelTravelM: 0,
+        wheelVelocityMps: 0.4,
+        coiloverLengthM: 0.2,
+        coiloverCompressionM: 0,
+        coiloverCompressionVelocityMps: 0.2,
+        motionRatio: 0.5,
+        springForceN: 100,
+        damperForceN: -200,
+        totalAxialForceN: 300,
+        wheelForceN: -150,
+        storedEnergyJ: 0,
+        remainingCompressionTravelM: 0.02,
+        remainingReboundTravelM: 0.02,
+      }],
+      warnings: ["UNVALIDATED_PHYSICALLY"],
+    });
+    expect(parsed.validationStatus.physical).toBe("UNVALIDATED_PHYSICALLY");
+    expect(parsed.samples[0].totalAxialForceN).toBe(300);
   });
 
   it("parses a traceable upright-equilibrium payload", () => {

@@ -7,6 +7,7 @@ Updated: 2026-10-17
 - [x] Six supplied GLB files extracted to `apps/web/public/models/` and audited for nodes, meshes, materials, bounds, axes, and pivots
 - [x] Coilover GLB eye centres audited and connected at FL/FR/RL/RR to separately generated, explicitly labeled DEMO/SYNTHETIC pushrod-rocker hardpoints
 - [x] Rocker rotation and coilover length solved from rigid-upright motion, fixed pushrod length, and fixed rocker-axis constraints; infeasible branches are suppressed
+- [x] Coilover solver 3.1.0 combines geometrically derived motion ratio with explicit wheel velocity, spring preload/rate, asymmetric compression/rebound damping, and hard stroke rejection; the GLB axial length follows the same accepted state
 - [x] Synthetic grey pickup-carrier rods removed from the default GLB scene; the non-CAD chassis/pickup reference panel is available only through its explicit visibility control
 - [x] Tire/rim, rotor/caliper, hub, and upright models connected to the active render path without duplicate brake parts
 - [x] FL/FR/RL/RR placement uses each corner's own hardpoints, wheel dimensions, handedness, and accepted wheel-axis pose
@@ -106,7 +107,7 @@ Updated: 2026-10-17
 - [x] Analytical 3D equilibrium, conservation, scaling, symmetry, sensitivity, spring-energy, failure, API, contract, and browser tests
 - [x] Phase 3 model and verification documentation
 - [x] Final gates: 59 Python tests, 16 Vitest tests, 2 Chromium tests, Ruff, mypy, ESLint, TypeScript, and production build
-- [ ] Integrated rocker/pushrod kinematic closure from stored coordinates
+- [x] Integrated rocker/pushrod kinematic closure from stored coordinates
 - [ ] Independent CAD/static-load and physical rig validation for MSKU Racing vehicle data
 
 ## Phase 4 — Verified road and vehicle dynamics

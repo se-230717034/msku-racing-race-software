@@ -10,6 +10,7 @@ from msku_engineering import (
     VehicleLoadTransferInput,
     calculate_actuation_series,
     calculate_damper_force,
+    calculate_coilover_series,
     calculate_vehicle_load_transfer,
     solve_upright_equilibrium,
 )
@@ -283,3 +284,65 @@ def test_damper_requires_explicit_velocity_and_opposes_motion() -> None:
     assert compression.force_n == pytest.approx(-200.0)
     assert rebound.force_n == pytest.approx(300.0)
     assert isclose(abs(compression.force_n or 0.0), 200.0)
+
+
+def test_coilover_series_combines_geometry_spring_and_compression_damping() -> None:
+    result = calculate_coilover_series(
+        wheel_travel_m=(-0.01, 0.0, 0.01),
+        wheel_velocity_mps=(0.4, 0.4, 0.4),
+        coilover_length_m=(0.205, 0.2, 0.195),
+        reference_coilover_length_m=0.2,
+        spring_rate_n_per_m=10_000.0,
+        preload_n=100.0,
+        compression_coefficient_ns_per_m=1_000.0,
+        rebound_coefficient_ns_per_m=1_500.0,
+        minimum_coilover_length_m=0.18,
+        maximum_coilover_length_m=0.22,
+    )
+
+    assert result.calculation_status == "VERIFIED_NUMERICALLY"
+    assert [sample.motion_ratio for sample in result.samples] == pytest.approx([0.5] * 3)
+    assert [sample.coilover_compression_velocity_mps for sample in result.samples] == pytest.approx(
+        [0.2] * 3
+    )
+    assert [sample.damper_force_n for sample in result.samples] == pytest.approx([-200.0] * 3)
+    assert result.samples[1].spring_force_n == pytest.approx(100.0)
+    assert result.samples[1].total_axial_force_n == pytest.approx(300.0)
+    assert result.samples[1].wheel_force_n == pytest.approx(-150.0)
+    assert result.samples[1].remaining_compression_travel_m == pytest.approx(0.02)
+    assert result.samples[1].remaining_rebound_travel_m == pytest.approx(0.02)
+
+
+def test_coilover_series_uses_rebound_damping_and_rejects_stroke_overrun() -> None:
+    rebound = calculate_coilover_series(
+        (-0.01, 0.0, 0.01),
+        (-0.4, -0.4, -0.4),
+        (0.205, 0.2, 0.195),
+        0.2,
+        10_000.0,
+        100.0,
+        1_000.0,
+        1_500.0,
+        0.18,
+        0.22,
+    )
+    assert rebound.calculation_status == "VERIFIED_NUMERICALLY"
+    assert rebound.samples[1].damper_force_n == pytest.approx(300.0)
+    assert rebound.samples[1].total_axial_force_n == pytest.approx(-200.0)
+    assert rebound.samples[1].wheel_force_n == pytest.approx(100.0)
+
+    overrun = calculate_coilover_series(
+        (-0.01, 0.0, 0.01),
+        (0.0, 0.0, 0.0),
+        (0.205, 0.2, 0.175),
+        0.2,
+        10_000.0,
+        100.0,
+        1_000.0,
+        1_500.0,
+        0.18,
+        0.22,
+    )
+    assert overrun.calculation_status == "NOT_COMPUTABLE"
+    assert overrun.samples == ()
+    assert overrun.warnings == ("COILOVER_TRAVEL_LIMIT_EXCEEDED_AT_INDEX_2",)

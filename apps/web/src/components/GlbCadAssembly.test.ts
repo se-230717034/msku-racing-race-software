@@ -35,6 +35,7 @@ describe("GLB coilover placement", () => {
     expect(placement.placement?.start[1]).toBeCloseTo(0.51, 12);
     expect(placement.placement?.start[2]).toBeCloseTo(-0.41, 12);
     expect(placement.placement?.end).toEqual([0.61, 0.71, -0.21]);
+    expect(placement.placement?.referenceLengthM).toBeCloseTo(Math.sqrt(0.17), 12);
   });
 
   it("refuses to invent a placement when actuation hardpoints are absent", () => {

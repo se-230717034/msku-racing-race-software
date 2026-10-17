@@ -44,6 +44,12 @@ test("edits geometry and runs the constrained kinematics workflow", async ({ pag
   expect(Math.abs(movedRockerAngle - initialRockerAngle)).toBeGreaterThan(1e-4);
   expect(Math.abs(movedCoiloverLength - initialCoiloverLength)).toBeGreaterThan(1e-5);
   expect(pushrodResidual).toBeLessThan(1e-7);
+  await expect(page.getByTestId("coilover-physics-panel")).toBeVisible();
+  await expect(viewport).toHaveAttribute("data-coilover-physics-status", "VERIFIED_NUMERICALLY");
+  await page.getByLabel("Tekerlek hızı m/s").fill("0.4");
+  await expect.poll(async () => Math.abs(Number(await viewport.getAttribute("data-coilover-damper-force-n"))))
+    .toBeGreaterThan(1);
+  expect(Number(await viewport.getAttribute("data-coilover-motion-ratio"))).not.toBe(0);
 });
 
 test("renders four distinct assemblies at the configured wheelbase and tracks", async ({ page }) => {

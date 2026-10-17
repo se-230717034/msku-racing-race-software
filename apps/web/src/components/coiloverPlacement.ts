@@ -15,6 +15,7 @@ export const REQUIRED_ACTUATION_HARDPOINTS = [
 export interface CoiloverPlacement {
   start: ThreePosition;
   end: ThreePosition;
+  referenceLengthM: number;
 }
 
 export type CoiloverPlacementResolution =
@@ -61,11 +62,20 @@ export const resolveCoiloverPlacement = (
       reason: kinematics.reason,
     };
   }
+  const staticKinematics = solveActuationKinematics(actuation, staticWheelCenter);
+  if (staticKinematics.status === "FAILED") {
+    return {
+      status: "FAILED_ACTUATION_KINEMATICS",
+      missingHardpoints: [],
+      reason: staticKinematics.reason,
+    };
+  }
   return {
     status: "SOLVED_ACTUATION_GEOMETRY",
     placement: {
       start: actuationPointFor(kinematics.rockerCoiloverPickup),
       end: actuationPointFor(kinematics.chassisCoiloverPickup),
+      referenceLengthM: staticKinematics.coiloverLengthM,
     },
     missingHardpoints: [],
   };

@@ -265,7 +265,19 @@ class ActuationGeometry(StrictModel):
     springFreeLengthM: float = Field(gt=0)
     springRateNPerM: float = Field(gt=0)
     springPreloadN: float = Field(default=0.0, ge=0)
+    minimumLengthM: float | None = Field(default=None, gt=0)
+    maximumLengthM: float | None = Field(default=None, gt=0)
     damper: DamperDefinition | None = None
+
+    @model_validator(mode="after")
+    def travel_limits_are_consistent(self) -> ActuationGeometry:
+        if (
+            self.minimumLengthM is not None
+            and self.maximumLengthM is not None
+            and self.minimumLengthM >= self.maximumLengthM
+        ):
+            raise ValueError("minimumLengthM must be less than maximumLengthM")
+        return self
 
 
 CornerId = Literal["front_left", "front_right", "rear_left", "rear_right"]
@@ -698,6 +710,62 @@ class DamperForceResponse(StrictModel):
     forceN: float | None
     warning: str | None
     physicalStatus: Literal["UNVALIDATED_PHYSICALLY"] = "UNVALIDATED_PHYSICALLY"
+    parameterManifest: VehicleParameterManifestSummary | None = None
+    verificationAxes: IndependentVerification | None = None
+
+
+class CoiloverSeriesRequest(StrictModel):
+    wheelTravelM: list[float] = Field(min_length=3)
+    wheelVelocityMps: list[float] = Field(min_length=3)
+    coiloverLengthM: list[float] = Field(min_length=3)
+    referenceCoiloverLengthM: float = Field(gt=0)
+    springRateNPerM: float = Field(gt=0)
+    preloadN: float = Field(default=0.0, ge=0)
+    compressionCoefficientNsPerM: float = Field(ge=0)
+    reboundCoefficientNsPerM: float = Field(ge=0)
+    minimumCoiloverLengthM: float | None = Field(default=None, gt=0)
+    maximumCoiloverLengthM: float | None = Field(default=None, gt=0)
+    compressionOnly: bool = True
+    parameterManifest: VehicleParameterManifestModel | None = None
+
+    @model_validator(mode="after")
+    def arrays_and_limits_are_consistent(self) -> CoiloverSeriesRequest:
+        sample_count = len(self.wheelTravelM)
+        if len(self.wheelVelocityMps) != sample_count or len(self.coiloverLengthM) != sample_count:
+            raise ValueError("wheelTravelM, wheelVelocityMps and coiloverLengthM must have equal length")
+        if (
+            self.minimumCoiloverLengthM is not None
+            and self.maximumCoiloverLengthM is not None
+            and self.minimumCoiloverLengthM >= self.maximumCoiloverLengthM
+        ):
+            raise ValueError("minimumCoiloverLengthM must be less than maximumCoiloverLengthM")
+        return self
+
+
+class CoiloverSampleResponse(StrictModel):
+    wheelTravelM: float
+    wheelVelocityMps: float
+    coiloverLengthM: float
+    coiloverCompressionM: float
+    coiloverCompressionVelocityMps: float
+    motionRatio: float
+    springForceN: float
+    damperForceN: float
+    totalAxialForceN: float
+    wheelForceN: float
+    storedEnergyJ: float
+    remainingCompressionTravelM: float | None
+    remainingReboundTravelM: float | None
+
+
+class CoiloverSeriesResponse(StrictModel):
+    schemaVersion: Literal["1.0.0"]
+    calculationStatus: Phase3CalculationStatus
+    validationStatus: Phase3ValidationStatusResponse
+    solverVersion: str
+    units: dict[str, str]
+    samples: list[CoiloverSampleResponse]
+    warnings: list[str]
     parameterManifest: VehicleParameterManifestSummary | None = None
     verificationAxes: IndependentVerification | None = None
 

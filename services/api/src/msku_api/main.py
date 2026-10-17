@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from msku_engineering import (
+    COILOVER_SOLVER_VERSION,
     BICYCLE_SOLVER_VERSION,
     DYNAMICS_SOLVER_VERSION,
     FULL_CAR_SOLVER_VERSION,
@@ -34,6 +35,7 @@ from msku_engineering import (
     TwoForceMember,
     VehicleLoadTransferInput,
     calculate_actuation_series,
+    calculate_coilover_series,
     calculate_damper_force,
     calculate_vehicle_load_transfer,
     run_optimization,
@@ -56,6 +58,9 @@ from .models import (
     BicycleSampleResponse,
     BicycleSimulationRequest,
     BicycleSimulationResponse,
+    CoiloverSampleResponse,
+    CoiloverSeriesRequest,
+    CoiloverSeriesResponse,
     DamperForceRequest,
     DamperForceResponse,
     DeclaredVerificationAxis,
@@ -717,6 +722,62 @@ async def damper_force(request: DamperForceRequest) -> DamperForceResponse:
     )
 
 
+@app.post("/api/v1/quasi-static/coilover-series", response_model=CoiloverSeriesResponse)
+async def coilover_series(request: CoiloverSeriesRequest) -> CoiloverSeriesResponse:
+    result = calculate_coilover_series(
+        request.wheelTravelM,
+        request.wheelVelocityMps,
+        request.coiloverLengthM,
+        request.referenceCoiloverLengthM,
+        request.springRateNPerM,
+        request.preloadN,
+        request.compressionCoefficientNsPerM,
+        request.reboundCoefficientNsPerM,
+        request.minimumCoiloverLengthM,
+        request.maximumCoiloverLengthM,
+        request.compressionOnly,
+    )
+    return CoiloverSeriesResponse(
+        schemaVersion="1.0.0",
+        calculationStatus=result.calculation_status,
+        validationStatus=_phase3_validation(result.calculation_status),
+        solverVersion=COILOVER_SOLVER_VERSION,
+        units={
+            "length": "m",
+            "velocity": "m/s",
+            "force": "N",
+            "springRate": "N/m",
+            "damping": "N*s/m",
+            "energy": "J",
+            "motionRatio": "m/m",
+        },
+        samples=[
+            CoiloverSampleResponse(
+                wheelTravelM=item.wheel_travel_m,
+                wheelVelocityMps=item.wheel_velocity_mps,
+                coiloverLengthM=item.coilover_length_m,
+                coiloverCompressionM=item.coilover_compression_m,
+                coiloverCompressionVelocityMps=item.coilover_compression_velocity_mps,
+                motionRatio=item.motion_ratio,
+                springForceN=item.spring_force_n,
+                damperForceN=item.damper_force_n,
+                totalAxialForceN=item.total_axial_force_n,
+                wheelForceN=item.wheel_force_n,
+                storedEnergyJ=item.stored_energy_j,
+                remainingCompressionTravelM=item.remaining_compression_travel_m,
+                remainingReboundTravelM=item.remaining_rebound_travel_m,
+            )
+            for item in result.samples
+        ],
+        warnings=[
+            *result.warnings,
+            *_result_manifest_warnings(result.calculation_status, request.parameterManifest),
+        ],
+        parameterManifest=_manifest_summary(request.parameterManifest),
+        verificationAxes=_verification_axes(
+            result.calculation_status, result.solver_version, _request_input_sha256(request)
+        ),
+    )
 @app.post(
     "/api/v1/dynamics/quarter-car/simulate",
     response_model=QuarterCarSimulationResponse,
@@ -1304,3 +1365,6 @@ async def capabilities() -> dict[str, Any]:
         ],
         "vehicleParameterManifestSchemaVersion": "1.0.0",
     }
+    CoiloverSampleResponse,
+    CoiloverSeriesRequest,
+    CoiloverSeriesResponse,

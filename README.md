@@ -23,7 +23,9 @@ An original, browser-based suspension and vehicle-dynamics engineering applicati
 
 Every bundled hardpoint is demonstration data, not an MSKU Racing vehicle specification. The visible model status is `demonstration / unvalidated`.
 
-Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.0`, and Phase 5 full-car/bicycle solvers `5.0.0` are checked against analytical and independent reference cases, conservation/passivity, convergence, cross-algorithm agreement, scaling, symmetry, perturbation, singularity, and failure-path tests as applicable. The demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
+Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, coilover spring–damper solver `3.1.0`, quarter-car solver `4.0.0`, and Phase 5 full-car/bicycle solvers `5.0.0` are checked against analytical and independent reference cases, conservation/passivity, convergence, cross-algorithm agreement, scaling, symmetry, perturbation, singularity, and failure-path tests as applicable. The demonstration vehicle model has not been compared with MSKU Racing CAD or physical measurements.
+
+The Kinematics workspace evaluates the solved pushrod–rocker coilover with explicit spring rate, preload, compression/rebound damping, stroke limits, local motion ratio, and user-declared wheel velocity. The GLB coilover follows the same solved eye-to-eye length without changing hub or brake placement. See [docs/COILOVER_SPRING_DAMPER_MODEL.md](docs/COILOVER_SPRING_DAMPER_MODEL.md) for equations, signs, and limitations.
 
 ## Implemented
 

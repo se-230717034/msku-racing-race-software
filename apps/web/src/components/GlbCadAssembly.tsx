@@ -1,5 +1,5 @@
 import { useGLTF } from "@react-three/drei";
-import type { ActuationGeometry, KinematicPose, Vec3 } from "@msku/contracts";
+import type { ActuationGeometry, CoiloverSample, KinematicPose, Vec3 } from "@msku/contracts";
 import { useMemo } from "react";
 import {
   Box3,
@@ -259,7 +259,15 @@ function ImportedUpright({
   );
 }
 
-function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement; opacity: number }) {
+function ImportedCoilover({
+  placement,
+  opacity,
+  physics,
+}: {
+  placement: CoiloverPlacement;
+  opacity: number;
+  physics?: CoiloverSample;
+}) {
   const source = useGLTF(MODEL_URLS.coilover).scene;
   const scene = useMemo(() => {
     const clone = preparedClone(source, opacity);
@@ -277,7 +285,8 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
   const sourceMountCentreY = (
     GLB_SOURCE_DIMENSIONS.coilover.mountLowY + GLB_SOURCE_DIMENSIONS.coilover.mountHighY
   ) / 2;
-  const scale = targetLength / sourceMountLength;
+  const radialScale = placement.referenceLengthM / sourceMountLength;
+  const axialScale = targetLength / sourceMountLength;
   const midpoint = start.add(end).multiplyScalar(0.5);
   const quaternion = new Quaternion().setFromUnitVectors(
     new Vector3(0, 1, 0),
@@ -288,9 +297,17 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
       position={midpoint}
       quaternion={quaternion}
       name="glb-coilover-katmani"
-      userData={{ visualStatus: "SOLVED_ACTUATION_GEOMETRY", kinematicClosure: true, mechanicallyMounted: true }}
+      userData={{
+        visualStatus: "SOLVED_ACTUATION_GEOMETRY",
+        kinematicClosure: true,
+        mechanicallyMounted: true,
+        physicsStatus: physics ? "VERIFIED_NUMERICALLY" : "GEOMETRY_ONLY",
+        springForceN: physics?.springForceN,
+        damperForceN: physics?.damperForceN,
+        totalAxialForceN: physics?.totalAxialForceN,
+      }}
     >
-      <group scale={scale}>
+      <group scale={[radialScale, axialScale, radialScale]}>
         <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
       </group>
     </group>
@@ -347,6 +364,7 @@ export function GlbCadAssembly({
   staticWheelCenter,
   actuationPointFor,
   kinematicPose,
+  coiloverPhysics,
   opacity = 1,
 }: {
   positionFor: (id: string) => ThreePosition;
@@ -362,6 +380,7 @@ export function GlbCadAssembly({
   staticWheelCenter: Vec3;
   actuationPointFor?: (point: Vec3) => ThreePosition;
   kinematicPose?: KinematicPose;
+  coiloverPhysics?: CoiloverSample;
   opacity?: number;
 }) {
   const upper = positionFor("uca_outboard");
@@ -420,6 +439,7 @@ export function GlbCadAssembly({
         <ImportedCoilover
           placement={coiloverPlacement.placement}
           opacity={opacity}
+          physics={coiloverPhysics}
         />
       )}
       {showRepresentativeSuspension && (

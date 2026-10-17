@@ -46,6 +46,7 @@ export const createSyntheticDemoActuation = (suspension: Suspension): ActuationG
     y: pivot.y - side * 0.265,
     z: pivot.z + 0.04,
   };
+  const staticLengthM = distance(rockerSpringPickup, springChassisPickup);
   return {
     type: "pushrod",
     uprightPickup,
@@ -54,8 +55,16 @@ export const createSyntheticDemoActuation = (suspension: Suspension): ActuationG
     rockerAxisStart: { x: pivot.x - 0.06, y: pivot.y, z: pivot.z },
     rockerAxisEnd: { x: pivot.x + 0.06, y: pivot.y, z: pivot.z },
     springChassisPickup,
-    springFreeLengthM: distance(rockerSpringPickup, springChassisPickup),
+    springFreeLengthM: staticLengthM,
     springRateNPerM: 30_000,
-    springPreloadN: 0,
+    springPreloadN: 350,
+    minimumLengthM: staticLengthM - 0.035,
+    maximumLengthM: staticLengthM + 0.035,
+    damper: {
+      rockerPickup: rockerSpringPickup,
+      chassisPickup: springChassisPickup,
+      compressionCoefficientNsPerM: 1_200,
+      reboundCoefficientNsPerM: 1_800,
+    },
   };
 };

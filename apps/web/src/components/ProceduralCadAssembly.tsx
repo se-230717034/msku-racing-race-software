@@ -1,6 +1,6 @@
 import { Edges, Html, Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import type { ActuationGeometry, KinematicPose, Vec3 } from "@msku/contracts";
+import type { ActuationGeometry, CoiloverSample, KinematicPose, Vec3 } from "@msku/contracts";
 import { Suspense, useEffect, useMemo } from "react";
 import { DoubleSide, Quaternion, Vector3 } from "three";
 import { ConvexGeometry } from "three-stdlib";
@@ -768,6 +768,7 @@ export function ProceduralCadAssembly({
   staticWheelCenter,
   actuationPointFor,
   kinematicPose,
+  coiloverPhysics,
   selectedHardpointId,
   onSelectHardpoint,
   opacity = 1,
@@ -790,6 +791,7 @@ export function ProceduralCadAssembly({
   staticWheelCenter: Vec3;
   actuationPointFor?: (point: Vec3) => ThreePosition;
   kinematicPose?: KinematicPose;
+  coiloverPhysics?: CoiloverSample;
   selectedHardpointId?: string;
   onSelectHardpoint?: (id: string) => void;
   opacity?: number;
@@ -955,6 +957,7 @@ export function ProceduralCadAssembly({
             staticWheelCenter={staticWheelCenter}
             actuationPointFor={actuationPointFor}
             kinematicPose={kinematicPose}
+        coiloverPhysics={coiloverPhysics}
             opacity={opacity}
           />
         </Suspense>

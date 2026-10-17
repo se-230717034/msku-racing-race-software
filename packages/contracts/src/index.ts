@@ -29,12 +29,26 @@ export const actuationGeometrySchema = z.object({
   springFreeLengthM: z.number().finite().positive(),
   springRateNPerM: z.number().finite().positive(),
   springPreloadN: z.number().finite().nonnegative().default(0),
+  minimumLengthM: z.number().finite().positive().optional(),
+  maximumLengthM: z.number().finite().positive().optional(),
   damper: z.object({
     rockerPickup: vec3Schema,
     chassisPickup: vec3Schema,
     compressionCoefficientNsPerM: z.number().finite().nonnegative(),
     reboundCoefficientNsPerM: z.number().finite().nonnegative(),
   }).optional(),
+}).superRefine((value, context) => {
+  if (
+    value.minimumLengthM !== undefined
+    && value.maximumLengthM !== undefined
+    && value.minimumLengthM >= value.maximumLengthM
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["minimumLengthM"],
+      message: "minimumLengthM must be less than maximumLengthM",
+    });
+  }
 });
 
 export const cornerIdSchema = z.enum(["front_left", "front_right", "rear_left", "rear_right"]);
@@ -481,6 +495,11 @@ export const createDemoProject = (projectId = "msku-demo-full-vehicle"): Project
       ["vehicle.track.front", 1.44, "m", ["quasi_static"]],
       ["vehicle.track.rear", 1.4, "m", ["quasi_static"]],
       ["vehicle.cg.position", [0, 0, 0.29], "m", ["quasi_static", "bicycle"]],
+      ["suspension.coilover.spring_rate", 30000, "N/m", ["quasi_static"]],
+      ["suspension.coilover.preload", 350, "N", ["quasi_static"]],
+      ["suspension.coilover.compression_damping", 1200, "N*s/m", ["quasi_static"]],
+      ["suspension.coilover.rebound_damping", 1800, "N*s/m", ["quasi_static"]],
+      ["suspension.coilover.stroke", 0.07, "m", ["quasi_static"]],
     ].map(([key, value, unit, applicableModules]) => ({
       key: key as string,
       value: value as number | number[],
@@ -744,6 +763,40 @@ export const actuationSeriesResponseSchema = z.object({
     storedEnergyJ: z.number().finite(),
     wheelForceN: z.number().finite(),
     wheelRateNPerM: z.number().finite(),
+  })),
+  warnings: z.array(z.string()),
+  parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
+  verificationAxes: independentVerificationSchema.optional(),
+});
+
+export const coiloverSeriesResponseSchema = z.object({
+  schemaVersion: z.literal(API_SCHEMA_VERSION),
+  calculationStatus: phase3CalculationStatusSchema,
+  validationStatus: phase3ValidationStatusSchema,
+  solverVersion: z.string(),
+  units: z.object({
+    length: z.literal("m"),
+    velocity: z.literal("m/s"),
+    force: z.literal("N"),
+    springRate: z.literal("N/m"),
+    damping: z.literal("N*s/m"),
+    energy: z.literal("J"),
+    motionRatio: z.literal("m/m"),
+  }),
+  samples: z.array(z.object({
+    wheelTravelM: z.number().finite(),
+    wheelVelocityMps: z.number().finite(),
+    coiloverLengthM: z.number().finite().positive(),
+    coiloverCompressionM: z.number().finite(),
+    coiloverCompressionVelocityMps: z.number().finite(),
+    motionRatio: z.number().finite(),
+    springForceN: z.number().finite(),
+    damperForceN: z.number().finite(),
+    totalAxialForceN: z.number().finite(),
+    wheelForceN: z.number().finite(),
+    storedEnergyJ: z.number().finite(),
+    remainingCompressionTravelM: z.number().finite().nonnegative().nullable(),
+    remainingReboundTravelM: z.number().finite().nonnegative().nullable(),
   })),
   warnings: z.array(z.string()),
   parameterManifest: vehicleParameterManifestSummarySchema.nullable().optional(),
@@ -1241,6 +1294,8 @@ export type MemberForce = z.infer<typeof memberForceSchema>;
 export type UprightEquilibriumResponse = z.infer<typeof uprightEquilibriumResponseSchema>;
 export type VehicleLoadTransferResponse = z.infer<typeof vehicleLoadTransferResponseSchema>;
 export type ActuationSeriesResponse = z.infer<typeof actuationSeriesResponseSchema>;
+export type CoiloverSeriesResponse = z.infer<typeof coiloverSeriesResponseSchema>;
+export type CoiloverSample = CoiloverSeriesResponse["samples"][number];
 export type QuarterCarParameters = z.infer<typeof quarterCarParametersSchema>;
 export type RoadProfile = z.infer<typeof roadProfileSchema>;
 export type QuarterCarSimulationRequest = z.infer<typeof quarterCarSimulationRequestSchema>;

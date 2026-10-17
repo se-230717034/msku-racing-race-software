@@ -16,6 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 QUASI_STATIC_SOLVER_VERSION = "3.0.0"
+COILOVER_SOLVER_VERSION = "3.1.0"
 REFERENCE_STATUS: Literal["REFERENCE_BENCHMARKED"] = "REFERENCE_BENCHMARKED"
 PHYSICAL_STATUS: Literal["UNVALIDATED_PHYSICALLY"] = "UNVALIDATED_PHYSICALLY"
 
@@ -166,6 +167,40 @@ class DamperForceResult:
     calculation_status: CalculationStatus
     force_n: float | None
     warning: str | None
+
+
+@dataclass(frozen=True)
+class CoiloverSample:
+    """One spring-damper state using compression-positive conventions.
+
+    ``damper_force_n`` is the signed generalized force opposing coilover
+    compression velocity. ``total_axial_force_n`` is positive when the
+    coilover pushes its mounts apart.
+    """
+
+    wheel_travel_m: float
+    wheel_velocity_mps: float
+    coilover_length_m: float
+    coilover_compression_m: float
+    coilover_compression_velocity_mps: float
+    motion_ratio: float
+    spring_force_n: float
+    damper_force_n: float
+    total_axial_force_n: float
+    wheel_force_n: float
+    stored_energy_j: float
+    remaining_compression_travel_m: float | None
+    remaining_rebound_travel_m: float | None
+
+
+@dataclass(frozen=True)
+class CoiloverSeriesResult:
+    calculation_status: CalculationStatus
+    samples: tuple[CoiloverSample, ...]
+    warnings: tuple[str, ...]
+    solver_version: str = COILOVER_SOLVER_VERSION
+    reference_status: Literal["REFERENCE_BENCHMARKED"] = REFERENCE_STATUS
+    physical_status: Literal["UNVALIDATED_PHYSICALLY"] = PHYSICAL_STATUS
 
 
 def _vector3(value: Sequence[float], name: str) -> NDArray[np.float64]:
@@ -604,3 +639,130 @@ def calculate_damper_force(
         compression_coefficient_ns_per_m if velocity_mps >= 0.0 else rebound_coefficient_ns_per_m
     )
     return DamperForceResult("VERIFIED_NUMERICALLY", -coefficient * velocity_mps, None)
+
+
+def calculate_coilover_series(
+    wheel_travel_m: Sequence[float],
+    wheel_velocity_mps: Sequence[float],
+    coilover_length_m: Sequence[float],
+    reference_coilover_length_m: float,
+    spring_rate_n_per_m: float,
+    preload_n: float,
+    compression_coefficient_ns_per_m: float,
+    rebound_coefficient_ns_per_m: float,
+    minimum_coilover_length_m: float | None = None,
+    maximum_coilover_length_m: float | None = None,
+    compression_only: bool = True,
+) -> CoiloverSeriesResult:
+    """Evaluate a geometrically supplied coilover length history.
+
+    Motion ratio is ``d(compression)/d(wheel bump)``. Coilover compression
+    velocity is derived only from that ratio and the explicitly supplied wheel
+    velocity. No velocity is inferred from UI timing or sample spacing.
+    """
+
+    velocity = np.asarray(wheel_velocity_mps, dtype=np.float64)
+    lengths = np.asarray(coilover_length_m, dtype=np.float64)
+    scalars = np.asarray(
+        [
+            reference_coilover_length_m,
+            spring_rate_n_per_m,
+            preload_n,
+            compression_coefficient_ns_per_m,
+            rebound_coefficient_ns_per_m,
+        ],
+        dtype=np.float64,
+    )
+    if (
+        velocity.ndim != 1
+        or lengths.ndim != 1
+        or velocity.size != lengths.size
+        or velocity.size != len(wheel_travel_m)
+        or not np.all(np.isfinite(velocity))
+        or not np.all(np.isfinite(lengths))
+        or not np.all(np.isfinite(scalars))
+        or compression_coefficient_ns_per_m < 0.0
+        or rebound_coefficient_ns_per_m < 0.0
+    ):
+        return CoiloverSeriesResult("FAILED", (), ("INVALID_COILOVER_SERIES_INPUT",))
+
+    limits = (minimum_coilover_length_m, maximum_coilover_length_m)
+    if any(value is not None and (not np.isfinite(value) or value <= 0.0) for value in limits):
+        return CoiloverSeriesResult("FAILED", (), ("INVALID_COILOVER_TRAVEL_LIMIT",))
+    if (
+        minimum_coilover_length_m is not None
+        and maximum_coilover_length_m is not None
+        and minimum_coilover_length_m >= maximum_coilover_length_m
+    ):
+        return CoiloverSeriesResult("FAILED", (), ("INVALID_COILOVER_TRAVEL_LIMIT",))
+
+    spring = calculate_actuation_series(
+        wheel_travel_m,
+        coilover_length_m,
+        reference_coilover_length_m,
+        spring_rate_n_per_m,
+        preload_n,
+        compression_only,
+    )
+    if spring.calculation_status != "VERIFIED_NUMERICALLY":
+        return CoiloverSeriesResult(spring.calculation_status, (), spring.warnings)
+
+    for index, length in enumerate(lengths):
+        below_minimum = minimum_coilover_length_m is not None and length < minimum_coilover_length_m - 1.0e-12
+        above_maximum = maximum_coilover_length_m is not None and length > maximum_coilover_length_m + 1.0e-12
+        if below_minimum or above_maximum:
+            return CoiloverSeriesResult(
+                "NOT_COMPUTABLE",
+                (),
+                (f"COILOVER_TRAVEL_LIMIT_EXCEEDED_AT_INDEX_{index}",),
+            )
+
+    samples: list[CoiloverSample] = []
+    for index, spring_sample in enumerate(spring.samples):
+        compression_velocity = spring_sample.motion_ratio * float(velocity[index])
+        damper = calculate_damper_force(
+            compression_velocity,
+            compression_coefficient_ns_per_m,
+            rebound_coefficient_ns_per_m,
+        )
+        if damper.calculation_status != "VERIFIED_NUMERICALLY" or damper.force_n is None:
+            return CoiloverSeriesResult(
+                damper.calculation_status,
+                (),
+                (damper.warning or "DAMPER_FORCE_NOT_COMPUTABLE",),
+            )
+        total_axial_force = spring_sample.spring_force_n - damper.force_n
+        samples.append(
+            CoiloverSample(
+                wheel_travel_m=spring_sample.wheel_travel_m,
+                wheel_velocity_mps=float(velocity[index]),
+                coilover_length_m=spring_sample.spring_length_m,
+                coilover_compression_m=spring_sample.spring_compression_m,
+                coilover_compression_velocity_mps=compression_velocity,
+                motion_ratio=spring_sample.motion_ratio,
+                spring_force_n=spring_sample.spring_force_n,
+                damper_force_n=damper.force_n,
+                total_axial_force_n=total_axial_force,
+                wheel_force_n=-total_axial_force * spring_sample.motion_ratio,
+                stored_energy_j=spring_sample.stored_energy_j,
+                remaining_compression_travel_m=(
+                    spring_sample.spring_length_m - minimum_coilover_length_m
+                    if minimum_coilover_length_m is not None
+                    else None
+                ),
+                remaining_rebound_travel_m=(
+                    maximum_coilover_length_m - spring_sample.spring_length_m
+                    if maximum_coilover_length_m is not None
+                    else None
+                ),
+            )
+        )
+    return CoiloverSeriesResult(
+        "VERIFIED_NUMERICALLY",
+        tuple(samples),
+        (
+            *spring.warnings,
+            "DAMPER_VELOCITY_DERIVED_FROM_EXPLICIT_WHEEL_VELOCITY_AND_LOCAL_MOTION_RATIO",
+            "LINEAR_SPRING_AND_PIECEWISE_LINEAR_DAMPER_UNVALIDATED_PHYSICALLY",
+        ),
+    )

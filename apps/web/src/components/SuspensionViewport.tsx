@@ -1,6 +1,6 @@
 import { ContactShadows, GizmoHelper, GizmoViewport, OrbitControls, useProgress } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import type { KinematicPose, Vec3 } from "@msku/contracts";
+import type { CoiloverSample, KinematicPose, Phase3CalculationStatus, Vec3 } from "@msku/contracts";
 import { useEffect, useMemo, useRef } from "react";
 import { Quaternion, Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -39,9 +39,10 @@ interface ModelProps {
   mirrored?: boolean;
   pose?: KinematicPose;
   hardpointOverrides?: Record<string, Vec3>;
+  coiloverPhysics?: CoiloverSample;
 }
 
-function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelProps) {
+function SuspensionModel({ mirrored = false, pose, hardpointOverrides, coiloverPhysics }: ModelProps) {
   const project = useWorkspace((state) => state.project);
   const selectedId = useWorkspace((state) => state.selectedHardpointId);
   const select = useWorkspace((state) => state.setSelectedHardpoint);
@@ -105,6 +106,7 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
         staticWheelCenter={points.get("wheel_center")!.position}
         actuationPointFor={actuationPointFor}
         kinematicPose={pose}
+        coiloverPhysics={coiloverPhysics}
         opacity={mirrored ? 0.2 : 1}
       />
     </group>
@@ -116,6 +118,9 @@ export function SuspensionViewport({
   mode = "geometry",
   forceVectors = [],
   hardpointOverrides,
+  coiloverPhysics,
+  coiloverPhysicsStatus,
+  coiloverPhysicsWarning,
 }: {
   pose?: KinematicPose;
   mode?: "geometry" | "kinematics" | "loads" | "optimization";
@@ -125,6 +130,9 @@ export function SuspensionViewport({
     origin: { x: number; y: number; z: number };
     force: { x: number; y: number; z: number };
   }>;
+  coiloverPhysics?: CoiloverSample;
+  coiloverPhysicsStatus?: Phase3CalculationStatus;
+  coiloverPhysicsWarning?: string;
 }) {
   const cameraPreset = useWorkspace((state) => state.cameraPreset);
   const cadMode = useWorkspace((state) => state.cadViewMode);
@@ -196,6 +204,12 @@ export function SuspensionViewport({
       data-rocker-angle-rad={actuationResult?.status === "SOLVED" ? actuationResult.rockerAngleRad : undefined}
       data-coilover-length-m={actuationResult?.status === "SOLVED" ? actuationResult.coiloverLengthM : undefined}
       data-pushrod-residual-m={actuationResult?.status === "SOLVED" ? actuationResult.pushrodResidualM : undefined}
+      data-coilover-physics-status={coiloverPhysicsStatus}
+      data-coilover-spring-force-n={coiloverPhysics?.springForceN}
+      data-coilover-damper-force-n={coiloverPhysics?.damperForceN}
+      data-coilover-total-force-n={coiloverPhysics?.totalAxialForceN}
+      data-coilover-motion-ratio={coiloverPhysics?.motionRatio}
+      data-coilover-physics-warning={coiloverPhysicsWarning}
     >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
@@ -206,7 +220,7 @@ export function SuspensionViewport({
         <directionalLight position={[-1.4, 1.1, -1.6]} intensity={0.48} color="#9aa9b8" />
         <spotLight position={[0.2, 2.8, -2.1]} intensity={0.72} angle={0.55} penumbra={0.82} color="#d7e1eb" />
         {referencePlanesVisible && <gridHelper args={[2, 20, sceneSurface.gridMajor, sceneSurface.gridMinor]} position={[0, 0, 0]} />}
-        <SuspensionModel pose={pose} hardpointOverrides={hardpointOverrides} />
+        <SuspensionModel pose={pose} hardpointOverrides={hardpointOverrides} coiloverPhysics={coiloverPhysics} />
         {maximumForce > 0 && forceVectors.map(({ id, origin, force }) => {
           const magnitude = Math.hypot(force.x, force.y, force.z);
           if (magnitude <= 1e-12) return null;
@@ -220,7 +234,7 @@ export function SuspensionViewport({
             />
           );
         })}
-        {mirror && <SuspensionModel mirrored pose={pose} hardpointOverrides={hardpointOverrides} />}
+        {mirror && <SuspensionModel mirrored pose={pose} hardpointOverrides={hardpointOverrides} coiloverPhysics={coiloverPhysics} />}
         <ContactShadows position={[0, 0.002, -0.48]} scale={2.2} opacity={0.3} blur={2.8} far={1.4} resolution={512} />
         <CameraRig preset={cameraPreset} />
         <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
@@ -238,6 +252,8 @@ export function SuspensionViewport({
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
         {coiloverStatus === "SOLVED_ACTUATION_GEOMETRY" && <span>GLB COILOVER · İKİ GÖZ ÇÖZÜLMÜŞ ROCKER/ŞASİ NOKTALARINA BAĞLI</span>}
         {coiloverStatus === "SOLVED_ACTUATION_GEOMETRY" && project.dataClassification === "demonstration" && <span>DEMO/SENTETİK AKTÜASYON · GERÇEK ARAÇ/CAD VERİSİ DEĞİL</span>}
+        {coiloverPhysicsStatus === "VERIFIED_NUMERICALLY" && coiloverPhysics && <span>COILOVER FİZİĞİ · F={coiloverPhysics.totalAxialForceN.toFixed(1)} N · MR={coiloverPhysics.motionRatio.toFixed(3)}</span>}
+        {coiloverPhysicsStatus && coiloverPhysicsStatus !== "VERIFIED_NUMERICALLY" && <span>COILOVER FİZİĞİ ENGELLENDİ · {coiloverPhysicsWarning ?? coiloverPhysicsStatus}</span>}
         {coiloverStatus === "MISSING_ACTUATION_HARDPOINTS" && <span>GLB COILOVER GİZLENDİ · UPRIGHT/ROCKER/ŞASİ MONTAJ HARDPOINT VERİSİ YOK</span>}
         {coiloverStatus === "FAILED_ACTUATION_KINEMATICS" && <span>GLB COILOVER GİZLENDİ · {actuationResult?.status === "FAILED" ? actuationResult.reason : "AKTÜASYON KAPANIŞI ÇÖZÜLEMEDİ"}</span>}
         {visualModelSource === "glb" && chassisVisible && <span>ŞASİ/PICKUP REFERANS PANELİ · ŞASİ CAD'İ DEĞİL</span>}
