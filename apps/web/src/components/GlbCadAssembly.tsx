@@ -493,18 +493,13 @@ export function GlbCadAssembly({
       )}
       {visibility.coilover && (
         <group name="demo-direct-acting-damper-mounts" userData={{ visualStatus: "DEMO_DIRECT_ACTING_NOT_ENGINEERING_VALIDATED" }}>
-          {/* Compact lower-arm tab and upper chassis-side mounting stub.
-              Do not render fictitious full-length chassis braces. */}
+          {/* Lower eye bracket follows the moving lower-arm pickup segment. */}
           <DemoMountStrut start={[lowerEye[0], lowerEye[1] - 0.045, lowerEye[2]]} end={lowerEye} opacity={opacity} />
-          <DemoMountStrut
-            start={upperEye}
-            end={[
-              upperEye[0] + (upperInboard[0] - upperEye[0]) * 0.09,
-              upperEye[1] + (upperInboard[1] - upperEye[1]) * 0.09,
-              upperEye[2] + (upperInboard[2] - upperEye[2]) * 0.09,
-            ]}
-            opacity={opacity}
-          />
+          {/* Fixed chassis reference crossmember with an upright damper tower.
+              Synthetic support geometry, not a validated frame load path. */}
+          <DemoMountStrut start={upperFront} end={upperRear} opacity={opacity} />
+          <DemoMountStrut start={upperInboard} end={upperEye} opacity={opacity} />
+          <DemoMountEye position={upperInboard} opacity={opacity} />
           <DemoMountEye position={lowerEye} opacity={opacity} />
           <DemoMountEye position={upperEye} opacity={opacity} />
           <DemoDamperClevis position={lowerEye} toward={upperEye} opacity={opacity} />
