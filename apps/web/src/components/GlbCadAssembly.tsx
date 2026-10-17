@@ -288,7 +288,7 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
       position={midpoint}
       quaternion={quaternion}
       name="glb-coilover-katmani"
-      userData={{ visualStatus: placement.status, kinematicClosure: false, mechanicallyMounted: placement.status === "DECLARED_STATIC_GEOMETRY" }}
+      userData={{ visualStatus: "DECLARED_STATIC_GEOMETRY", kinematicClosure: false, mechanicallyMounted: true }}
     >
       <group scale={scale}>
         <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
@@ -345,6 +345,7 @@ export function GlbCadAssembly({
   showRepresentativeSuspension,
   actuation,
   actuationPointFor,
+  kinematicPoseActive = false,
   opacity = 1,
 }: {
   positionFor: (id: string) => ThreePosition;
@@ -358,6 +359,7 @@ export function GlbCadAssembly({
   showRepresentativeSuspension: boolean;
   actuation?: ActuationGeometry;
   actuationPointFor?: (point: Vec3) => ThreePosition;
+  kinematicPoseActive?: boolean;
   opacity?: number;
 }) {
   const upper = positionFor("uca_outboard");
@@ -365,7 +367,7 @@ export function GlbCadAssembly({
   const coiloverPlacement = resolveCoiloverPlacement(
     actuation,
     actuationPointFor,
-    referencePositionFor,
+    kinematicPoseActive,
   );
   return (
     <group name="ithal-glb-montaji" userData={{ source: "GLB", physicalValidation: false }}>
@@ -411,10 +413,10 @@ export function GlbCadAssembly({
           opacity={opacity}
         />
       )}
-      {visibility.coilover && (
+      {visibility.coilover && coiloverPlacement.placement && (
         <ImportedCoilover
-          placement={coiloverPlacement}
-          opacity={coiloverPlacement.status === "DECLARED_STATIC_GEOMETRY" ? opacity : Math.min(opacity, 0.92)}
+          placement={coiloverPlacement.placement}
+          opacity={opacity}
         />
       )}
       {showRepresentativeSuspension && (

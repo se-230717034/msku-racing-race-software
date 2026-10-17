@@ -77,8 +77,8 @@ test("loads the six GLB assets and retains the procedural fallback", async ({ pa
   const vehicleViewport = page.getByTestId("full-vehicle-viewport");
   await expect(vehicleViewport).toHaveAttribute("data-visual-model-source", "glb");
   await expect(vehicleViewport).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
-  await expect(vehicleViewport).toHaveAttribute("data-coilover-status", "UNMOUNTED_COMPONENT_PREVIEW");
-  await expect(vehicleViewport).toHaveAttribute("data-coilover-count", "4");
+  await expect(vehicleViewport).toHaveAttribute("data-coilover-status", "MISSING_ACTUATION_HARDPOINTS");
+  await expect(vehicleViewport).toHaveAttribute("data-coilover-count", "0");
   for (const file of ["wheel.glb", "brake.glb", "hub.glb", "upright.glb", "suspension.glb", "coilover.glb"]) {
     const response = await page.request.get(`/models/${file}`);
     expect(response.ok(), `${file} should be served`).toBe(true);
@@ -89,12 +89,12 @@ test("loads the six GLB assets and retains the procedural fallback", async ({ pa
   const suspensionViewport = page.getByTestId("suspension-viewport");
   await expect(suspensionViewport).toHaveAttribute("data-visual-model-source", "glb");
   await expect(suspensionViewport).toHaveAttribute("data-glb-ready", "true");
-  await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "UNMOUNTED_COMPONENT_PREVIEW");
-  await expect(page.getByText("GLB COILOVER · BAĞLANTISIZ PARÇA ÖNİZLEMESİ", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "coilover önizlemesi", exact: true }).click();
+  await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "MISSING_ACTUATION_HARDPOINTS");
+  await expect(page.getByText("GLB COILOVER GİZLENDİ · UPRIGHT/ROCKER/ŞASİ", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "coilover (montaj verisi gerekir)", exact: true }).click();
   await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "HIDDEN");
-  await page.getByRole("button", { name: "coilover önizlemesi", exact: true }).click();
-  await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "UNMOUNTED_COMPONENT_PREVIEW");
+  await page.getByRole("button", { name: "coilover (montaj verisi gerekir)", exact: true }).click();
+  await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "MISSING_ACTUATION_HARDPOINTS");
   await expect(page.getByText("ÖLÇEĞE UYARLANMIŞ GLB", { exact: false })).toBeVisible();
   stage = "switch-procedural";
   await page.getByRole("button", { name: "Prosedürel modelleri kullan" }).click();
@@ -105,7 +105,7 @@ test("loads the six GLB assets and retains the procedural fallback", async ({ pa
   await expect(suspensionViewport).toHaveAttribute("data-visual-model-source", "glb");
   stage = "load-suspension-reference";
   await page.getByRole("button", { name: /temsili çalıştırma/i }).click({ force: true });
-  await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "UNMOUNTED_COMPONENT_PREVIEW");
+  await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "MISSING_ACTUATION_HARDPOINTS");
   await expect(page.getByText("TEMSİLİ PUSHROD/ROCKER · veri yok · hareketsiz", { exact: true })).toBeVisible();
   await page.waitForTimeout(750);
   expect(pageErrors).toEqual([]);
@@ -126,7 +126,7 @@ test("separates the single-corner mechanical layers and applies the mechanical-a
   await expect(page.getByRole("button", { name: "üst salıncak", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "alt salıncak", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "rot kolu", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "coilover önizlemesi", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "coilover (montaj verisi gerekir)", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "fren diski", exact: true }).click();
   await expect(viewport).toHaveAttribute("data-brake-disc-visible", "false");
@@ -149,9 +149,9 @@ test("separates the single-corner mechanical layers and applies the mechanical-a
 test("keeps unsupported actuation in an explicit static representative layer", async ({ page }) => {
   await page.goto("/");
   const vehicleViewport = page.getByTestId("full-vehicle-viewport");
-  await expect(vehicleViewport).toHaveAttribute("data-coilover-status", "UNMOUNTED_COMPONENT_PREVIEW");
-  await expect(vehicleViewport).toHaveAttribute("data-coilover-count", "4");
-  await expect(page.getByText("COILOVER ÖNİZLEMESİ · MONTAJ VERİSİ YOK", { exact: false })).toBeVisible();
+  await expect(vehicleViewport).toHaveAttribute("data-coilover-status", "MISSING_ACTUATION_HARDPOINTS");
+  await expect(vehicleViewport).toHaveAttribute("data-coilover-count", "0");
+  await expect(page.getByText("COILOVER GİZLENDİ · MONTAJ VERİSİ YOK", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: /temsili çalıştırma/i }).click({ force: true });
   await page.waitForTimeout(1_000);
   await expect(vehicleViewport).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
@@ -163,7 +163,7 @@ test("keeps unsupported actuation in an explicit static representative layer", a
   await page.getByRole("button", { name: "Geometri" }).click();
   await page.waitForTimeout(1_000);
   await expect(page.getByTestId("suspension-viewport")).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
-  await expect(page.getByText("GLB COILOVER · BAĞLANTISIZ PARÇA ÖNİZLEMESİ", { exact: false })).toBeVisible();
+  await expect(page.getByText("GLB COILOVER GİZLENDİ · UPRIGHT/ROCKER/ŞASİ", { exact: false })).toBeVisible();
 });
 
 test("keeps per-corner edits persistent and blocks unsupported playback", async ({ page }) => {

@@ -740,6 +740,7 @@ export function ProceduralCadAssembly({
   importedAssetMirrored = false,
   actuation,
   actuationPointFor,
+  kinematicPoseActive = false,
   selectedHardpointId,
   onSelectHardpoint,
   opacity = 1,
@@ -760,6 +761,7 @@ export function ProceduralCadAssembly({
   importedAssetMirrored?: boolean;
   actuation?: ActuationGeometry;
   actuationPointFor?: (point: Vec3) => ThreePosition;
+  kinematicPoseActive?: boolean;
   selectedHardpointId?: string;
   onSelectHardpoint?: (id: string) => void;
   opacity?: number;
@@ -918,6 +920,7 @@ export function ProceduralCadAssembly({
             showRepresentativeSuspension={showMechanism && showRepresentativeActuation}
             actuation={actuation}
             actuationPointFor={actuationPointFor}
+            kinematicPoseActive={kinematicPoseActive}
             opacity={opacity}
           />
         </Suspense>

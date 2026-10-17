@@ -22,7 +22,7 @@ const visibilityLabels = {
   brakeDisc: "fren diski",
   caliper: "kaliper",
   hub: "porya",
-  coilover: "coilover önizlemesi",
+  coilover: "coilover (montaj verisi gerekir)",
   hardpoints: "bağlantı noktaları",
   chassis: "şasi referansı",
   referencePlanes: "referans düzlemi",

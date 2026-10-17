@@ -102,6 +102,7 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
         importedAssetMirrored={project.suspension.corner.endsWith("right") !== mirrored}
         actuation={project.suspension.actuation}
         actuationPointFor={actuationPointFor}
+        kinematicPoseActive={Boolean(pose)}
         opacity={mirrored ? 0.2 : 1}
       />
     </group>
@@ -146,6 +147,13 @@ export function SuspensionViewport({
   const referencePlanesVisible = useWorkspace((state) => state.visibility.referencePlanes);
   const representativeVisible = useWorkspace((state) => state.visibility.representativeActuation);
   const hasDeclaredActuation = useWorkspace((state) => Boolean(state.project.suspension.actuation));
+  const coiloverStatus = visualModelSource !== "glb" || !coiloverVisible
+    ? "HIDDEN"
+    : !hasDeclaredActuation
+      ? "MISSING_ACTUATION_HARDPOINTS"
+      : pose
+        ? "UNSOLVED_KINEMATIC_CLOSURE"
+        : "DECLARED_STATIC_GEOMETRY";
   const mechanicalAssemblyActive = !tireVisible
     && !rimVisible
     && uprightVisible
@@ -177,7 +185,7 @@ export function SuspensionViewport({
       data-hub-visible={wheelVisible && hubVisible}
       data-reference-plane-visible={referencePlanesVisible}
       data-mechanical-assembly-active={mechanicalAssemblyActive}
-      data-coilover-status={visualModelSource === "glb" && coiloverVisible ? (hasDeclaredActuation ? "DECLARED_STATIC_GEOMETRY" : "UNMOUNTED_COMPONENT_PREVIEW") : "HIDDEN"}
+      data-coilover-status={coiloverStatus}
     >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
@@ -218,7 +226,9 @@ export function SuspensionViewport({
         {mechanicalAssemblyActive && <span>MEKANİK MONTAJ · LASTİK/JANT GİZLİ</span>}
         <span>{visualModelSource === "glb" ? "ÖLÇEĞE UYARLANMIŞ GLB · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK" : "PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK"}</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
-        {visualModelSource === "glb" && coiloverVisible && <span>GLB COILOVER · {hasDeclaredActuation ? "tanımlı statik uç noktaları · kinematik kapanış yok" : "BAĞLANTISIZ PARÇA ÖNİZLEMESİ · MONTAJ HARDPOINT VERİSİ YOK"}</span>}
+        {coiloverStatus === "DECLARED_STATIC_GEOMETRY" && <span>GLB COILOVER · İKİ GÖZ TANIMLI UÇ NOKTALARINA BAĞLI · yalnızca statik geometri</span>}
+        {coiloverStatus === "MISSING_ACTUATION_HARDPOINTS" && <span>GLB COILOVER GİZLENDİ · UPRIGHT/ROCKER/ŞASİ MONTAJ HARDPOINT VERİSİ YOK</span>}
+        {coiloverStatus === "UNSOLVED_KINEMATIC_CLOSURE" && <span>GLB COILOVER GİZLENDİ · ROCKER HAREKETİ VE DAMPER BOYU ÇÖZÜLMEDİ</span>}
         {visualModelSource === "glb" && <span>PICKUP TAŞIYICI PANELİ · SADECE GÖRSEL REFERANS · ŞASİ CAD'İ DEĞİL</span>}
         {representativeVisible && <span>TEMSİLİ PUSHROD/ROCKER · veri yok · hareketsiz</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}

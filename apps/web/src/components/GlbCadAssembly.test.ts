@@ -3,13 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import { resolveCoiloverPlacement } from "./coiloverPlacement";
 
-const referencePoints: Record<string, [number, number, number]> = {
-  uca_front_inboard: [0.10, 0.40, -0.30],
-  uca_rear_inboard: [-0.10, 0.40, -0.30],
-  lca_front_inboard: [0.12, 0.12, -0.32],
-  lca_rear_inboard: [-0.12, 0.12, -0.32],
-};
-
 describe("GLB coilover placement", () => {
   it("uses declared damper endpoints without inventing a connection", () => {
     const actuation: ActuationGeometry = {
@@ -34,24 +27,52 @@ describe("GLB coilover placement", () => {
     const placement = resolveCoiloverPlacement(
       actuation,
       toScene,
-      (id) => referencePoints[id],
     );
 
     expect(placement.status).toBe("DECLARED_STATIC_GEOMETRY");
-    expect(placement.start).toEqual([0.31, 0.51, -0.41]);
-    expect(placement.end).toEqual([0.61, 0.71, -0.21]);
+    expect(placement.placement?.start).toEqual([0.31, 0.51, -0.41]);
+    expect(placement.placement?.end).toEqual([0.61, 0.71, -0.21]);
   });
 
-  it("returns an explicitly unmounted preview when actuation hardpoints are absent", () => {
+  it("refuses to invent a placement when actuation hardpoints are absent", () => {
     const placement = resolveCoiloverPlacement(
       undefined,
       undefined,
-      (id) => referencePoints[id],
     );
 
-    expect(placement.status).toBe("UNMOUNTED_COMPONENT_PREVIEW");
-    expect(placement.start[1]).toBeCloseTo(0.48);
-    expect(placement.end[1]).toBeCloseTo(0.48);
-    expect(placement.end[0] - placement.start[0]).toBeCloseTo(0.22);
+    expect(placement.status).toBe("MISSING_ACTUATION_HARDPOINTS");
+    expect(placement.placement).toBeUndefined();
+    expect(placement.missingHardpoints).toEqual([
+      "uprightPickup",
+      "rockerPushrodPickup",
+      "rockerSpringPickup",
+      "rockerAxisStart",
+      "rockerAxisEnd",
+      "springChassisPickup",
+    ]);
+  });
+
+  it("suppresses the static coilover while rocker closure is unsolved", () => {
+    const actuation: ActuationGeometry = {
+      type: "pushrod",
+      uprightPickup: { x: 0.1, y: 0.2, z: 0.3 },
+      rockerPushrodPickup: { x: 0.2, y: 0.3, z: 0.4 },
+      rockerSpringPickup: { x: 0.3, y: 0.4, z: 0.5 },
+      rockerAxisStart: { x: 0, y: 0.2, z: 0.5 },
+      rockerAxisEnd: { x: 0.1, y: 0.2, z: 0.5 },
+      springChassisPickup: { x: 0.6, y: 0.2, z: 0.7 },
+      springFreeLengthM: 0.25,
+      springRateNPerM: 30_000,
+      springPreloadN: 0,
+    };
+
+    const placement = resolveCoiloverPlacement(
+      actuation,
+      (point) => [point.x, point.z, -point.y],
+      true,
+    );
+
+    expect(placement.status).toBe("UNSOLVED_KINEMATIC_CLOSURE");
+    expect(placement.placement).toBeUndefined();
   });
 });
