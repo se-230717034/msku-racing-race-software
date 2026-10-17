@@ -288,12 +288,18 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
       position={midpoint}
       quaternion={quaternion}
       name="glb-coilover-katmani"
-      userData={{ visualStatus: "SOLVED_ACTUATION_GEOMETRY", kinematicClosure: true, mechanicallyMounted: true }}
+      userData={{ visualStatus: "SOLVED_ACTUATION_GEOMETRY", kinematicClosure: true, mechanicallyMounted: false, physicalValidation: false }}
     >
       {/* Keep the imported coilover's radial dimensions fixed while matching the solved eye-to-eye length. */}
       <group scale={[1, scale, 1]}>
         <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
       </group>
+      {[-targetLength / 2, targetLength / 2].map((y) => (
+        <mesh key={y} position={[0, y, 0]} castShadow receiveShadow>
+          <sphereGeometry args={[0.012, 16, 12]} />
+          <meshStandardMaterial color="#606a73" metalness={0.45} roughness={0.52} transparent={opacity < 1} opacity={opacity} />
+        </mesh>
+      ))}
     </group>
   );
 }
