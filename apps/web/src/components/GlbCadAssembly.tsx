@@ -189,10 +189,10 @@ function ImportedHub({
   const radialScale = radius * 0.24 / GLB_SOURCE_DIMENSIONS.hub.radius;
   const widthScale = width * 0.42 / GLB_SOURCE_DIMENSIONS.hub.width;
   const [cx, cy, cz] = GLB_SOURCE_DIMENSIONS.hub.centre;
-  // Small visual-only axial correction to reduce overlap with the rotor hat.
-  // Unlike a full half-width offset, this keeps the visible hub flange seated
-  // at the wheel centre. The GLB stack is not a validated mechanical assembly.
-  const hubAxialCorrection = 0.012;
+  // Visual-only hub offset toward the wheel-facing side of the rotor.
+  // Preserve every mesh; no components are hidden or deleted.
+  // The GLB stack is not a validated mechanical assembly.
+  const hubAxialCorrection = -0.012;
   return (
     <group position={position} quaternion={quaternion} name="glb-porya-katmani">
       <group position={[0, 0, hubAxialCorrection]}>
