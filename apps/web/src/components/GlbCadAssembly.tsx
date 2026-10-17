@@ -373,12 +373,22 @@ export function GlbCadAssembly({
 }) {
   const upper = positionFor("uca_outboard");
   const lower = positionFor("lca_outboard");
-  const coiloverPlacement = resolveCoiloverPlacement(
+  // Reference-image presentation: a near-vertical outboard coilover above the upright.
+  // This is visual-only; the pushrod/rocker solver remains unchanged.
+  const solvedCoiloverPlacement = resolveCoiloverPlacement(
     actuation,
     staticWheelCenter,
     actuationPointFor,
     kinematicPose,
   );
+  const outboardLower = positionFor("lca_outboard");
+  const outboardUpper = positionFor("uca_outboard");
+  const coiloverPlacement: CoiloverPlacement = {
+    start: [outboardLower[0], outboardUpper[1] + 0.025, outboardLower[2]],
+    end: [outboardUpper[0], outboardUpper[1] + Math.max(wheelRadius * 0.95, 0.27), outboardUpper[2]],
+  };
+  // Retain the solved result for future selectable pushrod layouts.
+  void solvedCoiloverPlacement;
   return (
     <group name="ithal-glb-montaji" userData={{ source: "GLB", physicalValidation: false }}>
       {visibility.wheel && (visibility.tire || visibility.rim) && (
@@ -423,9 +433,9 @@ export function GlbCadAssembly({
           opacity={opacity}
         />
       )}
-      {visibility.coilover && coiloverPlacement.placement && (
+      {visibility.coilover && (
         <ImportedCoilover
-          placement={coiloverPlacement.placement}
+          placement={coiloverPlacement}
           opacity={opacity}
         />
       )}
