@@ -414,15 +414,18 @@ export function GlbCadAssembly({
     (upperFront[1] + upperRear[1]) / 2,
     (upperFront[2] + upperRear[2]) / 2,
   ];
+  // Reference-style outboard mounting: lower eye on the upper face of the
+  // moving lower arm, top eye above it on a fixed chassis-side bracket.
+  // Both points remain inboard of the tire and are visual demo locations.
   const lowerEye: ThreePosition = [
-    lowerOutboard[0] * 0.62 + lowerInboard[0] * 0.38,
-    lowerOutboard[1] * 0.62 + lowerInboard[1] * 0.38 + 0.025,
-    lowerOutboard[2] * 0.62 + lowerInboard[2] * 0.38,
+    lowerOutboard[0] * 0.54 + lowerInboard[0] * 0.46,
+    lowerOutboard[1] * 0.54 + lowerInboard[1] * 0.46 + 0.045,
+    lowerOutboard[2] * 0.54 + lowerInboard[2] * 0.46,
   ];
   const upperEye: ThreePosition = [
-    upperInboard[0] * 0.45 + lowerEye[0] * 0.55,
-    Math.max(upperInboard[1] + 0.19, lowerEye[1] + Math.max(wheelRadius * 0.9, 0.28)),
-    upperInboard[2] * 0.45 + lowerEye[2] * 0.55,
+    lowerEye[0] * 0.82 + upperInboard[0] * 0.18,
+    Math.max(upperInboard[1] + 0.16, lowerEye[1] + Math.max(wheelRadius * 0.85, 0.3)),
+    lowerEye[2] * 0.82 + upperInboard[2] * 0.18,
   ];
   const coiloverPlacement: CoiloverPlacement = { start: lowerEye, end: upperEye };
   return (
