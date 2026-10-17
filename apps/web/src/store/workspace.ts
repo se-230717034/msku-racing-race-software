@@ -13,6 +13,7 @@ export type ModuleId = "workspace" | "vehicle" | "geometry" | "kinematics" | "lo
 export type CameraPreset = "perspective" | "isometric" | "front" | "rear" | "side" | "top";
 export type VehicleViewMode = "full_vehicle" | "front_axle" | "rear_axle" | "active_corner" | "chassis_cg" | "suspension" | "kinematics" | "dynamics";
 export type CadViewMode = "technical" | "detailed" | "hybrid";
+export type VisualModelSource = "glb" | "procedural";
 
 export interface VisibilityState {
   upper: boolean;
@@ -41,6 +42,7 @@ interface WorkspaceState {
   cameraPreset: CameraPreset;
   vehicleViewMode: VehicleViewMode;
   cadViewMode: CadViewMode;
+  visualModelSource: VisualModelSource;
   visibility: VisibilityState;
   latestFullCarResult: FullCarSimulationResponse | null;
   latestBicycleResult: BicycleSimulationResponse | null;
@@ -49,6 +51,7 @@ interface WorkspaceState {
   setCameraPreset: (preset: CameraPreset) => void;
   setVehicleViewMode: (mode: VehicleViewMode) => void;
   setCadViewMode: (mode: CadViewMode) => void;
+  setVisualModelSource: (source: VisualModelSource) => void;
   setActiveCorner: (cornerId: CornerId) => void;
   toggleVisibility: (key: keyof VisibilityState) => void;
   setVisibility: (values: Partial<VisibilityState>) => void;
@@ -90,6 +93,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   cameraPreset: "perspective",
   vehicleViewMode: "full_vehicle",
   cadViewMode: "detailed",
+  visualModelSource: "glb",
   latestFullCarResult: null,
   latestBicycleResult: null,
   visibility: {
@@ -116,6 +120,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   setCameraPreset: (cameraPreset) => set({ cameraPreset }),
   setVehicleViewMode: (vehicleViewMode) => set({ vehicleViewMode }),
   setCadViewMode: (cadViewMode) => set({ cadViewMode }),
+  setVisualModelSource: (visualModelSource) => set({ visualModelSource }),
   setActiveCorner: (activeCornerId) => set((state) => ({
     project: stamp({
       ...state.project,

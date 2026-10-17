@@ -1,11 +1,12 @@
 import { Edges, Html, Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { DoubleSide, Quaternion, Vector3 } from "three";
 import { ConvexGeometry } from "three-stdlib";
 
 import { LINKS } from "../domain/geometry";
-import type { CadViewMode, VisibilityState } from "../store/workspace";
+import type { CadViewMode, VisibilityState, VisualModelSource } from "../store/workspace";
+import { GlbCadAssembly } from "./GlbCadAssembly";
 
 export type ThreePosition = [number, number, number];
 export type ThreeQuaternion = [number, number, number, number];
@@ -716,6 +717,8 @@ export function ProceduralCadAssembly({
   mode,
   showMechanism = true,
   showRepresentativeActuation = false,
+  visualModelSource = "procedural",
+  importedAssetMirrored = false,
   selectedHardpointId,
   onSelectHardpoint,
   opacity = 1,
@@ -732,12 +735,15 @@ export function ProceduralCadAssembly({
   mode: CadViewMode;
   showMechanism?: boolean;
   showRepresentativeActuation?: boolean;
+  visualModelSource?: VisualModelSource;
+  importedAssetMirrored?: boolean;
   selectedHardpointId?: string;
   onSelectHardpoint?: (id: string) => void;
   opacity?: number;
 }) {
   const showTechnical = mode !== "detailed";
   const showDetailed = mode !== "technical";
+  const useImportedParts = visualModelSource === "glb";
   const upperOutboard = positionFor("uca_outboard");
   const lowerOutboard = positionFor("lca_outboard");
   const tieOutboard = positionFor("tie_rod_outboard");
@@ -748,6 +754,39 @@ export function ProceduralCadAssembly({
     positionFor("lca_rear_inboard"),
     positionFor("tie_rod_inboard"),
   ];
+  const importedFallback = <>
+    {showMechanism && visibility.upright && (
+      <MechanicalUpright
+        upper={upperOutboard}
+        lower={lowerOutboard}
+        tie={tieOutboard}
+        wheelCentre={wheelPosition}
+        wheelQuaternion={wheelQuaternion}
+        opacity={opacity}
+      />
+    )}
+    {(visibility.upright || (visibility.wheel && (
+      visibility.tire
+      || visibility.rim
+      || visibility.hub
+      || (visibility.brake && (visibility.brakeDisc || visibility.caliper))
+    ))) && (
+      <ProceduralWheel
+        name={`loading-wheel-${assemblyId}`}
+        position={wheelPosition}
+        quaternion={wheelQuaternion}
+        radius={wheelRadius}
+        width={wheelWidth}
+        mode={mode}
+        showTire={visibility.wheel && visibility.tire}
+        showRim={visibility.wheel && visibility.rim}
+        showBrakeDisc={visibility.wheel && visibility.brake && visibility.brakeDisc}
+        showCaliper={visibility.wheel && visibility.brake && visibility.caliper}
+        showHub={visibility.wheel && visibility.hub}
+        opacity={opacity}
+      />
+    )}
+  </>;
 
   return (
     <group name={`cad-assembly-${assemblyId}`}>
@@ -775,7 +814,7 @@ export function ProceduralCadAssembly({
       })}
       {showMechanism && showDetailed && <>
         {visibility.chassis && <ChassisPickupReference points={chassisPickupPoints} opacity={opacity} />}
-        {visibility.upright && (
+        {visibility.upright && !useImportedParts && (
           <MechanicalUpright
             upper={upperOutboard}
             lower={lowerOutboard}
@@ -794,8 +833,13 @@ export function ProceduralCadAssembly({
           <PivotBushing position={positionFor("lca_rear_inboard")} axisTarget={positionFor("lca_front_inboard")} opacity={opacity} />
         </>}
         {visibility.steering && <RodEndJoint position={positionFor("tie_rod_inboard")} toward={tieOutboard} scale={0.75} opacity={opacity} />}
+        {useImportedParts && visibility.upright && <>
+          <RodEndJoint position={upperOutboard} toward={wheelPosition} opacity={opacity} />
+          <RodEndJoint position={lowerOutboard} toward={wheelPosition} opacity={opacity} />
+          <RodEndJoint position={tieOutboard} toward={wheelPosition} scale={0.82} opacity={opacity} />
+        </>}
       </>}
-      {showMechanism && showRepresentativeActuation && (
+      {showMechanism && showRepresentativeActuation && !useImportedParts && (
         <RepresentativeActuationLayer positionFor={staticPositionFor ?? positionFor} />
       )}
       {showMechanism && visibility.hardpoints && hardpointIds.map((id) => (
@@ -810,7 +854,7 @@ export function ProceduralCadAssembly({
           } : undefined}
         />
       ))}
-      {(visibility.upright || (visibility.wheel && (
+      {!useImportedParts && (visibility.upright || (visibility.wheel && (
         visibility.tire
         || visibility.rim
         || visibility.hub
@@ -830,6 +874,22 @@ export function ProceduralCadAssembly({
           showHub={visibility.wheel && visibility.hub}
           opacity={opacity}
         />
+      )}
+      {useImportedParts && (
+        <Suspense fallback={importedFallback}>
+          <GlbCadAssembly
+            positionFor={positionFor}
+            referencePositionFor={staticPositionFor ?? positionFor}
+            wheelPosition={wheelPosition}
+            wheelQuaternion={wheelQuaternion}
+            wheelRadius={wheelRadius}
+            wheelWidth={wheelWidth}
+            visibility={visibility}
+            mirrored={importedAssetMirrored}
+            showRepresentativeSuspension={showMechanism && showRepresentativeActuation}
+            opacity={opacity}
+          />
+        </Suspense>
       )}
     </group>
   );

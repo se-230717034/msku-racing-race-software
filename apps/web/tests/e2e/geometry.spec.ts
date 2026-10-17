@@ -68,6 +68,39 @@ test("switches the shared Turkish CAD view modes without changing engineering da
   await expect(suspensionViewport).toHaveAttribute("data-cad-mode", "hybrid");
 });
 
+test("loads the five GLB assets and retains the procedural fallback", async ({ page }) => {
+  const pageErrors: string[] = [];
+  let stage = "initial-load";
+  page.on("pageerror", (error) => pageErrors.push(`${stage}: ${error.stack ?? error.message}`));
+  await page.goto("/");
+  const vehicleViewport = page.getByTestId("full-vehicle-viewport");
+  await expect(vehicleViewport).toHaveAttribute("data-visual-model-source", "glb");
+  await expect(vehicleViewport).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
+  for (const file of ["wheel.glb", "brake.glb", "hub.glb", "upright.glb", "suspension.glb"]) {
+    const response = await page.request.get(`/models/${file}`);
+    expect(response.ok(), `${file} should be served`).toBe(true);
+    expect((await response.body()).byteLength).toBeGreaterThan(10_000);
+  }
+  stage = "open-geometry";
+  await page.getByRole("button", { name: "Geometri" }).click();
+  const suspensionViewport = page.getByTestId("suspension-viewport");
+  await expect(suspensionViewport).toHaveAttribute("data-visual-model-source", "glb");
+  await expect(suspensionViewport).toHaveAttribute("data-glb-ready", "true");
+  await expect(page.getByText("ÖLÇEĞE UYARLANMIŞ GLB", { exact: false })).toBeVisible();
+  stage = "switch-procedural";
+  await page.getByRole("button", { name: "Prosedürel modelleri kullan" }).click();
+  await expect(suspensionViewport).toHaveAttribute("data-visual-model-source", "procedural");
+  await expect(page.getByText("PROSEDÜREL GÖRSEL", { exact: false })).toBeVisible();
+  stage = "switch-glb";
+  await page.getByRole("button", { name: "Hazır GLB modellerini kullan" }).click();
+  await expect(suspensionViewport).toHaveAttribute("data-visual-model-source", "glb");
+  stage = "load-suspension-reference";
+  await page.getByRole("button", { name: /temsili çalıştırma/i }).click();
+  await expect(page.getByText("TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz", { exact: true })).toBeVisible();
+  await page.waitForTimeout(750);
+  expect(pageErrors).toEqual([]);
+});
+
 test("separates the single-corner mechanical layers and applies the mechanical-assembly view", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Geometri" }).click();
@@ -79,7 +112,7 @@ test("separates the single-corner mechanical layers and applies the mechanical-a
   await expect(viewport).toHaveAttribute("data-caliper-visible", "true");
   await expect(viewport).toHaveAttribute("data-hub-visible", "true");
   await expect(viewport).toHaveAttribute("data-reference-plane-visible", "false");
-  await expect(page.getByText("PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK", { exact: true })).toBeVisible();
+  await expect(page.getByText("ÖLÇEĞE UYARLANMIŞ GLB · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "üst salıncak", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "alt salıncak", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "rot kolu", exact: true })).toBeVisible();

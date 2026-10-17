@@ -1,4 +1,4 @@
-import { ContactShadows, GizmoHelper, GizmoViewport, Html, Line, OrbitControls } from "@react-three/drei";
+import { ContactShadows, GizmoHelper, GizmoViewport, Html, Line, OrbitControls, useProgress } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import type { CornerId, FullCarSample, KinematicPose, Project, Suspension, Vec3 } from "@msku/contracts";
 import { useEffect, useMemo, useRef } from "react";
@@ -73,6 +73,7 @@ export function VehicleCornerAssembly({
   steeringRad = 0,
   showMechanism = true,
   cadMode,
+  visualModelSource,
   showRepresentativeActuation = false,
 }: {
   project: Project;
@@ -83,6 +84,7 @@ export function VehicleCornerAssembly({
   steeringRad?: number;
   showMechanism?: boolean;
   cadMode: CadViewMode;
+  visualModelSource: "glb" | "procedural";
   showRepresentativeActuation?: boolean;
 }) {
   const corner = project.vehicle.corners[cornerId];
@@ -136,8 +138,10 @@ export function VehicleCornerAssembly({
         mode={cadMode}
         showMechanism={showMechanism}
         showRepresentativeActuation={showRepresentativeActuation}
+        visualModelSource={visualModelSource}
+        importedAssetMirrored={cornerId.endsWith("right")}
       />
-      {visibility.labels && (
+      {visibility.labels && visualModelSource === "procedural" && (
         <Html position={toThreePosition({ ...wheelPosition, z: wheelPosition.z + suspension.wheel.radius + 0.07 })} center>
           <span className="scene-label">{cornerLabel(cornerId)} · {uiStatus(corner.geometrySource)}</span>
         </Html>
@@ -218,6 +222,10 @@ export function FullVehicleViewport({
   const mode = useWorkspace((state) => state.vehicleViewMode);
   const visibility = useWorkspace((state) => state.visibility);
   const cadMode = useWorkspace((state) => state.cadViewMode);
+  const visualModelSource = useWorkspace((state) => state.visualModelSource);
+  const glbProgress = useProgress();
+  const glbReady = visualModelSource !== "glb"
+    || (glbProgress.total > 0 && glbProgress.loaded === glbProgress.total && !glbProgress.active);
   const sceneSurface = cadMode === "detailed"
     ? { background: "#d9dde0", fog: "#d9dde0", gridMajor: "#747c83", gridMinor: "#b8bec3" }
     : { background: "#080a0e", fog: "#080a0e", gridMajor: "#303846", gridMinor: "#171c24" };
@@ -241,7 +249,7 @@ export function FullVehicleViewport({
       : null;
 
   return (
-    <div className="full-vehicle-viewport" data-testid="full-vehicle-viewport" data-cad-mode={cadMode}>
+    <div className="full-vehicle-viewport" data-testid="full-vehicle-viewport" data-cad-mode={cadMode} data-visual-model-source={visualModelSource} data-glb-ready={glbReady}>
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 36, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
         <fog attach="fog" args={[sceneSurface.fog, 5.5, 13]} />
@@ -274,6 +282,7 @@ export function FullVehicleViewport({
               steeringRad={steeringRad}
               showMechanism={showMechanism}
               cadMode={cadMode}
+              visualModelSource={visualModelSource}
               showRepresentativeActuation={showMechanism && visibility.representativeActuation && cornerId === project.activeCornerId}
             />
           ))}
@@ -303,8 +312,10 @@ export function FullVehicleViewport({
           />
         )}
       </div>
-      <div className="full-vehicle-badge">DÖRT KÖŞE MODELİ · {VIEW_MODE_LABELS[mode]} · {cadMode === "technical" ? "TEKNİK" : cadMode === "detailed" ? "DETAYLI" : "KARMA"}</div>
+      <div className="full-vehicle-badge">DÖRT KÖŞE MODELİ · {VIEW_MODE_LABELS[mode]} · {cadMode === "technical" ? "TEKNİK" : cadMode === "detailed" ? "DETAYLI" : "KARMA"} · {visualModelSource === "glb" ? "GLB" : "PROSEDÜREL"}</div>
       <div className="reference-disclaimer">Şasi zarfı ve aks çizgileri yalnızca referanstır — sağlanmamış bağlantı veya çalıştırma geometrisi varsayılmaz.</div>
+      {visualModelSource === "glb" && <div className="solver-motion-note">İçe aktarılan GLB parçaları mevcut tekerlek ölçüsü ve hardpoint açıklığına görsel olarak ölçeklenmiştir; üretim boyutu veya MSKU Racing fiziksel parça doğrulaması değildir.</div>}
+      {visualModelSource === "glb" && !glbReady && <div className="representative-layer-note">GLB parçaları yükleniyor · %{Math.round(glbProgress.progress)}</div>}
       {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7 serbestlik dereceli çözücü örneği · şasi yükselme/başvurma/yalpa + dört yaylanmayan kütle geçmişi · bağlantı kapanışı bu modelde bulunmadığı için süspansiyon kolları gizlendi.</div>}
       {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bisiklet modeli çözücüsü · sapma yönelimi hesaplanan sapma hızından trapez yöntemiyle tümleştirilir; ön tekerlek yönlendirmesi sağlanan direksiyon geçmişini kullanır.</div>}
       {showMechanism && visibility.representativeActuation && <div className="representative-layer-note">TEMSİLİ PUSHROD · ROCKER · YAY/AMORTİSÖR — bağlantı verisi yok, hareketsiz ve mühendislik sonucu değildir</div>}

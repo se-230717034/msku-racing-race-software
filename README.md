@@ -30,6 +30,7 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Project schema `2.0.0` with four independently addressable corners, vehicle dimensions, CG, mass properties, provenance, evidence records, and safe `1.0.0` migration.
 - Full-vehicle Three.js/R3F assembly with distinct FL/FR/RL/RR wheels and suspensions, independent front/rear definitions, configurable wheelbase/tracks/CG, reference chassis/axles/planes, and explicit mirror/synthetic labels.
 - Procedural CAD-style tires, tread, rims, hubs, drilled brake discs, calipers, open-web uprights, clevises, rod-end joints, wishbone tubes, and steering rods driven directly by the current hardpoints and accepted pose data.
+- Selectable GLB visual assembly using audited tire/rim, rotor/caliper, hub, and upright assets on all four corners; duplicate embedded brake meshes are suppressed, right-hand parts are mirrored, and the complete procedural assembly remains available as a fallback.
 - Turkish `Teknik`, `Detaylı`, and `Karma` inspection modes shared by the Vehicle and Geometry screens, with physically based materials, multi-source lighting, shadows, and performance-conscious reusable corner assemblies.
 - Full vehicle, axle, individual-corner, chassis/CG, suspension, kinematics, and dynamics views with six camera presets and persistent visibility state.
 - Exact stored-input comparison for corner provenance, link lengths, alignment, and hardpoint deltas; calculated cross-corner comparison stays blocked until both corners have independent results.
@@ -65,7 +66,7 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Versioned Vehicle Parameter Manifest records configuration, SI units, source type, measurement state, uncertainty, applicable modules, evidence references, and deterministic content hash. Bundled defaults remain explicitly `SYNTHETIC`.
 - Independent `declared`, `numerically verified`, `reference benchmarked`, and `physically correlated` axes require accepted evidence of their own type; numerical tests and solver success cannot promote physical correlation.
 
-See [PROGRESS.md](./PROGRESS.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+See [PROGRESS.md](./PROGRESS.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 

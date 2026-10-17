@@ -1,4 +1,4 @@
-import { ContactShadows, GizmoHelper, GizmoViewport, OrbitControls } from "@react-three/drei";
+import { ContactShadows, GizmoHelper, GizmoViewport, OrbitControls, useProgress } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import type { KinematicPose, Vec3 } from "@msku/contracts";
 import { useEffect, useMemo, useRef } from "react";
@@ -46,6 +46,7 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
   const select = useWorkspace((state) => state.setSelectedHardpoint);
   const visibility = useWorkspace((state) => state.visibility);
   const cadMode = useWorkspace((state) => state.cadViewMode);
+  const visualModelSource = useWorkspace((state) => state.visualModelSource);
   const points = useMemo(() => pointMap(project.suspension.hardpoints), [project.suspension.hardpoints]);
 
   const positionFor = (id: string): [number, number, number] => {
@@ -92,6 +93,8 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
         selectedHardpointId={mirrored ? undefined : selectedId}
         onSelectHardpoint={mirrored ? undefined : select}
         showRepresentativeActuation={!mirrored && visibility.representativeActuation}
+        visualModelSource={visualModelSource}
+        importedAssetMirrored={project.suspension.corner.endsWith("right") !== mirrored}
         opacity={mirrored ? 0.2 : 1}
       />
     </group>
@@ -115,6 +118,10 @@ export function SuspensionViewport({
 }) {
   const cameraPreset = useWorkspace((state) => state.cameraPreset);
   const cadMode = useWorkspace((state) => state.cadViewMode);
+  const visualModelSource = useWorkspace((state) => state.visualModelSource);
+  const glbProgress = useProgress();
+  const glbReady = visualModelSource !== "glb"
+    || (glbProgress.total > 0 && glbProgress.loaded === glbProgress.total && !glbProgress.active);
   const mirror = useWorkspace((state) => state.visibility.mirror);
   const chassisVisible = useWorkspace((state) => state.visibility.chassis);
   const wheelVisible = useWorkspace((state) => state.visibility.wheel);
@@ -152,6 +159,8 @@ export function SuspensionViewport({
       className={`viewport ${mode}`}
       data-testid="suspension-viewport"
       data-cad-mode={cadMode}
+      data-visual-model-source={visualModelSource}
+      data-glb-ready={glbReady}
       data-tire-visible={wheelVisible && tireVisible}
       data-rim-visible={wheelVisible && rimVisible}
       data-brake-disc-visible={wheelVisible && brakeVisible && brakeDiscVisible}
@@ -197,12 +206,13 @@ export function SuspensionViewport({
         <span>İç birim: m · Düzenleyici: mm</span>
         <span>CAD görünümü: {cadMode === "technical" ? "Teknik" : cadMode === "detailed" ? "Detaylı" : "Karma"}</span>
         {mechanicalAssemblyActive && <span>MEKANİK MONTAJ · LASTİK/JANT GİZLİ</span>}
-        <span>PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK</span>
+        <span>{visualModelSource === "glb" ? "ÖLÇEĞE UYARLANMIŞ GLB · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK" : "PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK"}</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
         {representativeVisible && <span>TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>
+      {visualModelSource === "glb" && !glbReady && <div className="solver-motion-note">GLB parçaları yükleniyor · %{Math.round(glbProgress.progress)}</div>}
     </div>
   );
 }

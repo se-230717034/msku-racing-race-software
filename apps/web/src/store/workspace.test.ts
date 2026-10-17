@@ -11,6 +11,7 @@ describe("Phase 6 four-corner workspace", () => {
       selectedHardpointId: "uca_outboard",
       vehicleViewMode: "full_vehicle",
       cadViewMode: "hybrid",
+      visualModelSource: "glb",
       visibility: {
         ...useWorkspace.getState().visibility,
         wheel: true,
@@ -44,6 +45,7 @@ describe("Phase 6 four-corner workspace", () => {
     const before = JSON.stringify(useWorkspace.getState().project);
     useWorkspace.getState().setCameraPreset("rear");
     useWorkspace.getState().setCadViewMode("detailed");
+    useWorkspace.getState().setVisualModelSource("procedural");
     useWorkspace.getState().toggleVisibility("chassis");
     useWorkspace.getState().toggleVisibility("tire");
     useWorkspace.getState().toggleVisibility("rim");
@@ -54,6 +56,7 @@ describe("Phase 6 four-corner workspace", () => {
     useWorkspace.getState().setVehicleViewMode("rear_axle");
     expect(JSON.stringify(useWorkspace.getState().project)).toBe(before);
     expect(useWorkspace.getState().cadViewMode).toBe("detailed");
+    expect(useWorkspace.getState().visualModelSource).toBe("procedural");
     expect(useWorkspace.getState().visibility.tire).toBe(false);
     expect(useWorkspace.getState().visibility.rim).toBe(false);
     expect(useWorkspace.getState().visibility.brake).toBe(false);

@@ -1,6 +1,19 @@
 # Implementation progress
 
-Updated: 2026-10-16
+Updated: 2026-10-17
+
+## Four-corner GLB visual assembly
+
+- [x] Five supplied GLB files extracted to `apps/web/public/models/` and audited for nodes, meshes, materials, bounds, axes, and pivots
+- [x] Tire/rim, rotor/caliper, hub, and upright models connected to the active render path without duplicate brake parts
+- [x] FL/FR/RL/RR placement uses each corner's own hardpoints, wheel dimensions, handedness, and accepted wheel-axis pose
+- [x] Imported upright frame follows the current upper/lower outboard axis and accepted wheel orientation
+- [x] Existing procedural assembly retained as a selectable Turkish fallback
+- [x] Generic suspension GLB restricted to the default-off unsupported static-reference layer because semantic link endpoints are absent
+- [x] Separate tire, rim, rotor, caliper, hub, upright, arm, and tie-rod visibility remains functional
+- [x] GLB source dimensions, scale mismatch, CC-BY attribution, and physical-validation limits documented
+- [x] Quality gates: 118 Python tests, 42 Vitest tests, 12 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Compare imported parts with controlled MSKU Racing component CAD before any dimensional claim
 
 ## Engineering safety hardening — audit priorities 1–3
 
