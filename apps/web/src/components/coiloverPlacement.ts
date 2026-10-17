@@ -1,5 +1,6 @@
-import type { ActuationGeometry, Vec3 } from "@msku/contracts";
+import type { ActuationGeometry, KinematicPose, Vec3 } from "@msku/contracts";
 
+import { solveActuationKinematics } from "../domain/actuationKinematics";
 import type { ThreePosition } from "./ProceduralCadAssembly";
 
 export const REQUIRED_ACTUATION_HARDPOINTS = [
@@ -18,7 +19,7 @@ export interface CoiloverPlacement {
 
 export type CoiloverPlacementResolution =
   | {
-    status: "DECLARED_STATIC_GEOMETRY";
+    status: "SOLVED_ACTUATION_GEOMETRY";
     placement: CoiloverPlacement;
     missingHardpoints: [];
   }
@@ -28,22 +29,23 @@ export type CoiloverPlacementResolution =
     missingHardpoints: readonly string[];
   }
   | {
-    status: "UNSOLVED_KINEMATIC_CLOSURE";
+    status: "FAILED_ACTUATION_KINEMATICS";
     placement?: undefined;
     missingHardpoints: [];
+    reason: string;
   };
 
 /**
  * Resolves only explicitly declared damper/spring eyes.
  *
- * A wheel kinematic pose does not include rocker rotation or damper length. The
- * coilover is therefore suppressed during solved wheel motion until a coupled
- * actuation result exists. No visual fallback coordinates are generated.
+ * The GLB eye centres are mapped only after the fixed-length pushrod constraint
+ * produces a valid rocker solution. No visual fallback coordinates are generated.
  */
 export const resolveCoiloverPlacement = (
   actuation: ActuationGeometry | undefined,
+  staticWheelCenter: Vec3,
   actuationPointFor: ((point: Vec3) => ThreePosition) | undefined,
-  kinematicPoseActive = false,
+  pose?: KinematicPose,
 ): CoiloverPlacementResolution => {
   if (!actuation || !actuationPointFor) {
     return {
@@ -51,19 +53,19 @@ export const resolveCoiloverPlacement = (
       missingHardpoints: REQUIRED_ACTUATION_HARDPOINTS,
     };
   }
-  if (kinematicPoseActive) {
+  const kinematics = solveActuationKinematics(actuation, staticWheelCenter, pose);
+  if (kinematics.status === "FAILED") {
     return {
-      status: "UNSOLVED_KINEMATIC_CLOSURE",
+      status: "FAILED_ACTUATION_KINEMATICS",
       missingHardpoints: [],
+      reason: kinematics.reason,
     };
   }
-  const rockerPickup = actuation.damper?.rockerPickup ?? actuation.rockerSpringPickup;
-  const chassisPickup = actuation.damper?.chassisPickup ?? actuation.springChassisPickup;
   return {
-    status: "DECLARED_STATIC_GEOMETRY",
+    status: "SOLVED_ACTUATION_GEOMETRY",
     placement: {
-      start: actuationPointFor(rockerPickup),
-      end: actuationPointFor(chassisPickup),
+      start: actuationPointFor(kinematics.rockerCoiloverPickup),
+      end: actuationPointFor(kinematics.chassisCoiloverPickup),
     },
     missingHardpoints: [],
   };

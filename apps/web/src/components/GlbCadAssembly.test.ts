@@ -26,17 +26,21 @@ describe("GLB coilover placement", () => {
     const toScene = (point: Vec3): [number, number, number] => [point.x, point.z, -point.y];
     const placement = resolveCoiloverPlacement(
       actuation,
+      { x: 0, y: 0, z: 0 },
       toScene,
     );
 
-    expect(placement.status).toBe("DECLARED_STATIC_GEOMETRY");
-    expect(placement.placement?.start).toEqual([0.31, 0.51, -0.41]);
+    expect(placement.status).toBe("SOLVED_ACTUATION_GEOMETRY");
+    expect(placement.placement?.start[0]).toBeCloseTo(0.31, 12);
+    expect(placement.placement?.start[1]).toBeCloseTo(0.51, 12);
+    expect(placement.placement?.start[2]).toBeCloseTo(-0.41, 12);
     expect(placement.placement?.end).toEqual([0.61, 0.71, -0.21]);
   });
 
   it("refuses to invent a placement when actuation hardpoints are absent", () => {
     const placement = resolveCoiloverPlacement(
       undefined,
+      { x: 0, y: 0, z: 0 },
       undefined,
     );
 
@@ -52,7 +56,7 @@ describe("GLB coilover placement", () => {
     ]);
   });
 
-  it("suppresses the static coilover while rocker closure is unsolved", () => {
+  it("suppresses the coilover when the pushrod cannot reach the rocker", () => {
     const actuation: ActuationGeometry = {
       type: "pushrod",
       uprightPickup: { x: 0.1, y: 0.2, z: 0.3 },
@@ -68,11 +72,17 @@ describe("GLB coilover placement", () => {
 
     const placement = resolveCoiloverPlacement(
       actuation,
+      { x: 0, y: 0, z: 0 },
       (point) => [point.x, point.z, -point.y],
-      true,
+      {
+        hardpoints: {},
+        wheelAxis: { x: 0, y: 1, z: 0 },
+        translation: { x: 0, y: 0, z: 10 },
+        rotationVector: { x: 0, y: 0, z: 0 },
+      },
     );
 
-    expect(placement.status).toBe("UNSOLVED_KINEMATIC_CLOSURE");
+    expect(placement.status).toBe("FAILED_ACTUATION_KINEMATICS");
     expect(placement.placement).toBeUndefined();
   });
 });

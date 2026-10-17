@@ -14,6 +14,7 @@ import {
   fullCarVisualState,
   visibleCornerIds,
 } from "../domain/vehicle";
+import { solveActuationKinematics } from "../domain/actuationKinematics";
 import { uiCorner, uiStatus } from "../lib/uiText";
 import { useKinematics } from "../store/kinematics";
 import { useWorkspace, type CadViewMode, type CameraPreset, type VehicleViewMode, type VisibilityState } from "../store/workspace";
@@ -144,8 +145,9 @@ export function VehicleCornerAssembly({
         visualModelSource={visualModelSource}
         importedAssetMirrored={cornerId.endsWith("right")}
         actuation={suspension.actuation}
+        staticWheelCenter={points.get("wheel_center")!}
         actuationPointFor={actuationVehiclePoint}
-        kinematicPoseActive={Boolean(pose)}
+        kinematicPose={pose}
       />
       {visibility.labels && visualModelSource === "procedural" && (
         <Html position={toThreePosition({ ...wheelPosition, z: wheelPosition.z + suspension.wheel.radius + 0.07 })} center>
@@ -252,18 +254,29 @@ export function FullVehicleViewport({
   const coiloverMissingCorners = CORNER_IDS.filter(
     (cornerId) => !project.vehicle.corners[cornerId].suspension.actuation,
   );
-  const renderableCoiloverCount = corners.filter(
-    (cornerId) => Boolean(project.vehicle.corners[cornerId].suspension.actuation),
-  ).length;
+  const visibleActuationResults = corners.map((cornerId) => {
+    const suspension = project.vehicle.corners[cornerId].suspension;
+    const actuation = suspension.actuation;
+    const wheelCenter = suspension.hardpoints.find((point) => point.id === "wheel_center")?.position;
+    if (!actuation || !wheelCenter) return { cornerId, status: "MISSING" as const };
+    const result = solveActuationKinematics(
+      actuation,
+      wheelCenter,
+      cornerId === project.activeCornerId ? kinematicPose : undefined,
+    );
+    return { cornerId, status: result.status, reason: result.status === "FAILED" ? result.reason : undefined };
+  });
+  const renderableCoiloverCount = visibleActuationResults.filter((item) => item.status === "SOLVED").length;
+  const failedActuation = visibleActuationResults.find((item) => item.status === "FAILED");
   const coiloverStatus = visualModelSource !== "glb" || !visibility.coilover
     ? "HIDDEN"
-    : kinematicPose
-      ? "UNSOLVED_KINEMATIC_CLOSURE"
+    : failedActuation
+      ? "FAILED_ACTUATION_KINEMATICS"
       : renderableCoiloverCount === 0
       ? "MISSING_ACTUATION_HARDPOINTS"
       : renderableCoiloverCount < corners.length
         ? "PARTIAL_ACTUATION_GEOMETRY"
-        : "DECLARED_STATIC_GEOMETRY";
+        : "SOLVED_ACTUATION_GEOMETRY";
   const showMechanism = mode !== "dynamics";
   const bodyVisible = visibility.chassis && mode !== "suspension" && mode !== "kinematics";
   const blockedReason = mode === "kinematics" && !kinematicPose
@@ -280,7 +293,7 @@ export function FullVehicleViewport({
       data-visual-model-source={visualModelSource}
       data-glb-ready={glbReady}
       data-coilover-status={coiloverStatus}
-      data-coilover-count={coiloverStatus === "HIDDEN" || coiloverStatus === "UNSOLVED_KINEMATIC_CLOSURE" ? 0 : renderableCoiloverCount}
+      data-coilover-count={coiloverStatus === "HIDDEN" ? 0 : renderableCoiloverCount}
       data-coilover-mounted-corners={coiloverMountedCorners.join(",")}
       data-coilover-missing-corners={coiloverMissingCorners.join(",")}
     >
@@ -317,7 +330,7 @@ export function FullVehicleViewport({
               showMechanism={showMechanism}
               cadMode={cadMode}
               visualModelSource={visualModelSource}
-              showRepresentativeActuation={showMechanism && visibility.representativeActuation && (visualModelSource === "glb" || cornerId === project.activeCornerId)}
+              showRepresentativeActuation={showMechanism && visibility.representativeActuation && !project.vehicle.corners[cornerId].suspension.actuation && (visualModelSource === "glb" || cornerId === project.activeCornerId)}
             />
           ))}
         </group>
@@ -338,7 +351,7 @@ export function FullVehicleViewport({
             data-z={point.z + dynamics.unsprungDisplacementsM[cornerIndex(cornerId)]}
           />;
         })}
-        {showMechanism && visibility.representativeActuation && (
+        {showMechanism && visibility.representativeActuation && !project.suspension.actuation && (
           <span
             data-testid="representative-actuation-layer"
             data-status="UNSUPPORTED_STATIC_REFERENCE"
@@ -351,12 +364,13 @@ export function FullVehicleViewport({
       {visualModelSource === "glb" && <div className="solver-motion-note">İçe aktarılan GLB parçaları mevcut tekerlek ölçüsü ve hardpoint açıklığına görsel olarak ölçeklenmiştir; üretim boyutu veya MSKU Racing fiziksel parça doğrulaması değildir.</div>}
       {coiloverStatus === "MISSING_ACTUATION_HARDPOINTS" && <div className="representative-layer-note">COILOVER GİZLENDİ · MONTAJ VERİSİ YOK — upright pickup, rocker ekseni/pickup ve şasi damper noktaları tanımlanmadan sahneye eklenmez</div>}
       {coiloverStatus === "PARTIAL_ACTUATION_GEOMETRY" && <div className="representative-layer-note">COILOVER KISMİ GÖSTERİM · yalnızca aktüasyon hardpoint'leri tanımlı köşeler sahneye eklenir</div>}
-      {coiloverStatus === "UNSOLVED_KINEMATIC_CLOSURE" && <div className="representative-layer-note">COILOVER GİZLENDİ · ROCKER HAREKETİ ÇÖZÜLMEDİ — hareket sırasında kopmayan bağlantı doğrulanamadığı için gösterilmez</div>}
-      {visualModelSource === "glb" && <div className="solver-motion-note">COILOVER MONTAJ DENETİMİ · {CORNER_IDS.map((cornerId) => `${cornerLabel(cornerId)}:${project.vehicle.corners[cornerId].suspension.actuation ? "TANIMLI" : "EKSİK"}`).join(" · ")}</div>}
+      {coiloverStatus === "FAILED_ACTUATION_KINEMATICS" && <div className="representative-layer-note">COILOVER GİZLENDİ · AKTÜASYON KAPANIŞI ÇÖZÜLEMEDİ — {failedActuation?.reason}</div>}
+      {coiloverStatus === "SOLVED_ACTUATION_GEOMETRY" && project.dataClassification === "demonstration" && <div className="representative-layer-note">DEMO/SENTETİK PUSHROD–ROCKER–COILOVER · gerçek araç veya CAD verisi değildir</div>}
+      {visualModelSource === "glb" && <div className="solver-motion-note">COILOVER MONTAJ DENETİMİ · {CORNER_IDS.map((cornerId) => `${cornerLabel(cornerId)}:${project.vehicle.corners[cornerId].suspension.actuation ? (project.dataClassification === "demonstration" ? "DEMO" : "TANIMLI") : "EKSİK"}`).join(" · ")}</div>}
       {visualModelSource === "glb" && !glbReady && <div className="representative-layer-note">GLB parçaları yükleniyor · %{Math.round(glbProgress.progress)}</div>}
       {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7 serbestlik dereceli çözücü örneği · şasi yükselme/başvurma/yalpa + dört yaylanmayan kütle geçmişi · bağlantı kapanışı bu modelde bulunmadığı için süspansiyon kolları gizlendi.</div>}
       {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bisiklet modeli çözücüsü · sapma yönelimi hesaplanan sapma hızından trapez yöntemiyle tümleştirilir; ön tekerlek yönlendirmesi sağlanan direksiyon geçmişini kullanır.</div>}
-      {showMechanism && visibility.representativeActuation && <div className="representative-layer-note">TEMSİLİ PUSHROD/ROCKER — bağlantı verisi yok, hareketsiz ve mühendislik sonucu değildir</div>}
+      {showMechanism && visibility.representativeActuation && !project.suspension.actuation && <div className="representative-layer-note">TEMSİLİ PUSHROD/ROCKER — bağlantı verisi yok, hareketsiz ve mühendislik sonucu değildir</div>}
       {blockedReason && <div className="vehicle-blocked">{blockedReason}</div>}
     </div>
   );

@@ -5,7 +5,8 @@ Updated: 2026-10-17
 ## Four-corner GLB visual assembly
 
 - [x] Six supplied GLB files extracted to `apps/web/public/models/` and audited for nodes, meshes, materials, bounds, axes, and pivots
-- [x] Coilover GLB eye centres audited; rendering is gated on explicit FL/FR/RL/RR actuation hardpoints and suppressed rather than floated when mounting or solved rocker-motion data is absent
+- [x] Coilover GLB eye centres audited and connected at FL/FR/RL/RR to separately generated, explicitly labeled DEMO/SYNTHETIC pushrod-rocker hardpoints
+- [x] Rocker rotation and coilover length solved from rigid-upright motion, fixed pushrod length, and fixed rocker-axis constraints; infeasible branches are suppressed
 - [x] Synthetic grey pickup-carrier rods removed from the default GLB scene; the non-CAD chassis/pickup reference panel is available only through its explicit visibility control
 - [x] Tire/rim, rotor/caliper, hub, and upright models connected to the active render path without duplicate brake parts
 - [x] FL/FR/RL/RR placement uses each corner's own hardpoints, wheel dimensions, handedness, and accepted wheel-axis pose
@@ -14,7 +15,7 @@ Updated: 2026-10-17
 - [x] Generic suspension GLB restricted to the default-off unsupported static-reference layer because semantic link endpoints are absent
 - [x] Separate tire, rim, rotor, caliper, hub, upright, arm, and tie-rod visibility remains functional
 - [x] GLB source dimensions, scale mismatch, CC-BY attribution, and physical-validation limits documented
-- [x] Quality gates: 118 Python tests, 45 Vitest tests, 12 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [x] Quality gates: 118 Python tests, 48 Vitest tests, 12 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
 - [ ] Compare imported parts with controlled MSKU Racing component CAD before any dimensional claim
 
 ## Engineering safety hardening — audit priorities 1–3

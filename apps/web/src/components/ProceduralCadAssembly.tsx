@@ -1,11 +1,12 @@
 import { Edges, Html, Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import type { ActuationGeometry, Vec3 } from "@msku/contracts";
+import type { ActuationGeometry, KinematicPose, Vec3 } from "@msku/contracts";
 import { Suspense, useEffect, useMemo } from "react";
 import { DoubleSide, Quaternion, Vector3 } from "three";
 import { ConvexGeometry } from "three-stdlib";
 
 import { LINKS } from "../domain/geometry";
+import { solveActuationKinematics, type SolvedActuationKinematics } from "../domain/actuationKinematics";
 import type { CadViewMode, VisibilityState, VisualModelSource } from "../store/workspace";
 import { GlbCadAssembly } from "./GlbCadAssembly";
 
@@ -405,6 +406,47 @@ function RepresentativeActuationLayer({ positionFor }: { positionFor: (id: strin
   );
 }
 
+function SolvedActuationMechanism({
+  solution,
+  pointFor,
+  opacity,
+}: {
+  solution: SolvedActuationKinematics;
+  pointFor: (point: Vec3) => ThreePosition;
+  opacity: number;
+}) {
+  const axisStart = pointFor(solution.rockerAxisStart);
+  const axisEnd = pointFor(solution.rockerAxisEnd);
+  const pivot = pointFor(solution.rockerPivot);
+  const uprightPickup = pointFor(solution.uprightPickup);
+  const rockerPushrodPickup = pointFor(solution.rockerPushrodPickup);
+  const rockerCoiloverPickup = pointFor(solution.rockerCoiloverPickup);
+  const chassisCoiloverPickup = pointFor(solution.chassisCoiloverPickup);
+  return (
+    <group
+      name="demo-sentetik-pushrod-rocker"
+      userData={{
+        visualStatus: "DEMO_SYNTHETIC_ACTUATION",
+        rockerAngleRad: solution.rockerAngleRad,
+        pushrodResidualM: solution.pushrodResidualM,
+        coiloverLengthM: solution.coiloverLengthM,
+      }}
+    >
+      <TubeBetween start={uprightPickup} end={rockerPushrodPickup} radius={0.007} color="#5f9b45" metalness={0.16} roughness={0.7} opacity={opacity} />
+      <TubeBetween start={axisStart} end={axisEnd} radius={0.011} color="#343a40" metalness={0.42} roughness={0.5} opacity={opacity} />
+      <TubeBetween start={pivot} end={rockerPushrodPickup} radius={0.012} color="#a36b28" metalness={0.22} roughness={0.62} opacity={opacity} />
+      <TubeBetween start={pivot} end={rockerCoiloverPickup} radius={0.012} color="#a36b28" metalness={0.22} roughness={0.62} opacity={opacity} />
+      <TubeBetween start={rockerPushrodPickup} end={rockerCoiloverPickup} radius={0.007} color="#80511e" metalness={0.2} roughness={0.66} opacity={opacity} />
+      {[uprightPickup, rockerPushrodPickup, rockerCoiloverPickup, chassisCoiloverPickup].map((position, index) => (
+        <mesh key={index} position={position} castShadow>
+          <sphereGeometry args={[0.011, 16, 12]} />
+          <meshStandardMaterial color={index === 0 ? "#5f9b45" : "#a36b28"} metalness={0.22} roughness={0.62} transparent opacity={opacity} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function SlickTireDetails({ radius, width, sidewall }: { radius: number; width: number; sidewall: number }) {
   const shoulderRadius = radius - sidewall * 0.36;
   return (
@@ -723,8 +765,9 @@ export function ProceduralCadAssembly({
   visualModelSource = "procedural",
   importedAssetMirrored = false,
   actuation,
+  staticWheelCenter,
   actuationPointFor,
-  kinematicPoseActive = false,
+  kinematicPose,
   selectedHardpointId,
   onSelectHardpoint,
   opacity = 1,
@@ -744,8 +787,9 @@ export function ProceduralCadAssembly({
   visualModelSource?: VisualModelSource;
   importedAssetMirrored?: boolean;
   actuation?: ActuationGeometry;
+  staticWheelCenter: Vec3;
   actuationPointFor?: (point: Vec3) => ThreePosition;
-  kinematicPoseActive?: boolean;
+  kinematicPose?: KinematicPose;
   selectedHardpointId?: string;
   onSelectHardpoint?: (id: string) => void;
   opacity?: number;
@@ -763,6 +807,9 @@ export function ProceduralCadAssembly({
     positionFor("lca_rear_inboard"),
     positionFor("tie_rod_inboard"),
   ];
+  const actuationKinematics = actuation
+    ? solveActuationKinematics(actuation, staticWheelCenter, kinematicPose)
+    : undefined;
   const importedFallback = <>
     {showMechanism && visibility.upright && (
       <MechanicalUpright
@@ -853,7 +900,10 @@ export function ProceduralCadAssembly({
           <RodEndJoint position={tieOutboard} toward={wheelPosition} scale={0.82} opacity={opacity} />
         </>}
       </>}
-      {showMechanism && showRepresentativeActuation && !useImportedParts && (
+      {showMechanism && visibility.coilover && actuationKinematics?.status === "SOLVED" && actuationPointFor && (
+        <SolvedActuationMechanism solution={actuationKinematics} pointFor={actuationPointFor} opacity={opacity} />
+      )}
+      {showMechanism && showRepresentativeActuation && !actuation && !useImportedParts && (
         <RepresentativeActuationLayer positionFor={staticPositionFor ?? positionFor} />
       )}
       {showMechanism && visibility.hardpoints && hardpointIds.map((id) => (
@@ -902,8 +952,9 @@ export function ProceduralCadAssembly({
             mirrored={importedAssetMirrored}
             showRepresentativeSuspension={showMechanism && showRepresentativeActuation}
             actuation={actuation}
+            staticWheelCenter={staticWheelCenter}
             actuationPointFor={actuationPointFor}
-            kinematicPoseActive={kinematicPoseActive}
+            kinematicPose={kinematicPose}
             opacity={opacity}
           />
         </Suspense>

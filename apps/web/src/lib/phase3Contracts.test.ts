@@ -15,8 +15,10 @@ const quality = {
 };
 
 describe("Phase 3 versioned contracts", () => {
-  it("accepts optional explicit actuation geometry without changing legacy projects", () => {
-    expect(projectSchema.parse(createDemoProject()).suspension.actuation).toBeUndefined();
+  it("accepts explicit actuation geometry and keeps the packaged project demonstrative", () => {
+    const packaged = projectSchema.parse(createDemoProject());
+    expect(packaged.suspension.actuation?.type).toBe("pushrod");
+    expect(packaged.dataClassification).toBe("demonstration");
     const project = createDemoProject();
     project.suspension.actuation = {
       type: "pushrod",

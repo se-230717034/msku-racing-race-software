@@ -1,5 +1,5 @@
 import { useGLTF } from "@react-three/drei";
-import type { ActuationGeometry, Vec3 } from "@msku/contracts";
+import type { ActuationGeometry, KinematicPose, Vec3 } from "@msku/contracts";
 import { useMemo } from "react";
 import {
   Box3,
@@ -288,7 +288,7 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
       position={midpoint}
       quaternion={quaternion}
       name="glb-coilover-katmani"
-      userData={{ visualStatus: "DECLARED_STATIC_GEOMETRY", kinematicClosure: false, mechanicallyMounted: true }}
+      userData={{ visualStatus: "SOLVED_ACTUATION_GEOMETRY", kinematicClosure: true, mechanicallyMounted: true }}
     >
       <group scale={scale}>
         <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
@@ -344,8 +344,9 @@ export function GlbCadAssembly({
   mirrored,
   showRepresentativeSuspension,
   actuation,
+  staticWheelCenter,
   actuationPointFor,
-  kinematicPoseActive = false,
+  kinematicPose,
   opacity = 1,
 }: {
   positionFor: (id: string) => ThreePosition;
@@ -358,16 +359,18 @@ export function GlbCadAssembly({
   mirrored: boolean;
   showRepresentativeSuspension: boolean;
   actuation?: ActuationGeometry;
+  staticWheelCenter: Vec3;
   actuationPointFor?: (point: Vec3) => ThreePosition;
-  kinematicPoseActive?: boolean;
+  kinematicPose?: KinematicPose;
   opacity?: number;
 }) {
   const upper = positionFor("uca_outboard");
   const lower = positionFor("lca_outboard");
   const coiloverPlacement = resolveCoiloverPlacement(
     actuation,
+    staticWheelCenter,
     actuationPointFor,
-    kinematicPoseActive,
+    kinematicPose,
   );
   return (
     <group name="ithal-glb-montaji" userData={{ source: "GLB", physicalValidation: false }}>

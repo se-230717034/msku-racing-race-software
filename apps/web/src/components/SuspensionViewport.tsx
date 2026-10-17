@@ -6,6 +6,7 @@ import { Quaternion, Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 import { mirrorAcrossVehicleCentreline, pointMap, staticWheelAxis, toThreePosition } from "../domain/geometry";
+import { solveActuationKinematics } from "../domain/actuationKinematics";
 import { useWorkspace, type CameraPreset } from "../store/workspace";
 import { ProceduralCadAssembly } from "./ProceduralCadAssembly";
 
@@ -97,12 +98,13 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
         mode={cadMode}
         selectedHardpointId={mirrored ? undefined : selectedId}
         onSelectHardpoint={mirrored ? undefined : select}
-        showRepresentativeActuation={!mirrored && visibility.representativeActuation}
+        showRepresentativeActuation={!mirrored && visibility.representativeActuation && !project.suspension.actuation}
         visualModelSource={visualModelSource}
         importedAssetMirrored={project.suspension.corner.endsWith("right") !== mirrored}
         actuation={project.suspension.actuation}
+        staticWheelCenter={points.get("wheel_center")!.position}
         actuationPointFor={actuationPointFor}
-        kinematicPoseActive={Boolean(pose)}
+        kinematicPose={pose}
         opacity={mirrored ? 0.2 : 1}
       />
     </group>
@@ -146,14 +148,19 @@ export function SuspensionViewport({
   const steeringVisible = useWorkspace((state) => state.visibility.steering);
   const referencePlanesVisible = useWorkspace((state) => state.visibility.referencePlanes);
   const representativeVisible = useWorkspace((state) => state.visibility.representativeActuation);
-  const hasDeclaredActuation = useWorkspace((state) => Boolean(state.project.suspension.actuation));
+  const project = useWorkspace((state) => state.project);
+  const activeActuation = project.suspension.actuation;
+  const staticWheelCenter = project.suspension.hardpoints.find((point) => point.id === "wheel_center")?.position;
+  const actuationResult = activeActuation && staticWheelCenter
+    ? solveActuationKinematics(activeActuation, staticWheelCenter, pose)
+    : undefined;
   const coiloverStatus = visualModelSource !== "glb" || !coiloverVisible
     ? "HIDDEN"
-    : !hasDeclaredActuation
+    : !actuationResult
       ? "MISSING_ACTUATION_HARDPOINTS"
-      : pose
-        ? "UNSOLVED_KINEMATIC_CLOSURE"
-        : "DECLARED_STATIC_GEOMETRY";
+      : actuationResult.status === "FAILED"
+        ? "FAILED_ACTUATION_KINEMATICS"
+        : "SOLVED_ACTUATION_GEOMETRY";
   const mechanicalAssemblyActive = !tireVisible
     && !rimVisible
     && uprightVisible
@@ -186,6 +193,9 @@ export function SuspensionViewport({
       data-reference-plane-visible={referencePlanesVisible}
       data-mechanical-assembly-active={mechanicalAssemblyActive}
       data-coilover-status={coiloverStatus}
+      data-rocker-angle-rad={actuationResult?.status === "SOLVED" ? actuationResult.rockerAngleRad : undefined}
+      data-coilover-length-m={actuationResult?.status === "SOLVED" ? actuationResult.coiloverLengthM : undefined}
+      data-pushrod-residual-m={actuationResult?.status === "SOLVED" ? actuationResult.pushrodResidualM : undefined}
     >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
@@ -226,11 +236,12 @@ export function SuspensionViewport({
         {mechanicalAssemblyActive && <span>MEKANİK MONTAJ · LASTİK/JANT GİZLİ</span>}
         <span>{visualModelSource === "glb" ? "ÖLÇEĞE UYARLANMIŞ GLB · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK" : "PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK"}</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
-        {coiloverStatus === "DECLARED_STATIC_GEOMETRY" && <span>GLB COILOVER · İKİ GÖZ TANIMLI UÇ NOKTALARINA BAĞLI · yalnızca statik geometri</span>}
+        {coiloverStatus === "SOLVED_ACTUATION_GEOMETRY" && <span>GLB COILOVER · İKİ GÖZ ÇÖZÜLMÜŞ ROCKER/ŞASİ NOKTALARINA BAĞLI</span>}
+        {coiloverStatus === "SOLVED_ACTUATION_GEOMETRY" && project.dataClassification === "demonstration" && <span>DEMO/SENTETİK AKTÜASYON · GERÇEK ARAÇ/CAD VERİSİ DEĞİL</span>}
         {coiloverStatus === "MISSING_ACTUATION_HARDPOINTS" && <span>GLB COILOVER GİZLENDİ · UPRIGHT/ROCKER/ŞASİ MONTAJ HARDPOINT VERİSİ YOK</span>}
-        {coiloverStatus === "UNSOLVED_KINEMATIC_CLOSURE" && <span>GLB COILOVER GİZLENDİ · ROCKER HAREKETİ VE DAMPER BOYU ÇÖZÜLMEDİ</span>}
+        {coiloverStatus === "FAILED_ACTUATION_KINEMATICS" && <span>GLB COILOVER GİZLENDİ · {actuationResult?.status === "FAILED" ? actuationResult.reason : "AKTÜASYON KAPANIŞI ÇÖZÜLEMEDİ"}</span>}
         {visualModelSource === "glb" && chassisVisible && <span>ŞASİ/PICKUP REFERANS PANELİ · ŞASİ CAD'İ DEĞİL</span>}
-        {representativeVisible && <span>TEMSİLİ PUSHROD/ROCKER · veri yok · hareketsiz</span>}
+        {representativeVisible && !activeActuation && <span>TEMSİLİ PUSHROD/ROCKER · veri yok · hareketsiz</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>

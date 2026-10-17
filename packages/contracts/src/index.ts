@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { createSyntheticDemoActuation } from "./demoActuation";
+
 export const API_SCHEMA_VERSION = "1.0.0" as const;
 export const PROJECT_SCHEMA_VERSION = "2.0.0" as const;
 
@@ -338,10 +340,11 @@ export const REQUIRED_HARDPOINT_IDS = [
   "wheel_center",
 ] as const;
 
-const frontLeftDemoSuspension = (): Suspension => ({
-  type: "double_wishbone",
-  corner: "front_left",
-  hardpoints: [
+const frontLeftDemoSuspension = (): Suspension => {
+  const suspension: Suspension = {
+    type: "double_wishbone",
+    corner: "front_left",
+    hardpoints: [
     { id: "uca_front_inboard", label: "Üst salıncak ön iç", group: "upper_wishbone", position: { x: 0.18, y: 0.31, z: 0.46 } },
     { id: "uca_rear_inboard", label: "Üst salıncak arka iç", group: "upper_wishbone", position: { x: -0.16, y: 0.30, z: 0.45 } },
     { id: "uca_outboard", label: "Üst salıncak dış", group: "upper_wishbone", position: { x: 0.01, y: 0.64, z: 0.40 } },
@@ -351,9 +354,11 @@ const frontLeftDemoSuspension = (): Suspension => ({
     { id: "tie_rod_inboard", label: "Rot kolu iç", group: "steering", position: { x: -0.12, y: 0.29, z: 0.25 } },
     { id: "tie_rod_outboard", label: "Rot kolu dış", group: "steering", position: { x: -0.09, y: 0.67, z: 0.26 } },
     { id: "wheel_center", label: "Tekerlek merkezi", group: "wheel", position: { x: 0.0, y: 0.72, z: 0.285 } },
-  ],
-  wheel: { radius: 0.2286, width: 0.18, staticCamberRad: 0, staticToeRad: 0 },
-});
+    ],
+    wheel: { radius: 0.2286, width: 0.18, staticCamberRad: 0, staticToeRad: 0 },
+  };
+  return { ...suspension, actuation: createSyntheticDemoActuation(suspension) };
+};
 
 const cloneSuspensionForCorner = (
   source: Suspension,
@@ -374,7 +379,7 @@ const cloneSuspensionForCorner = (
 
 const demoCorners = (): Project["vehicle"]["corners"] => {
   const frontLeft = frontLeftDemoSuspension();
-  const rearLeft = cloneSuspensionForCorner(frontLeft, "rear_left", {
+  const rearLeftBase = cloneSuspensionForCorner(frontLeft, "rear_left", {
     uca_front_inboard: { x: 0.17, y: 0.30, z: 0.44 },
     uca_rear_inboard: { x: -0.15, y: 0.29, z: 0.43 },
     uca_outboard: { x: 0.0, y: 0.62, z: 0.385 },
@@ -385,13 +390,16 @@ const demoCorners = (): Project["vehicle"]["corners"] => {
     tie_rod_outboard: { x: 0.08, y: 0.64, z: 0.25 },
     wheel_center: { x: 0.0, y: 0.70, z: 0.285 },
   });
-  const frontRight = cloneSuspensionForCorner(frontLeft, "front_right");
-  const rearRight = cloneSuspensionForCorner(rearLeft, "rear_right");
+  const rearLeft = { ...rearLeftBase, actuation: createSyntheticDemoActuation(rearLeftBase) };
+  const frontRightBase = cloneSuspensionForCorner(frontLeft, "front_right");
+  const frontRight = { ...frontRightBase, actuation: createSyntheticDemoActuation(frontRightBase) };
+  const rearRightBase = cloneSuspensionForCorner(rearLeft, "rear_right");
+  const rearRight = { ...rearRightBase, actuation: createSyntheticDemoActuation(rearRightBase) };
   return {
-    front_left: { id: "front_left", label: "Ön sol", geometrySource: "synthetic_demo", provenanceNote: "Bağımsız sentetik Faz 6 gösterim tanımıdır; araç verisi değildir.", suspension: frontLeft },
-    front_right: { id: "front_right", label: "Ön sağ", geometrySource: "mirrored_assumption", derivedFrom: "front_left", provenanceNote: "Sentetik ön sol tanımından açık ayna varsayımıyla türetilmiştir.", suspension: frontRight },
-    rear_left: { id: "rear_left", label: "Arka sol", geometrySource: "synthetic_demo", provenanceNote: "Bağımsız sentetik arka geometridir; ön akstan kopyalanmamıştır ve araç verisi değildir.", suspension: rearLeft },
-    rear_right: { id: "rear_right", label: "Arka sağ", geometrySource: "mirrored_assumption", derivedFrom: "rear_left", provenanceNote: "Sentetik arka sol tanımından açık ayna varsayımıyla türetilmiştir.", suspension: rearRight },
+    front_left: { id: "front_left", label: "Ön sol", geometrySource: "synthetic_demo", provenanceNote: "Bağımsız sentetik Faz 6 gösterim ve DEMO pushrod aktüasyon tanımıdır; araç/CAD verisi değildir.", suspension: frontLeft },
+    front_right: { id: "front_right", label: "Ön sağ", geometrySource: "mirrored_assumption", derivedFrom: "front_left", provenanceNote: "Sentetik ön sol tanımından açık ayna varsayımıyla türetilmiş DEMO pushrod aktüasyonudur.", suspension: frontRight },
+    rear_left: { id: "rear_left", label: "Arka sol", geometrySource: "synthetic_demo", provenanceNote: "Bağımsız sentetik arka geometri ve DEMO pushrod aktüasyonudur; araç/CAD verisi değildir.", suspension: rearLeft },
+    rear_right: { id: "rear_right", label: "Arka sağ", geometrySource: "mirrored_assumption", derivedFrom: "rear_left", provenanceNote: "Sentetik arka sol tanımından açık ayna varsayımıyla türetilmiş DEMO pushrod aktüasyonudur.", suspension: rearRight },
   };
 };
 
