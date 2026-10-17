@@ -14,7 +14,7 @@ import {
 } from "three";
 
 import type { VisibilityState } from "../store/workspace";
-import { resolveCoiloverPlacement, type CoiloverPlacement } from "./coiloverPlacement";
+import type { CoiloverPlacement } from "./coiloverPlacement";
 import type { ThreePosition, ThreeQuaternion } from "./ProceduralCadAssembly";
 
 const MODEL_URLS = {
@@ -304,6 +304,29 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
   );
 }
 
+function DemoMountStrut({ start, end, opacity }: { start: ThreePosition; end: ThreePosition; opacity: number }) {
+  const a = new Vector3(...start);
+  const b = new Vector3(...end);
+  const delta = b.clone().sub(a);
+  const length = delta.length();
+  if (length < 1e-6) return null;
+  return (
+    <mesh position={a.add(b).multiplyScalar(0.5)} quaternion={new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), delta.normalize())} castShadow>
+      <cylinderGeometry args={[0.012, 0.012, length, 12]} />
+      <meshStandardMaterial color="#68747c" metalness={0.42} roughness={0.48} transparent={opacity < 1} opacity={opacity} />
+    </mesh>
+  );
+}
+
+function DemoMountEye({ position, opacity }: { position: ThreePosition; opacity: number }) {
+  return (
+    <mesh position={position} castShadow>
+      <sphereGeometry args={[0.017, 16, 12]} />
+      <meshStandardMaterial color="#39434a" metalness={0.45} roughness={0.5} transparent={opacity < 1} opacity={opacity} />
+    </mesh>
+  );
+}
+
 function ImportedSuspensionReference({
   positionFor,
   mirrored,
@@ -373,34 +396,35 @@ export function GlbCadAssembly({
 }) {
   const upper = positionFor("uca_outboard");
   const lower = positionFor("lca_outboard");
-  // Reference-image presentation: a near-vertical outboard coilover above the upright.
-  // This is visual-only; the pushrod/rocker solver remains unchanged.
-  const solvedCoiloverPlacement = resolveCoiloverPlacement(
-    actuation,
-    staticWheelCenter,
-    actuationPointFor,
-    kinematicPose,
-  );
-  const outboardUpper = positionFor("uca_outboard");
-  const inboardFront = positionFor("uca_front_inboard");
-  const inboardRear = positionFor("uca_rear_inboard");
-  const inboardMidpoint: ThreePosition = [
-    (inboardFront[0] + inboardRear[0]) / 2,
-    (inboardFront[1] + inboardRear[1]) / 2,
-    (inboardFront[2] + inboardRear[2]) / 2,
+  // Reference-style direct-acting damper: lower eye on the moving lower control
+  // arm, upper eye on a fixed inboard chassis pickup reference. Demo geometry only.
+  // Existing pushrod/rocker actuation remains the separate engineering solver.
+  const lowerOutboard = positionFor("lca_outboard");
+  const lowerFront = positionFor("lca_front_inboard");
+  const lowerRear = positionFor("lca_rear_inboard");
+  const upperFront = referencePositionFor("uca_front_inboard");
+  const upperRear = referencePositionFor("uca_rear_inboard");
+  const lowerInboard: ThreePosition = [
+    (lowerFront[0] + lowerRear[0]) / 2,
+    (lowerFront[1] + lowerRear[1]) / 2,
+    (lowerFront[2] + lowerRear[2]) / 2,
   ];
-  // Move the upright demo damper toward the chassis, away from the tire envelope.
-  // Both eye points use the same horizontal position to keep the spring upright.
-  const inboardFraction = 0.38;
-  const damperX = outboardUpper[0] + (inboardMidpoint[0] - outboardUpper[0]) * inboardFraction;
-  const damperZ = outboardUpper[2] + (inboardMidpoint[2] - outboardUpper[2]) * inboardFraction;
-  const damperBottomY = outboardUpper[1] + 0.025;
-  const coiloverPlacement: CoiloverPlacement = {
-    start: [damperX, damperBottomY, damperZ],
-    end: [damperX, damperBottomY + Math.max(wheelRadius * 0.95, 0.27), damperZ],
-  };
-  // Retain the solved result for future selectable pushrod layouts.
-  void solvedCoiloverPlacement;
+  const upperInboard: ThreePosition = [
+    (upperFront[0] + upperRear[0]) / 2,
+    (upperFront[1] + upperRear[1]) / 2,
+    (upperFront[2] + upperRear[2]) / 2,
+  ];
+  const lowerEye: ThreePosition = [
+    lowerOutboard[0] * 0.62 + lowerInboard[0] * 0.38,
+    lowerOutboard[1] * 0.62 + lowerInboard[1] * 0.38 + 0.025,
+    lowerOutboard[2] * 0.62 + lowerInboard[2] * 0.38,
+  ];
+  const upperEye: ThreePosition = [
+    upperInboard[0] * 0.45 + lowerEye[0] * 0.55,
+    Math.max(upperInboard[1] + 0.19, lowerEye[1] + Math.max(wheelRadius * 0.9, 0.28)),
+    upperInboard[2] * 0.45 + lowerEye[2] * 0.55,
+  ];
+  const coiloverPlacement: CoiloverPlacement = { start: lowerEye, end: upperEye };
   return (
     <group name="ithal-glb-montaji" userData={{ source: "GLB", physicalValidation: false }}>
       {visibility.wheel && (visibility.tire || visibility.rim) && (
@@ -444,6 +468,14 @@ export function GlbCadAssembly({
           mirrored={mirrored}
           opacity={opacity}
         />
+      )}
+      {visibility.coilover && (
+        <group name="demo-direct-acting-damper-mounts" userData={{ visualStatus: "DEMO_DIRECT_ACTING_NOT_ENGINEERING_VALIDATED" }}>
+          <DemoMountStrut start={lowerOutboard} end={lowerEye} opacity={opacity} />
+          <DemoMountStrut start={upperInboard} end={upperEye} opacity={opacity} />
+          <DemoMountEye position={lowerEye} opacity={opacity} />
+          <DemoMountEye position={upperEye} opacity={opacity} />
+        </group>
       )}
       {visibility.coilover && (
         <ImportedCoilover
