@@ -493,17 +493,22 @@ export function GlbCadAssembly({
       )}
       {visibility.coilover && (
         <group name="demo-direct-acting-damper-mounts" userData={{ visualStatus: "DEMO_DIRECT_ACTING_NOT_ENGINEERING_VALIDATED" }}>
-          <DemoMountStrut start={lowerOutboard} end={lowerEye} opacity={opacity} />
-          <DemoMountStrut start={lowerInboard} end={lowerEye} opacity={opacity} />
-          <DemoMountStrut start={upperFront} end={upperEye} opacity={opacity} />
-          <DemoMountStrut start={upperRear} end={upperEye} opacity={opacity} />
+          {/* Compact lower-arm tab and upper chassis-side mounting stub.
+              Do not render fictitious full-length chassis braces. */}
+          <DemoMountStrut start={[lowerEye[0], lowerEye[1] - 0.045, lowerEye[2]]} end={lowerEye} opacity={opacity} />
+          <DemoMountStrut
+            start={upperEye}
+            end={[
+              upperEye[0] + (upperInboard[0] - upperEye[0]) * 0.09,
+              upperEye[1] + (upperInboard[1] - upperEye[1]) * 0.09,
+              upperEye[2] + (upperInboard[2] - upperEye[2]) * 0.09,
+            ]}
+            opacity={opacity}
+          />
           <DemoMountEye position={lowerEye} opacity={opacity} />
           <DemoMountEye position={upperEye} opacity={opacity} />
           <DemoDamperClevis position={lowerEye} toward={upperEye} opacity={opacity} />
           <DemoDamperClevis position={upperEye} toward={lowerEye} opacity={opacity} />
-          {[lowerOutboard, lowerInboard, upperFront, upperRear].map((anchor, index) => (
-            <DemoMountEye key={index} position={anchor} opacity={opacity} />
-          ))}
         </group>
       )}
       {visibility.coilover && (
