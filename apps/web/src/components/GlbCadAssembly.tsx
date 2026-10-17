@@ -447,10 +447,22 @@ export function GlbCadAssembly({
     lowerOutboard[1] * 0.54 + lowerInboard[1] * 0.46 + 0.045,
     lowerOutboard[2] * 0.54 + lowerInboard[2] * 0.46,
   ];
+  // Visual-only 45-degree inboard coilover: the horizontal offset equals
+  // the vertical rise. Direction follows the lower eye toward chassis pickups.
+  // The 135-degree supplementary angle is measured against wheel vertical.
+  const coiloverRise = Math.max(wheelRadius * 0.85, 0.3);
+  const towardChassisX = upperInboard[0] - lowerEye[0];
+  const towardChassisZ = upperInboard[2] - lowerEye[2];
+  const chassisDistance = Math.hypot(towardChassisX, towardChassisZ);
+  const fallbackX = lowerInboard[0] - lowerOutboard[0];
+  const fallbackZ = lowerInboard[2] - lowerOutboard[2];
+  const fallbackDistance = Math.hypot(fallbackX, fallbackZ);
+  const inboardX = chassisDistance > 1e-6 ? towardChassisX / chassisDistance : fallbackDistance > 1e-6 ? fallbackX / fallbackDistance : 1;
+  const inboardZ = chassisDistance > 1e-6 ? towardChassisZ / chassisDistance : fallbackDistance > 1e-6 ? fallbackZ / fallbackDistance : 0;
   const upperEye: ThreePosition = [
-    lowerEye[0] * 0.82 + upperInboard[0] * 0.18,
-    Math.max(upperInboard[1] + 0.16, lowerEye[1] + Math.max(wheelRadius * 0.85, 0.3)),
-    lowerEye[2] * 0.82 + upperInboard[2] * 0.18,
+    lowerEye[0] + inboardX * coiloverRise,
+    lowerEye[1] + coiloverRise,
+    lowerEye[2] + inboardZ * coiloverRise,
   ];
   const coiloverPlacement: CoiloverPlacement = { start: lowerEye, end: upperEye };
   return (
@@ -501,7 +513,7 @@ export function GlbCadAssembly({
         <group name="demo-direct-acting-damper-mounts" userData={{ visualStatus: "DEMO_DIRECT_ACTING_NOT_ENGINEERING_VALIDATED" }}>
           {/* Lower eye bracket follows the moving lower-arm pickup segment. */}
           <DemoMountStrut start={[lowerEye[0], lowerEye[1] - 0.045, lowerEye[2]]} end={lowerEye} opacity={opacity} />
-          {/* Fixed chassis reference crossmember with an upright damper tower.
+          {/* Fixed chassis reference crossmember with an inboard-leaning damper tower.
               Synthetic support geometry, not a validated frame load path. */}
           <DemoMountStrut start={upperFront} end={upperRear} opacity={opacity} />
           <DemoMountStrut start={upperInboard} end={upperEye} opacity={opacity} />
