@@ -189,8 +189,18 @@ function ImportedHub({
   const radialScale = radius * 0.24 / GLB_SOURCE_DIMENSIONS.hub.radius;
   const widthScale = width * 0.42 / GLB_SOURCE_DIMENSIONS.hub.width;
   const [cx, cy, cz] = GLB_SOURCE_DIMENSIONS.hub.centre;
+  // Audited source GLBs: the hub extends 20 source units in each axial
+  // direction, while the rotor's outward x-face is at 0.02288075.
+  // The brake import rotates source x onto the wheel's local +z axis.
+  // Keep the hub's inner face outside the rotor's outer face (2 mm gap).
+  // Visual-only placement: actual bearing and rotor stack not validated.
+  const rotorOutboardFace = (0.02288075 - GLB_SOURCE_DIMENSIONS.brake.centre[0])
+    * (radius * 0.46 / GLB_SOURCE_DIMENSIONS.brake.rotorRadius);
+  const hubAxialOffset = rotorOutboardFace + GLB_SOURCE_DIMENSIONS.hub.width * widthScale * 0.5 + 0.002;
+  const shift = new Vector3(0, 0, hubAxialOffset).applyQuaternion(new Quaternion(...quaternion));
+  const hubPosition: ThreePosition = [position[0] + shift.x, position[1] + shift.y, position[2] + shift.z];
   return (
-    <group position={position} quaternion={quaternion} name="glb-porya-katmani">
+    <group position={hubPosition} quaternion={quaternion} name="glb-porya-katmani">
       <group scale={[radialScale, radialScale, widthScale]}>
         <primitive object={scene} position={[-cx, -cy, -cz]} />
       </group>
