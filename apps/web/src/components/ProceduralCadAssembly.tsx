@@ -433,7 +433,13 @@ function SolvedActuationMechanism({
       }}
     >
       <TubeBetween start={uprightPickup} end={rockerPushrodPickup} radius={0.007} color="#5f9b45" metalness={0.16} roughness={0.7} opacity={opacity} />
-      <TubeBetween start={axisStart} end={axisEnd} radius={0.011} color="#343a40" metalness={0.42} roughness={0.5} opacity={opacity} />
+      {/* Synthetic chassis mount references, never interpreted as validated chassis CAD. */}
+      <group name="demo-sentetik-sasi-baglantilari" userData={{ visualStatus: "DEMO_SYNTHETIC_CHASSIS_SUPPORT" }}>
+        <TubeBetween start={axisStart} end={axisEnd} radius={0.011} color="#343a40" metalness={0.42} roughness={0.5} opacity={opacity} />
+        <TubeBetween start={pivot} end={chassisCoiloverPickup} radius={0.008} color="#626d77" metalness={0.25} roughness={0.66} opacity={0.48 * opacity} />
+        <PivotBushing position={pivot} axisTarget={axisEnd} opacity={opacity} />
+        <RodEndJoint position={chassisCoiloverPickup} toward={rockerCoiloverPickup} scale={0.95} opacity={opacity} />
+      </group>
       <TubeBetween start={pivot} end={rockerPushrodPickup} radius={0.012} color="#a36b28" metalness={0.22} roughness={0.62} opacity={opacity} />
       <TubeBetween start={pivot} end={rockerCoiloverPickup} radius={0.012} color="#a36b28" metalness={0.22} roughness={0.62} opacity={opacity} />
       <TubeBetween start={rockerPushrodPickup} end={rockerCoiloverPickup} radius={0.007} color="#80511e" metalness={0.2} roughness={0.66} opacity={opacity} />
