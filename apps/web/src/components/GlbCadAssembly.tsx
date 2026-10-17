@@ -1,4 +1,5 @@
 import { useGLTF } from "@react-three/drei";
+import type { ActuationGeometry, Vec3 } from "@msku/contracts";
 import { useMemo } from "react";
 import {
   Box3,
@@ -17,6 +18,7 @@ import type { ThreePosition, ThreeQuaternion } from "./ProceduralCadAssembly";
 
 const MODEL_URLS = {
   brake: "/models/brake.glb",
+  coilover: "/models/coilover.glb",
   hub: "/models/hub.glb",
   suspension: "/models/suspension.glb",
   upright: "/models/upright.glb",
@@ -27,6 +29,13 @@ const MODEL_URLS = {
 export const GLB_SOURCE_DIMENSIONS = {
   wheel: { centre: [0.0102426035, 0, 0] as ThreePosition, radius: 0.37804719, width: 0.30945239 },
   brake: { centre: [-0.0185974904, 0.0028691291, 0.0003738213] as ThreePosition, rotorRadius: 0.16245149 },
+  coilover: {
+    centre: [0, 0.1338041141, 0] as ThreePosition,
+    mountLowY: -0.0326135741,
+    mountHighY: 0.3026527921,
+    overallLength: 0.3932980169,
+    diameter: 0.1072173344,
+  },
   hub: { centre: [0, -0.0197582245, 0] as ThreePosition, radius: 22.49011803, width: 40 },
   upright: { centre: [10.3034121831, 0.5226480478, -12.0506870403] as ThreePosition, height: 0.2588151039 },
   suspension: { centre: [56.5582870794, -12.8886999722, -2.7038653624] as ThreePosition, longestSpan: 291.170644174 },
@@ -249,6 +258,83 @@ function ImportedUpright({
   );
 }
 
+interface CoiloverPlacement {
+  start: ThreePosition;
+  end: ThreePosition;
+  status: "DECLARED_STATIC_GEOMETRY" | "UNSUPPORTED_STATIC_REFERENCE";
+}
+
+const representativeCoiloverPlacement = (
+  positionFor: (id: string) => ThreePosition,
+): CoiloverPlacement => {
+  const inboardIds = ["uca_front_inboard", "uca_rear_inboard", "lca_front_inboard", "lca_rear_inboard"];
+  const inboards = inboardIds.map(positionFor);
+  const chassisCentre: ThreePosition = [
+    inboards.reduce((sum, point) => sum + point[0], 0) / inboards.length,
+    inboards.reduce((sum, point) => sum + point[1], 0) / inboards.length,
+    inboards.reduce((sum, point) => sum + point[2], 0) / inboards.length,
+  ];
+  const maximumHeight = Math.max(...inboards.map((point) => point[1]));
+  const rockerPivot: ThreePosition = [chassisCentre[0], maximumHeight + 0.18, chassisCentre[2]];
+  return {
+    start: [rockerPivot[0] - 0.055, rockerPivot[1] + 0.018, rockerPivot[2] + 0.008],
+    end: [rockerPivot[0] - 0.27, rockerPivot[1] + 0.105, rockerPivot[2] + 0.015],
+    status: "UNSUPPORTED_STATIC_REFERENCE",
+  };
+};
+
+const declaredCoiloverPlacement = (
+  actuation: ActuationGeometry | undefined,
+  pointFor: ((point: Vec3) => ThreePosition) | undefined,
+): CoiloverPlacement | undefined => {
+  if (!actuation || !pointFor) return undefined;
+  const rockerPickup = actuation.damper?.rockerPickup ?? actuation.rockerSpringPickup;
+  const chassisPickup = actuation.damper?.chassisPickup ?? actuation.springChassisPickup;
+  return {
+    start: pointFor(rockerPickup),
+    end: pointFor(chassisPickup),
+    status: "DECLARED_STATIC_GEOMETRY",
+  };
+};
+
+function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement; opacity: number }) {
+  const source = useGLTF(MODEL_URLS.coilover).scene;
+  const scene = useMemo(() => {
+    const clone = preparedClone(source, opacity);
+    tuneBranchMaterial(clone, "opruga_low", 0.25, 0.58);
+    tuneBranchMaterial(clone, "bump stop_low", 0.02, 0.9);
+    return clone;
+  }, [opacity, source]);
+  const start = new Vector3(...placement.start);
+  const end = new Vector3(...placement.end);
+  const direction = end.clone().sub(start);
+  const targetLength = direction.length();
+  if (targetLength <= 1e-9) return null;
+  const sourceMountLength = GLB_SOURCE_DIMENSIONS.coilover.mountHighY
+    - GLB_SOURCE_DIMENSIONS.coilover.mountLowY;
+  const sourceMountCentreY = (
+    GLB_SOURCE_DIMENSIONS.coilover.mountLowY + GLB_SOURCE_DIMENSIONS.coilover.mountHighY
+  ) / 2;
+  const scale = targetLength / sourceMountLength;
+  const midpoint = start.add(end).multiplyScalar(0.5);
+  const quaternion = new Quaternion().setFromUnitVectors(
+    new Vector3(0, 1, 0),
+    direction.normalize(),
+  );
+  return (
+    <group
+      position={midpoint}
+      quaternion={quaternion}
+      name="glb-coilover-katmani"
+      userData={{ visualStatus: placement.status, kinematicClosure: false }}
+    >
+      <group scale={scale}>
+        <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
+      </group>
+    </group>
+  );
+}
+
 function ImportedSuspensionReference({
   positionFor,
   mirrored,
@@ -295,6 +381,8 @@ export function GlbCadAssembly({
   visibility,
   mirrored,
   showRepresentativeSuspension,
+  actuation,
+  actuationPointFor,
   opacity = 1,
 }: {
   positionFor: (id: string) => ThreePosition;
@@ -306,10 +394,14 @@ export function GlbCadAssembly({
   visibility: VisibilityState;
   mirrored: boolean;
   showRepresentativeSuspension: boolean;
+  actuation?: ActuationGeometry;
+  actuationPointFor?: (point: Vec3) => ThreePosition;
   opacity?: number;
 }) {
   const upper = positionFor("uca_outboard");
   const lower = positionFor("lca_outboard");
+  const coiloverPlacement = declaredCoiloverPlacement(actuation, actuationPointFor)
+    ?? representativeCoiloverPlacement(referencePositionFor);
   return (
     <group name="ithal-glb-montaji" userData={{ source: "GLB", physicalValidation: false }}>
       {visibility.wheel && (visibility.tire || visibility.rim) && (
@@ -355,10 +447,16 @@ export function GlbCadAssembly({
         />
       )}
       {showRepresentativeSuspension && (
-        <ImportedSuspensionReference
-          positionFor={referencePositionFor}
-          mirrored={mirrored}
-        />
+        <>
+          <ImportedSuspensionReference
+            positionFor={referencePositionFor}
+            mirrored={mirrored}
+          />
+          <ImportedCoilover
+            placement={coiloverPlacement}
+            opacity={coiloverPlacement.status === "DECLARED_STATIC_GEOMETRY" ? opacity : Math.min(opacity, 0.72)}
+          />
+        </>
       )}
     </group>
   );

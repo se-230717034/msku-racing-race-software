@@ -68,7 +68,7 @@ test("switches the shared Turkish CAD view modes without changing engineering da
   await expect(suspensionViewport).toHaveAttribute("data-cad-mode", "hybrid");
 });
 
-test("loads the five GLB assets and retains the procedural fallback", async ({ page }) => {
+test("loads the six GLB assets and retains the procedural fallback", async ({ page }) => {
   const pageErrors: string[] = [];
   let stage = "initial-load";
   page.on("pageerror", (error) => pageErrors.push(`${stage}: ${error.stack ?? error.message}`));
@@ -76,7 +76,7 @@ test("loads the five GLB assets and retains the procedural fallback", async ({ p
   const vehicleViewport = page.getByTestId("full-vehicle-viewport");
   await expect(vehicleViewport).toHaveAttribute("data-visual-model-source", "glb");
   await expect(vehicleViewport).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
-  for (const file of ["wheel.glb", "brake.glb", "hub.glb", "upright.glb", "suspension.glb"]) {
+  for (const file of ["wheel.glb", "brake.glb", "hub.glb", "upright.glb", "suspension.glb", "coilover.glb"]) {
     const response = await page.request.get(`/models/${file}`);
     expect(response.ok(), `${file} should be served`).toBe(true);
     expect((await response.body()).byteLength).toBeGreaterThan(10_000);
@@ -96,7 +96,8 @@ test("loads the five GLB assets and retains the procedural fallback", async ({ p
   await expect(suspensionViewport).toHaveAttribute("data-visual-model-source", "glb");
   stage = "load-suspension-reference";
   await page.getByRole("button", { name: /temsili çalıştırma/i }).click();
-  await expect(page.getByText("TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz", { exact: true })).toBeVisible();
+  await expect(suspensionViewport).toHaveAttribute("data-coilover-status", "UNSUPPORTED_STATIC_REFERENCE");
+  await expect(page.getByText("GLB COILOVER · temsili uç noktaları · veri yok · hareketsiz", { exact: true })).toBeVisible();
   await page.waitForTimeout(750);
   expect(pageErrors).toEqual([]);
 });
@@ -138,13 +139,18 @@ test("separates the single-corner mechanical layers and applies the mechanical-a
 test("keeps unsupported actuation in an explicit static representative layer", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /temsili çalıştırma/i }).click();
+  await page.waitForTimeout(1_000);
+  await expect(page.getByTestId("full-vehicle-viewport")).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
   const layer = page.getByTestId("representative-actuation-layer");
   await expect(layer).toHaveAttribute("data-status", "UNSUPPORTED_STATIC_REFERENCE");
   await expect(layer).toHaveAttribute("data-corner", "front_left");
+  await expect(layer).toHaveAttribute("data-coilover-count", "4");
   await expect(page.getByText("TEMSİLİ PUSHROD", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: "Geometri" }).click();
-  await expect(page.getByText("TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz", { exact: true })).toBeVisible();
+  await page.waitForTimeout(1_000);
+  await expect(page.getByTestId("suspension-viewport")).toHaveAttribute("data-glb-ready", "true", { timeout: 30_000 });
+  await expect(page.getByText("GLB COILOVER · temsili uç noktaları · veri yok · hareketsiz", { exact: true })).toBeVisible();
 });
 
 test("keeps per-corner edits persistent and blocks unsupported playback", async ({ page }) => {

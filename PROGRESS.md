@@ -4,7 +4,8 @@ Updated: 2026-10-17
 
 ## Four-corner GLB visual assembly
 
-- [x] Five supplied GLB files extracted to `apps/web/public/models/` and audited for nodes, meshes, materials, bounds, axes, and pivots
+- [x] Six supplied GLB files extracted to `apps/web/public/models/` and audited for nodes, meshes, materials, bounds, axes, and pivots
+- [x] Coilover GLB audited and added to FL/FR/RL/RR with declared-endpoint support and a default-off static fallback when actuation geometry is absent
 - [x] Tire/rim, rotor/caliper, hub, and upright models connected to the active render path without duplicate brake parts
 - [x] FL/FR/RL/RR placement uses each corner's own hardpoints, wheel dimensions, handedness, and accepted wheel-axis pose
 - [x] Imported upright frame follows the current upper/lower outboard axis and accepted wheel orientation

@@ -106,6 +106,9 @@ export function VehicleCornerAssembly({
     return toThreePosition(cornerPointToVehicle(project, cornerId, source));
   };
 
+  const actuationVehiclePoint = (point: Vec3): [number, number, number] =>
+    toThreePosition(cornerPointToVehicle(project, cornerId, point));
+
   const wheelCentre = cornerWheelPosition(project, cornerId);
   const solvedCentre = pose?.hardpoints.wheel_center;
   const wheelPosition = solvedCentre
@@ -140,6 +143,8 @@ export function VehicleCornerAssembly({
         showRepresentativeActuation={showRepresentativeActuation}
         visualModelSource={visualModelSource}
         importedAssetMirrored={cornerId.endsWith("right")}
+        actuation={suspension.actuation}
+        actuationPointFor={actuationVehiclePoint}
       />
       {visibility.labels && visualModelSource === "procedural" && (
         <Html position={toThreePosition({ ...wheelPosition, z: wheelPosition.z + suspension.wheel.radius + 0.07 })} center>
@@ -283,7 +288,7 @@ export function FullVehicleViewport({
               showMechanism={showMechanism}
               cadMode={cadMode}
               visualModelSource={visualModelSource}
-              showRepresentativeActuation={showMechanism && visibility.representativeActuation && cornerId === project.activeCornerId}
+              showRepresentativeActuation={showMechanism && visibility.representativeActuation && (visualModelSource === "glb" || cornerId === project.activeCornerId)}
             />
           ))}
         </group>
@@ -309,6 +314,7 @@ export function FullVehicleViewport({
             data-testid="representative-actuation-layer"
             data-status="UNSUPPORTED_STATIC_REFERENCE"
             data-corner={project.activeCornerId}
+            data-coilover-count={visualModelSource === "glb" ? corners.length : 0}
           />
         )}
       </div>
@@ -318,7 +324,7 @@ export function FullVehicleViewport({
       {visualModelSource === "glb" && !glbReady && <div className="representative-layer-note">GLB parçaları yükleniyor · %{Math.round(glbProgress.progress)}</div>}
       {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7 serbestlik dereceli çözücü örneği · şasi yükselme/başvurma/yalpa + dört yaylanmayan kütle geçmişi · bağlantı kapanışı bu modelde bulunmadığı için süspansiyon kolları gizlendi.</div>}
       {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bisiklet modeli çözücüsü · sapma yönelimi hesaplanan sapma hızından trapez yöntemiyle tümleştirilir; ön tekerlek yönlendirmesi sağlanan direksiyon geçmişini kullanır.</div>}
-      {showMechanism && visibility.representativeActuation && <div className="representative-layer-note">TEMSİLİ PUSHROD · ROCKER · YAY/AMORTİSÖR — bağlantı verisi yok, hareketsiz ve mühendislik sonucu değildir</div>}
+      {showMechanism && visibility.representativeActuation && <div className="representative-layer-note">GLB COILOVER + TEMSİLİ PUSHROD/ROCKER — tanımlı uç noktası olmayan köşeler hareketsiz referanstır; mühendislik sonucu değildir</div>}
       {blockedReason && <div className="vehicle-blocked">{blockedReason}</div>}
     </div>
   );

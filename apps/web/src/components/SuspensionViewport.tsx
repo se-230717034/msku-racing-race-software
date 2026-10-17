@@ -77,6 +77,11 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
     return [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
   }, [mirrored, pose, project.suspension.corner, project.suspension.wheel.staticCamberRad, project.suspension.wheel.staticToeRad]);
 
+  const actuationPointFor = (point: Vec3): [number, number, number] => {
+    const value = mirrored ? mirrorAcrossVehicleCentreline(point) : point;
+    return toThreePosition(value);
+  };
+
   return (
     <group>
       <ProceduralCadAssembly
@@ -95,6 +100,8 @@ function SuspensionModel({ mirrored = false, pose, hardpointOverrides }: ModelPr
         showRepresentativeActuation={!mirrored && visibility.representativeActuation}
         visualModelSource={visualModelSource}
         importedAssetMirrored={project.suspension.corner.endsWith("right") !== mirrored}
+        actuation={project.suspension.actuation}
+        actuationPointFor={actuationPointFor}
         opacity={mirrored ? 0.2 : 1}
       />
     </group>
@@ -137,6 +144,7 @@ export function SuspensionViewport({
   const steeringVisible = useWorkspace((state) => state.visibility.steering);
   const referencePlanesVisible = useWorkspace((state) => state.visibility.referencePlanes);
   const representativeVisible = useWorkspace((state) => state.visibility.representativeActuation);
+  const hasDeclaredActuation = useWorkspace((state) => Boolean(state.project.suspension.actuation));
   const mechanicalAssemblyActive = !tireVisible
     && !rimVisible
     && uprightVisible
@@ -168,6 +176,7 @@ export function SuspensionViewport({
       data-hub-visible={wheelVisible && hubVisible}
       data-reference-plane-visible={referencePlanesVisible}
       data-mechanical-assembly-active={mechanicalAssemblyActive}
+      data-coilover-status={representativeVisible ? (hasDeclaredActuation ? "DECLARED_STATIC_GEOMETRY" : "UNSUPPORTED_STATIC_REFERENCE") : "HIDDEN"}
     >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
@@ -208,7 +217,7 @@ export function SuspensionViewport({
         {mechanicalAssemblyActive && <span>MEKANİK MONTAJ · LASTİK/JANT GİZLİ</span>}
         <span>{visualModelSource === "glb" ? "ÖLÇEĞE UYARLANMIŞ GLB · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK" : "PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK"}</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
-        {representativeVisible && <span>TEMSİLİ ÇALIŞTIRMA · veri yok · hareketsiz</span>}
+        {representativeVisible && <span>GLB COILOVER · {hasDeclaredActuation ? "tanımlı statik uç noktaları · kinematik kapanış yok" : "temsili uç noktaları · veri yok · hareketsiz"}</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>

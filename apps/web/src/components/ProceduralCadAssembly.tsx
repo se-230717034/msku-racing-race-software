@@ -1,5 +1,6 @@
 import { Edges, Html, Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
+import type { ActuationGeometry, Vec3 } from "@msku/contracts";
 import { Suspense, useEffect, useMemo } from "react";
 import { DoubleSide, Quaternion, Vector3 } from "three";
 import { ConvexGeometry } from "three-stdlib";
@@ -719,6 +720,8 @@ export function ProceduralCadAssembly({
   showRepresentativeActuation = false,
   visualModelSource = "procedural",
   importedAssetMirrored = false,
+  actuation,
+  actuationPointFor,
   selectedHardpointId,
   onSelectHardpoint,
   opacity = 1,
@@ -737,6 +740,8 @@ export function ProceduralCadAssembly({
   showRepresentativeActuation?: boolean;
   visualModelSource?: VisualModelSource;
   importedAssetMirrored?: boolean;
+  actuation?: ActuationGeometry;
+  actuationPointFor?: (point: Vec3) => ThreePosition;
   selectedHardpointId?: string;
   onSelectHardpoint?: (id: string) => void;
   opacity?: number;
@@ -887,6 +892,8 @@ export function ProceduralCadAssembly({
             visibility={visibility}
             mirrored={importedAssetMirrored}
             showRepresentativeSuspension={showMechanism && showRepresentativeActuation}
+            actuation={actuation}
+            actuationPointFor={actuationPointFor}
             opacity={opacity}
           />
         </Suspense>
