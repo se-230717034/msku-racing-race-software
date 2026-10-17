@@ -475,7 +475,9 @@ export function GlbCadAssembly({
       {visibility.coilover && (
         <group name="demo-direct-acting-damper-mounts" userData={{ visualStatus: "DEMO_DIRECT_ACTING_NOT_ENGINEERING_VALIDATED" }}>
           <DemoMountStrut start={lowerOutboard} end={lowerEye} opacity={opacity} />
-          <DemoMountStrut start={upperInboard} end={upperEye} opacity={opacity} />
+          <DemoMountStrut start={lowerInboard} end={lowerEye} opacity={opacity} />
+          <DemoMountStrut start={upperFront} end={upperEye} opacity={opacity} />
+          <DemoMountStrut start={upperRear} end={upperEye} opacity={opacity} />
           <DemoMountEye position={lowerEye} opacity={opacity} />
           <DemoMountEye position={upperEye} opacity={opacity} />
         </group>
