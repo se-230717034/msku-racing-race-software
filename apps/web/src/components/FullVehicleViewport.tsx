@@ -245,6 +245,14 @@ export function FullVehicleViewport({
     : undefined;
   const dynamics = fullCarVisualState(mode === "dynamics" ? fullCarSample : undefined);
   const corners = visibleCornerIds(mode, project.activeCornerId);
+  const hasUnmountedCoiloverPreview = corners.some(
+    (cornerId) => !project.vehicle.corners[cornerId].suspension.actuation,
+  );
+  const coiloverStatus = visualModelSource !== "glb" || !visibility.coilover
+    ? "HIDDEN"
+    : hasUnmountedCoiloverPreview
+      ? "UNMOUNTED_COMPONENT_PREVIEW"
+      : "DECLARED_STATIC_GEOMETRY";
   const showMechanism = mode !== "dynamics";
   const bodyVisible = visibility.chassis && mode !== "suspension" && mode !== "kinematics";
   const blockedReason = mode === "kinematics" && !kinematicPose
@@ -254,7 +262,15 @@ export function FullVehicleViewport({
       : null;
 
   return (
-    <div className="full-vehicle-viewport" data-testid="full-vehicle-viewport" data-cad-mode={cadMode} data-visual-model-source={visualModelSource} data-glb-ready={glbReady}>
+    <div
+      className="full-vehicle-viewport"
+      data-testid="full-vehicle-viewport"
+      data-cad-mode={cadMode}
+      data-visual-model-source={visualModelSource}
+      data-glb-ready={glbReady}
+      data-coilover-status={coiloverStatus}
+      data-coilover-count={coiloverStatus === "HIDDEN" ? 0 : corners.length}
+    >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 36, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
         <fog attach="fog" args={[sceneSurface.fog, 5.5, 13]} />
@@ -314,17 +330,17 @@ export function FullVehicleViewport({
             data-testid="representative-actuation-layer"
             data-status="UNSUPPORTED_STATIC_REFERENCE"
             data-corner={project.activeCornerId}
-            data-coilover-count={visualModelSource === "glb" ? corners.length : 0}
           />
         )}
       </div>
       <div className="full-vehicle-badge">DÖRT KÖŞE MODELİ · {VIEW_MODE_LABELS[mode]} · {cadMode === "technical" ? "TEKNİK" : cadMode === "detailed" ? "DETAYLI" : "KARMA"} · {visualModelSource === "glb" ? "GLB" : "PROSEDÜREL"}</div>
       <div className="reference-disclaimer">Şasi zarfı ve aks çizgileri yalnızca referanstır — sağlanmamış bağlantı veya çalıştırma geometrisi varsayılmaz.</div>
       {visualModelSource === "glb" && <div className="solver-motion-note">İçe aktarılan GLB parçaları mevcut tekerlek ölçüsü ve hardpoint açıklığına görsel olarak ölçeklenmiştir; üretim boyutu veya MSKU Racing fiziksel parça doğrulaması değildir.</div>}
+      {coiloverStatus === "UNMOUNTED_COMPONENT_PREVIEW" && <div className="representative-layer-note">COILOVER ÖNİZLEMESİ · MONTAJ VERİSİ YOK — upright pickup, rocker ekseni/pickup ve şasi damper noktaları sağlanmadığı için bağlantısız gösterilir</div>}
       {visualModelSource === "glb" && !glbReady && <div className="representative-layer-note">GLB parçaları yükleniyor · %{Math.round(glbProgress.progress)}</div>}
       {mode === "dynamics" && fullCarSample && <div className="solver-motion-note">7 serbestlik dereceli çözücü örneği · şasi yükselme/başvurma/yalpa + dört yaylanmayan kütle geçmişi · bağlantı kapanışı bu modelde bulunmadığı için süspansiyon kolları gizlendi.</div>}
       {mode === "dynamics" && !fullCarSample && bicycleResultAvailable && <div className="solver-motion-note">Bisiklet modeli çözücüsü · sapma yönelimi hesaplanan sapma hızından trapez yöntemiyle tümleştirilir; ön tekerlek yönlendirmesi sağlanan direksiyon geçmişini kullanır.</div>}
-      {showMechanism && visibility.representativeActuation && <div className="representative-layer-note">GLB COILOVER + TEMSİLİ PUSHROD/ROCKER — tanımlı uç noktası olmayan köşeler hareketsiz referanstır; mühendislik sonucu değildir</div>}
+      {showMechanism && visibility.representativeActuation && <div className="representative-layer-note">TEMSİLİ PUSHROD/ROCKER — bağlantı verisi yok, hareketsiz ve mühendislik sonucu değildir</div>}
       {blockedReason && <div className="vehicle-blocked">{blockedReason}</div>}
     </div>
   );

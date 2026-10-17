@@ -14,6 +14,7 @@ import {
 } from "three";
 
 import type { VisibilityState } from "../store/workspace";
+import { resolveCoiloverPlacement, type CoiloverPlacement } from "./coiloverPlacement";
 import type { ThreePosition, ThreeQuaternion } from "./ProceduralCadAssembly";
 
 const MODEL_URLS = {
@@ -258,45 +259,6 @@ function ImportedUpright({
   );
 }
 
-interface CoiloverPlacement {
-  start: ThreePosition;
-  end: ThreePosition;
-  status: "DECLARED_STATIC_GEOMETRY" | "UNSUPPORTED_STATIC_REFERENCE";
-}
-
-const representativeCoiloverPlacement = (
-  positionFor: (id: string) => ThreePosition,
-): CoiloverPlacement => {
-  const inboardIds = ["uca_front_inboard", "uca_rear_inboard", "lca_front_inboard", "lca_rear_inboard"];
-  const inboards = inboardIds.map(positionFor);
-  const chassisCentre: ThreePosition = [
-    inboards.reduce((sum, point) => sum + point[0], 0) / inboards.length,
-    inboards.reduce((sum, point) => sum + point[1], 0) / inboards.length,
-    inboards.reduce((sum, point) => sum + point[2], 0) / inboards.length,
-  ];
-  const maximumHeight = Math.max(...inboards.map((point) => point[1]));
-  const rockerPivot: ThreePosition = [chassisCentre[0], maximumHeight + 0.18, chassisCentre[2]];
-  return {
-    start: [rockerPivot[0] - 0.055, rockerPivot[1] + 0.018, rockerPivot[2] + 0.008],
-    end: [rockerPivot[0] - 0.27, rockerPivot[1] + 0.105, rockerPivot[2] + 0.015],
-    status: "UNSUPPORTED_STATIC_REFERENCE",
-  };
-};
-
-const declaredCoiloverPlacement = (
-  actuation: ActuationGeometry | undefined,
-  pointFor: ((point: Vec3) => ThreePosition) | undefined,
-): CoiloverPlacement | undefined => {
-  if (!actuation || !pointFor) return undefined;
-  const rockerPickup = actuation.damper?.rockerPickup ?? actuation.rockerSpringPickup;
-  const chassisPickup = actuation.damper?.chassisPickup ?? actuation.springChassisPickup;
-  return {
-    start: pointFor(rockerPickup),
-    end: pointFor(chassisPickup),
-    status: "DECLARED_STATIC_GEOMETRY",
-  };
-};
-
 function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement; opacity: number }) {
   const source = useGLTF(MODEL_URLS.coilover).scene;
   const scene = useMemo(() => {
@@ -326,7 +288,7 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
       position={midpoint}
       quaternion={quaternion}
       name="glb-coilover-katmani"
-      userData={{ visualStatus: placement.status, kinematicClosure: false }}
+      userData={{ visualStatus: placement.status, kinematicClosure: false, mechanicallyMounted: placement.status === "DECLARED_STATIC_GEOMETRY" }}
     >
       <group scale={scale}>
         <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
@@ -400,8 +362,11 @@ export function GlbCadAssembly({
 }) {
   const upper = positionFor("uca_outboard");
   const lower = positionFor("lca_outboard");
-  const coiloverPlacement = declaredCoiloverPlacement(actuation, actuationPointFor)
-    ?? representativeCoiloverPlacement(referencePositionFor);
+  const coiloverPlacement = resolveCoiloverPlacement(
+    actuation,
+    actuationPointFor,
+    referencePositionFor,
+  );
   return (
     <group name="ithal-glb-montaji" userData={{ source: "GLB", physicalValidation: false }}>
       {visibility.wheel && (visibility.tire || visibility.rim) && (
@@ -446,15 +411,17 @@ export function GlbCadAssembly({
           opacity={opacity}
         />
       )}
+      {visibility.coilover && (
+        <ImportedCoilover
+          placement={coiloverPlacement}
+          opacity={coiloverPlacement.status === "DECLARED_STATIC_GEOMETRY" ? opacity : Math.min(opacity, 0.92)}
+        />
+      )}
       {showRepresentativeSuspension && (
         <>
           <ImportedSuspensionReference
             positionFor={referencePositionFor}
             mirrored={mirrored}
-          />
-          <ImportedCoilover
-            placement={coiloverPlacement}
-            opacity={coiloverPlacement.status === "DECLARED_STATIC_GEOMETRY" ? opacity : Math.min(opacity, 0.72)}
           />
         </>
       )}

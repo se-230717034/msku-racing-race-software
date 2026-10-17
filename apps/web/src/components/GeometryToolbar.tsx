@@ -22,6 +22,7 @@ const visibilityLabels = {
   brakeDisc: "fren diski",
   caliper: "kaliper",
   hub: "porya",
+  coilover: "coilover önizlemesi",
   hardpoints: "bağlantı noktaları",
   chassis: "şasi referansı",
   referencePlanes: "referans düzlemi",
@@ -76,6 +77,7 @@ export function GeometryToolbar() {
       brakeDisc: true,
       caliper: true,
       hub: true,
+      coilover: true,
       hardpoints: false,
       chassis: false,
       referencePlanes: false,
@@ -129,7 +131,7 @@ export function GeometryToolbar() {
       </div>
       <div className="toolbar-divider" />
       <div className="toolbar-group" aria-label="Görünürlük kontrolleri">
-        {(["upper", "lower", "steering", "upright", "wheel", "tire", "rim", "brakeDisc", "caliper", "hub", "hardpoints", "chassis", "referencePlanes", "representativeActuation"] as const).map((key) => (
+        {(["upper", "lower", "steering", "upright", "wheel", "tire", "rim", "brakeDisc", "caliper", "hub", "coilover", "hardpoints", "chassis", "referencePlanes", "representativeActuation"] as const).map((key) => (
           <button key={key} type="button" className={visibility[key] ? "active" : ""} onClick={() => toggle(key)}>
             {visibility[key] ? <Eye size={13} /> : <EyeOff size={13} />}{visibilityLabels[key]}
           </button>

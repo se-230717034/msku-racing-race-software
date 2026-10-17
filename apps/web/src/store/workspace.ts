@@ -27,6 +27,7 @@ export interface VisibilityState {
   brakeDisc: boolean;
   caliper: boolean;
   hub: boolean;
+  coilover: boolean;
   hardpoints: boolean;
   mirror: boolean;
   chassis: boolean;
@@ -108,6 +109,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     brakeDisc: true,
     caliper: true,
     hub: true,
+    coilover: true,
     hardpoints: true,
     mirror: false,
     chassis: false,

@@ -138,6 +138,7 @@ export function SuspensionViewport({
   const brakeDiscVisible = useWorkspace((state) => state.visibility.brakeDisc);
   const caliperVisible = useWorkspace((state) => state.visibility.caliper);
   const hubVisible = useWorkspace((state) => state.visibility.hub);
+  const coiloverVisible = useWorkspace((state) => state.visibility.coilover);
   const uprightVisible = useWorkspace((state) => state.visibility.upright);
   const upperVisible = useWorkspace((state) => state.visibility.upper);
   const lowerVisible = useWorkspace((state) => state.visibility.lower);
@@ -176,7 +177,7 @@ export function SuspensionViewport({
       data-hub-visible={wheelVisible && hubVisible}
       data-reference-plane-visible={referencePlanesVisible}
       data-mechanical-assembly-active={mechanicalAssemblyActive}
-      data-coilover-status={representativeVisible ? (hasDeclaredActuation ? "DECLARED_STATIC_GEOMETRY" : "UNSUPPORTED_STATIC_REFERENCE") : "HIDDEN"}
+      data-coilover-status={visualModelSource === "glb" && coiloverVisible ? (hasDeclaredActuation ? "DECLARED_STATIC_GEOMETRY" : "UNMOUNTED_COMPONENT_PREVIEW") : "HIDDEN"}
     >
       <Canvas shadows camera={{ position: CAMERA_POSITIONS.perspective, fov: 33, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance" }}>
         <color attach="background" args={[sceneSurface.background]} />
@@ -217,7 +218,9 @@ export function SuspensionViewport({
         {mechanicalAssemblyActive && <span>MEKANİK MONTAJ · LASTİK/JANT GİZLİ</span>}
         <span>{visualModelSource === "glb" ? "ÖLÇEĞE UYARLANMIŞ GLB · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK" : "PROSEDÜREL GÖRSEL · BOYUTSAL/FİZİKSEL DOĞRULAMA YOK"}</span>
         {chassisVisible && <span>Şasi/pickup paneli: görsel referans</span>}
-        {representativeVisible && <span>GLB COILOVER · {hasDeclaredActuation ? "tanımlı statik uç noktaları · kinematik kapanış yok" : "temsili uç noktaları · veri yok · hareketsiz"}</span>}
+        {visualModelSource === "glb" && coiloverVisible && <span>GLB COILOVER · {hasDeclaredActuation ? "tanımlı statik uç noktaları · kinematik kapanış yok" : "BAĞLANTISIZ PARÇA ÖNİZLEMESİ · MONTAJ HARDPOINT VERİSİ YOK"}</span>}
+        {visualModelSource === "glb" && <span>PICKUP TAŞIYICI PANELİ · SADECE GÖRSEL REFERANS · ŞASİ CAD'İ DEĞİL</span>}
+        {representativeVisible && <span>TEMSİLİ PUSHROD/ROCKER · veri yok · hareketsiz</span>}
         {mirror && <span>AYNA VARSAYIMI · yalnızca görselleştirme</span>}
         {mode === "loads" && <span>Kuvvet okları: göreli ölçek · değerler tabloda</span>}
       </div>

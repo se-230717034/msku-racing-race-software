@@ -24,6 +24,7 @@ describe("Phase 6 four-corner workspace", () => {
         chassis: false,
         referencePlanes: false,
         representativeActuation: false,
+        coilover: true,
       },
     });
   });
@@ -53,6 +54,7 @@ describe("Phase 6 four-corner workspace", () => {
     useWorkspace.getState().toggleVisibility("brakeDisc");
     useWorkspace.getState().setVisibility({ tire: false, rim: false, caliper: false, hub: false });
     useWorkspace.getState().toggleVisibility("representativeActuation");
+    useWorkspace.getState().toggleVisibility("coilover");
     useWorkspace.getState().setVehicleViewMode("rear_axle");
     expect(JSON.stringify(useWorkspace.getState().project)).toBe(before);
     expect(useWorkspace.getState().cadViewMode).toBe("detailed");
@@ -64,5 +66,6 @@ describe("Phase 6 four-corner workspace", () => {
     expect(useWorkspace.getState().visibility.caliper).toBe(false);
     expect(useWorkspace.getState().visibility.hub).toBe(false);
     expect(useWorkspace.getState().visibility.representativeActuation).toBe(true);
+    expect(useWorkspace.getState().visibility.coilover).toBe(false);
   });
 });

@@ -5,7 +5,8 @@ Updated: 2026-10-17
 ## Four-corner GLB visual assembly
 
 - [x] Six supplied GLB files extracted to `apps/web/public/models/` and audited for nodes, meshes, materials, bounds, axes, and pivots
-- [x] Coilover GLB audited and added to FL/FR/RL/RR with declared-endpoint support and a default-off static fallback when actuation geometry is absent
+- [x] Coilover GLB audited and added to FL/FR/RL/RR with declared-endpoint support and a default-visible, explicitly unmounted component preview when actuation geometry is absent
+- [x] GLB view adds a low-opacity hardpoint-derived pickup carrier panel so wishbone/tie-rod inboard joints do not appear unsupported; panel is labeled non-CAD visual reference
 - [x] Tire/rim, rotor/caliper, hub, and upright models connected to the active render path without duplicate brake parts
 - [x] FL/FR/RL/RR placement uses each corner's own hardpoints, wheel dimensions, handedness, and accepted wheel-axis pose
 - [x] Imported upright frame follows the current upper/lower outboard axis and accepted wheel orientation
@@ -13,7 +14,7 @@ Updated: 2026-10-17
 - [x] Generic suspension GLB restricted to the default-off unsupported static-reference layer because semantic link endpoints are absent
 - [x] Separate tire, rim, rotor, caliper, hub, upright, arm, and tie-rod visibility remains functional
 - [x] GLB source dimensions, scale mismatch, CC-BY attribution, and physical-validation limits documented
-- [x] Quality gates: 118 Python tests, 42 Vitest tests, 12 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [x] Quality gates: 118 Python tests, 44 Vitest tests, 12 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
 - [ ] Compare imported parts with controlled MSKU Racing component CAD before any dimensional claim
 
 ## Engineering safety hardening — audit priorities 1–3
