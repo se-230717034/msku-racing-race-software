@@ -410,10 +410,12 @@ function SolvedActuationMechanism({
   solution,
   pointFor,
   opacity,
+  chassisAnchors,
 }: {
   solution: SolvedActuationKinematics;
   pointFor: (point: Vec3) => ThreePosition;
   opacity: number;
+  chassisAnchors: ThreePosition[];
 }) {
   const axisStart = pointFor(solution.rockerAxisStart);
   const axisEnd = pointFor(solution.rockerAxisEnd);
@@ -422,6 +424,14 @@ function SolvedActuationMechanism({
   const rockerPushrodPickup = pointFor(solution.rockerPushrodPickup);
   const rockerCoiloverPickup = pointFor(solution.rockerCoiloverPickup);
   const chassisCoiloverPickup = pointFor(solution.chassisCoiloverPickup);
+  // Fixed suspension inboard pickups are visual chassis reference anchors.
+  // Do not attach a chassis bracket to moving rocker arms.
+  const closestAnchor = (target: ThreePosition) => chassisAnchors.reduce((best, candidate) =>
+    Math.hypot(candidate[0] - target[0], candidate[1] - target[1], candidate[2] - target[2]) <
+    Math.hypot(best[0] - target[0], best[1] - target[1], best[2] - target[2]) ? candidate : best,
+  chassisAnchors[0]);
+  const rockerSupport = closestAnchor(pivot);
+  const damperSupport = closestAnchor(chassisCoiloverPickup);
   return (
     <group
       name="demo-sentetik-pushrod-rocker"
@@ -433,7 +443,17 @@ function SolvedActuationMechanism({
       }}
     >
       <TubeBetween start={uprightPickup} end={rockerPushrodPickup} radius={0.007} color="#5f9b45" metalness={0.16} roughness={0.7} opacity={opacity} />
-      <TubeBetween start={axisStart} end={axisEnd} radius={0.011} color="#343a40" metalness={0.42} roughness={0.5} opacity={opacity} />
+      {/* Synthetic chassis mount references, never interpreted as validated chassis CAD. */}
+      <group name="demo-sentetik-sasi-baglantilari" userData={{ visualStatus: "DEMO_SYNTHETIC_CHASSIS_SUPPORT" }}>
+        <TubeBetween start={axisStart} end={axisEnd} radius={0.011} color="#343a40" metalness={0.42} roughness={0.5} opacity={opacity} />
+        <TubeBetween start={rockerSupport} end={axisStart} radius={0.014} color="#525e68" metalness={0.42} roughness={0.5} opacity={opacity} />
+        <TubeBetween start={rockerSupport} end={axisEnd} radius={0.014} color="#525e68" metalness={0.42} roughness={0.5} opacity={opacity} />
+        <TubeBetween start={damperSupport} end={chassisCoiloverPickup} radius={0.015} color="#525e68" metalness={0.42} roughness={0.5} opacity={opacity} />
+        <TubeBetween start={axisStart} end={chassisCoiloverPickup} radius={0.009} color="#626d77" metalness={0.25} roughness={0.66} opacity={0.85 * opacity} />
+        <TubeBetween start={axisEnd} end={chassisCoiloverPickup} radius={0.009} color="#626d77" metalness={0.25} roughness={0.66} opacity={0.85 * opacity} />
+        <PivotBushing position={pivot} axisTarget={axisEnd} opacity={opacity} />
+        <RodEndJoint position={chassisCoiloverPickup} toward={rockerCoiloverPickup} scale={0.95} opacity={opacity} />
+      </group>
       <TubeBetween start={pivot} end={rockerPushrodPickup} radius={0.012} color="#a36b28" metalness={0.22} roughness={0.62} opacity={opacity} />
       <TubeBetween start={pivot} end={rockerCoiloverPickup} radius={0.012} color="#a36b28" metalness={0.22} roughness={0.62} opacity={opacity} />
       <TubeBetween start={rockerPushrodPickup} end={rockerCoiloverPickup} radius={0.007} color="#80511e" metalness={0.2} roughness={0.66} opacity={opacity} />
@@ -900,8 +920,8 @@ export function ProceduralCadAssembly({
           <RodEndJoint position={tieOutboard} toward={wheelPosition} scale={0.82} opacity={opacity} />
         </>}
       </>}
-      {showMechanism && visibility.coilover && actuationKinematics?.status === "SOLVED" && actuationPointFor && (
-        <SolvedActuationMechanism solution={actuationKinematics} pointFor={actuationPointFor} opacity={opacity} />
+      {showMechanism && !useImportedParts && visibility.coilover && actuationKinematics?.status === "SOLVED" && actuationPointFor && (
+        <SolvedActuationMechanism solution={actuationKinematics} pointFor={actuationPointFor} chassisAnchors={chassisPickupPoints} opacity={opacity} />
       )}
       {showMechanism && showRepresentativeActuation && !actuation && !useImportedParts && (
         <RepresentativeActuationLayer positionFor={staticPositionFor ?? positionFor} />

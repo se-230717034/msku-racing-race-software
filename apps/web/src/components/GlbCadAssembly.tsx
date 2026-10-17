@@ -14,7 +14,7 @@ import {
 } from "three";
 
 import type { VisibilityState } from "../store/workspace";
-import { resolveCoiloverPlacement, type CoiloverPlacement } from "./coiloverPlacement";
+import type { CoiloverPlacement } from "./coiloverPlacement";
 import type { ThreePosition, ThreeQuaternion } from "./ProceduralCadAssembly";
 
 const MODEL_URLS = {
@@ -288,11 +288,60 @@ function ImportedCoilover({ placement, opacity }: { placement: CoiloverPlacement
       position={midpoint}
       quaternion={quaternion}
       name="glb-coilover-katmani"
-      userData={{ visualStatus: "SOLVED_ACTUATION_GEOMETRY", kinematicClosure: true, mechanicallyMounted: true }}
+      userData={{ visualStatus: "SOLVED_ACTUATION_GEOMETRY", kinematicClosure: true, mechanicallyMounted: false, physicalValidation: false }}
     >
-      <group scale={scale}>
+      {/* Keep the imported coilover's radial dimensions fixed while matching the solved eye-to-eye length. */}
+      <group scale={[1, scale, 1]}>
         <primitive object={scene} position={[0, -sourceMountCentreY, 0]} />
       </group>
+      {[-targetLength / 2, targetLength / 2].map((y) => (
+        <mesh key={y} position={[0, y, 0]} castShadow receiveShadow>
+          <sphereGeometry args={[0.012, 16, 12]} />
+          <meshStandardMaterial color="#606a73" metalness={0.45} roughness={0.52} transparent={opacity < 1} opacity={opacity} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function DemoMountStrut({ start, end, opacity }: { start: ThreePosition; end: ThreePosition; opacity: number }) {
+  const a = new Vector3(...start);
+  const b = new Vector3(...end);
+  const delta = b.clone().sub(a);
+  const length = delta.length();
+  if (length < 1e-6) return null;
+  return (
+    <mesh position={a.add(b).multiplyScalar(0.5)} quaternion={new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), delta.normalize())} castShadow>
+      <cylinderGeometry args={[0.012, 0.012, length, 12]} />
+      <meshStandardMaterial color="#68747c" metalness={0.42} roughness={0.48} transparent={opacity < 1} opacity={opacity} />
+    </mesh>
+  );
+}
+
+function DemoMountEye({ position, opacity }: { position: ThreePosition; opacity: number }) {
+  return (
+    <mesh position={position} castShadow>
+      <sphereGeometry args={[0.017, 16, 12]} />
+      <meshStandardMaterial color="#39434a" metalness={0.45} roughness={0.5} transparent={opacity < 1} opacity={opacity} />
+    </mesh>
+  );
+}
+
+function DemoDamperClevis({ position, toward, opacity }: { position: ThreePosition; toward: ThreePosition; opacity: number }) {
+  const direction = new Vector3(...toward).sub(new Vector3(...position)).normalize();
+  const quaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), direction);
+  return (
+    <group position={position} quaternion={quaternion} name="demo-damper-clevis">
+      {[-0.019, 0.019].map((x) => (
+        <mesh key={x} position={[x, 0, 0]} castShadow>
+          <boxGeometry args={[0.008, 0.055, 0.033]} />
+          <meshStandardMaterial color="#65717a" metalness={0.55} roughness={0.43} transparent={opacity < 1} opacity={opacity} />
+        </mesh>
+      ))}
+      <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.008, 0.008, 0.052, 16]} />
+        <meshStandardMaterial color="#252d33" metalness={0.62} roughness={0.38} transparent={opacity < 1} opacity={opacity} />
+      </mesh>
     </group>
   );
 }
@@ -364,14 +413,46 @@ export function GlbCadAssembly({
   kinematicPose?: KinematicPose;
   opacity?: number;
 }) {
+  // Keep the public component contract intact while the direct-acting visual
+  // layout is decoupled from the existing pushrod/rocker physics solver.
+  void actuation;
+  void staticWheelCenter;
+  void actuationPointFor;
+  void kinematicPose;
   const upper = positionFor("uca_outboard");
   const lower = positionFor("lca_outboard");
-  const coiloverPlacement = resolveCoiloverPlacement(
-    actuation,
-    staticWheelCenter,
-    actuationPointFor,
-    kinematicPose,
-  );
+  // Reference-style direct-acting damper: lower eye on the moving lower control
+  // arm, upper eye on a fixed inboard chassis pickup reference. Demo geometry only.
+  // Existing pushrod/rocker actuation remains the separate engineering solver.
+  const lowerOutboard = positionFor("lca_outboard");
+  const lowerFront = positionFor("lca_front_inboard");
+  const lowerRear = positionFor("lca_rear_inboard");
+  const upperFront = referencePositionFor("uca_front_inboard");
+  const upperRear = referencePositionFor("uca_rear_inboard");
+  const lowerInboard: ThreePosition = [
+    (lowerFront[0] + lowerRear[0]) / 2,
+    (lowerFront[1] + lowerRear[1]) / 2,
+    (lowerFront[2] + lowerRear[2]) / 2,
+  ];
+  const upperInboard: ThreePosition = [
+    (upperFront[0] + upperRear[0]) / 2,
+    (upperFront[1] + upperRear[1]) / 2,
+    (upperFront[2] + upperRear[2]) / 2,
+  ];
+  // Reference-style outboard mounting: lower eye on the upper face of the
+  // moving lower arm, top eye above it on a fixed chassis-side bracket.
+  // Both points remain inboard of the tire and are visual demo locations.
+  const lowerEye: ThreePosition = [
+    lowerOutboard[0] * 0.54 + lowerInboard[0] * 0.46,
+    lowerOutboard[1] * 0.54 + lowerInboard[1] * 0.46 + 0.045,
+    lowerOutboard[2] * 0.54 + lowerInboard[2] * 0.46,
+  ];
+  const upperEye: ThreePosition = [
+    lowerEye[0] * 0.82 + upperInboard[0] * 0.18,
+    Math.max(upperInboard[1] + 0.16, lowerEye[1] + Math.max(wheelRadius * 0.85, 0.3)),
+    lowerEye[2] * 0.82 + upperInboard[2] * 0.18,
+  ];
+  const coiloverPlacement: CoiloverPlacement = { start: lowerEye, end: upperEye };
   return (
     <group name="ithal-glb-montaji" userData={{ source: "GLB", physicalValidation: false }}>
       {visibility.wheel && (visibility.tire || visibility.rim) && (
@@ -416,9 +497,24 @@ export function GlbCadAssembly({
           opacity={opacity}
         />
       )}
-      {visibility.coilover && coiloverPlacement.placement && (
+      {visibility.coilover && (
+        <group name="demo-direct-acting-damper-mounts" userData={{ visualStatus: "DEMO_DIRECT_ACTING_NOT_ENGINEERING_VALIDATED" }}>
+          {/* Lower eye bracket follows the moving lower-arm pickup segment. */}
+          <DemoMountStrut start={[lowerEye[0], lowerEye[1] - 0.045, lowerEye[2]]} end={lowerEye} opacity={opacity} />
+          {/* Fixed chassis reference crossmember with an upright damper tower.
+              Synthetic support geometry, not a validated frame load path. */}
+          <DemoMountStrut start={upperFront} end={upperRear} opacity={opacity} />
+          <DemoMountStrut start={upperInboard} end={upperEye} opacity={opacity} />
+          <DemoMountEye position={upperInboard} opacity={opacity} />
+          <DemoMountEye position={lowerEye} opacity={opacity} />
+          <DemoMountEye position={upperEye} opacity={opacity} />
+          <DemoDamperClevis position={lowerEye} toward={upperEye} opacity={opacity} />
+          <DemoDamperClevis position={upperEye} toward={lowerEye} opacity={opacity} />
+        </group>
+      )}
+      {visibility.coilover && (
         <ImportedCoilover
-          placement={coiloverPlacement.placement}
+          placement={coiloverPlacement}
           opacity={opacity}
         />
       )}
