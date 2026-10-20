@@ -732,7 +732,9 @@ class CoiloverSeriesRequest(StrictModel):
     def arrays_and_limits_are_consistent(self) -> CoiloverSeriesRequest:
         sample_count = len(self.wheelTravelM)
         if len(self.wheelVelocityMps) != sample_count or len(self.coiloverLengthM) != sample_count:
-            raise ValueError("wheelTravelM, wheelVelocityMps and coiloverLengthM must have equal length")
+            raise ValueError(
+                "wheelTravelM, wheelVelocityMps and coiloverLengthM must have equal length"
+            )
         if (
             self.minimumCoiloverLengthM is not None
             and self.maximumCoiloverLengthM is not None

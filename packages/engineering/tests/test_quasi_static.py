@@ -9,8 +9,8 @@ from msku_engineering import (
     TwoForceMember,
     VehicleLoadTransferInput,
     calculate_actuation_series,
-    calculate_damper_force,
     calculate_coilover_series,
+    calculate_damper_force,
     calculate_vehicle_load_transfer,
     solve_upright_equilibrium,
 )

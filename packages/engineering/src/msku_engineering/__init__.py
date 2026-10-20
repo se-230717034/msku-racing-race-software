@@ -67,9 +67,6 @@ from .optimization import (
     run_optimization,
 )
 from .quasi_static import (
-    PHYSICAL_STATUS as QUASI_STATIC_PHYSICAL_STATUS,
-)
-from .quasi_static import (
     COILOVER_SOLVER_VERSION,
     QUASI_STATIC_SOLVER_VERSION,
     ActuationSeriesResult,
@@ -92,6 +89,9 @@ from .quasi_static import (
     calculate_damper_force,
     calculate_vehicle_load_transfer,
     solve_upright_equilibrium,
+)
+from .quasi_static import (
+    PHYSICAL_STATUS as QUASI_STATIC_PHYSICAL_STATUS,
 )
 from .quasi_static import (
     REFERENCE_STATUS as QUASI_STATIC_REFERENCE_STATUS,

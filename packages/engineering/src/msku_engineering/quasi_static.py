@@ -708,8 +708,14 @@ def calculate_coilover_series(
         return CoiloverSeriesResult(spring.calculation_status, (), spring.warnings)
 
     for index, length in enumerate(lengths):
-        below_minimum = minimum_coilover_length_m is not None and length < minimum_coilover_length_m - 1.0e-12
-        above_maximum = maximum_coilover_length_m is not None and length > maximum_coilover_length_m + 1.0e-12
+        below_minimum = (
+            minimum_coilover_length_m is not None
+            and length < minimum_coilover_length_m - 1.0e-12
+        )
+        above_maximum = (
+            maximum_coilover_length_m is not None
+            and length > maximum_coilover_length_m + 1.0e-12
+        )
         if below_minimum or above_maximum:
             return CoiloverSeriesResult(
                 "NOT_COMPUTABLE",

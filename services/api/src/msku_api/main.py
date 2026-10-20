@@ -8,8 +8,8 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from msku_engineering import (
-    COILOVER_SOLVER_VERSION,
     BICYCLE_SOLVER_VERSION,
+    COILOVER_SOLVER_VERSION,
     DYNAMICS_SOLVER_VERSION,
     FULL_CAR_SOLVER_VERSION,
     KINEMATICS_SOLVER_VERSION,
@@ -1365,6 +1365,3 @@ async def capabilities() -> dict[str, Any]:
         ],
         "vehicleParameterManifestSchemaVersion": "1.0.0",
     }
-    CoiloverSampleResponse,
-    CoiloverSeriesRequest,
-    CoiloverSeriesResponse,
