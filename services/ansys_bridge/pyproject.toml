@@ -1,6 +1,6 @@
 [project]
 name = "msku-ansys-bridge"
-version = "0.2.1"
+version = "0.3.0"
 description = "Local-only ANSYS integration bridge for MSKU Racing Dynamics Studio"
 requires-python = ">=3.12"
 dependencies = [

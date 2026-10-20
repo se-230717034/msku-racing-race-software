@@ -6,6 +6,7 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
   const token = "browser-session-token";
   let processVerified = false;
   let startedByBridge = false;
+  let analysisStarted = false;
   const connection = () => ({
     state: processVerified ? "VERIFIED" : "NOT_TESTED",
     processVerified,
@@ -27,7 +28,7 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
         body: JSON.stringify({
           status: "ok",
           service: "msku-ansys-local-bridge",
-          version: "0.2.1",
+          version: "0.3.0",
           scope: "localhost_only",
           tokenConfigured: true,
         }),
@@ -48,12 +49,44 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(connection()) });
       return;
     }
+    if (path.endsWith("/analyses/static-structural") && route.request().method() === "POST") {
+      analysisStarted = true;
+      expect(route.request().postDataJSON()).toMatchObject({
+        material: "Structural Steel",
+        fixedNamedSelection: "NS_Fixed",
+        forceNamedSelection: "NS_Force",
+        forceN: 1000,
+      });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        jobId: "11111111-1111-4111-8111-111111111111",
+        state: "QUEUED", stage: "queued", message: "İş kuyruğa alındı",
+        startedAt: "2026-10-21T10:00:00Z", completedAt: null, errorCode: null, result: null,
+      }) });
+      return;
+    }
+    if (path.includes("/analyses/static-structural/") && analysisStarted) {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        jobId: "11111111-1111-4111-8111-111111111111",
+        state: "SUCCEEDED", stage: "done", message: "Mechanical çözümü tamamlandı",
+        startedAt: "2026-10-21T10:00:00Z", completedAt: "2026-10-21T10:00:10Z", errorCode: null,
+        result: {
+          solverStatus: "Done", maximumVonMisesStressPa: 1250,
+          maximumTotalDeformationM: 0.0002, meshNodes: 500, meshElements: 200,
+          geometrySha256: "a".repeat(64), material: "Structural Steel",
+          fixedNamedSelection: "NS_Fixed", forceNamedSelection: "NS_Force",
+          forceAxis: "X", forceN: 1000, meshSizeMm: 25,
+          mechanicalVersion: "261", productInfo: "Ansys Mechanical",
+          units: "SI", validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY", warnings: [],
+        },
+      }) });
+      return;
+    }
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         status: "ready",
         service: "msku-ansys-local-bridge",
-        version: "0.2.1",
+        version: "0.3.0",
         transport: "localhost_token_wnua",
         adapter: {
           adapter: "pymechanical",
@@ -84,7 +117,7 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
           },
           connection: connection(),
         },
-        warnings: ["SIMULATION_ENDPOINTS_NOT_IMPLEMENTED"],
+        warnings: ["STATIC_STRUCTURAL_REQUIRES_EXPLICIT_LOCAL_ACTION"],
       }),
     });
   });
@@ -105,8 +138,16 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
   await expect(page.getByText("Gerçek proses doğrulandı").first()).toBeVisible();
   await expect(page.getByText("Aktif ve yazılabilir")).toBeVisible();
   await expect(page.getByText("Açık yoldan yerel bridge")).toBeVisible();
-  await expect(page.getByText("Devre dışı")).toBeVisible();
-  await expect(page.getByText("analiz çalıştırılmaz", { exact: false })).toBeVisible();
+  await expect(page.getByText("Yalnızca açık kullanıcı eylemiyle")).toBeVisible();
+  const analysis = page.getByRole("region", { name: "Static Structural analizi" });
+  await analysis.getByLabel("CAD yolu (.agdb, .pmdb, .step, .stp)").fill("C:\\CAD\\small.agdb");
+  await analysis.getByLabel("Sabit mesnet seçimi").fill("NS_Fixed");
+  await analysis.getByLabel("Kuvvet yüzeyi seçimi").fill("NS_Force");
+  await analysis.getByLabel("Kuvvet ekseni").selectOption("X");
+  await analysis.getByLabel("Kuvvet (N)").fill("1000");
+  await analysis.getByRole("button", { name: "Analizi açıkça başlat" }).click();
+  await expect(analysis).toContainText("Mechanical çözümü tamamlandı");
+  await expect(analysis).toContainText("0.0012500 MPa");
 });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {

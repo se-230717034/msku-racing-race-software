@@ -103,6 +103,20 @@ button { color: inherit; }
 .ansys-test-result { display: grid; gap: 4px; margin: 0 0 11px; padding: 9px 10px; border: 1px solid #6d2737; border-radius: 3px; color: #ff9cad; background: #251017; font-size: 9px; line-height: 1.4; }
 .ansys-test-result.verified { border-color: #245a3a; color: #7ce3a1; background: #0e2017; }
 .ansys-test-result span, .ansys-test-result small { color: #a8b0bd; }
+.ansys-analysis { display: grid; gap: 9px; margin-top: 14px; padding: 11px; border: 1px solid #303947; background: #0d1219; }
+.ansys-analysis h3 { margin: 0; color: #edf0f5; font-size: 12px; }
+.ansys-analysis p { margin: 0; color: #9ba6b7; font-size: 9px; line-height: 1.5; }
+.ansys-analysis label { display: grid; gap: 4px; min-width: 0; color: #aab3c0; font-size: 9px; }
+.ansys-analysis input, .ansys-analysis select { width: 100%; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid #3a4352; border-radius: 3px; color: #e7ebf1; background: #111821; font-size: 10px; }
+.ansys-analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ansys-analysis > button { min-height: 32px; border: 1px solid #8d2638; border-radius: 3px; color: #fff; background: #451b28; font-size: 10px; cursor: pointer; }
+.ansys-analysis > button:disabled { opacity: .45; cursor: not-allowed; }
+.ansys-analysis .ansys-analysis-error { color: #ff8d9d; }
+.ansys-analysis-result { display: grid; gap: 6px; padding: 9px; border: 1px solid #394658; color: #dde5ef; font-size: 9px; }
+.ansys-analysis-result span, .ansys-analysis-result small { overflow-wrap: anywhere; color: #aeb9c8; }
+.ansys-analysis-result dl { margin: 0; }
+.ansys-analysis-result dl div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.ansys-analysis-result dl dd { margin: 0; font-family: ui-monospace, monospace; }
 .ansys-security-note { margin: 11px 0 0; padding-top: 10px; border-top: 1px solid #252c36; color: #7f8999; font-size: 8px; line-height: 1.55; }
 .ansys-security-note code { color: #c8ced7; }
 

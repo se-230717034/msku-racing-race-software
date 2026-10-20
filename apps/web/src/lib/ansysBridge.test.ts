@@ -4,13 +4,15 @@ import {
   launchRealAnsysConnection,
   normalizeLoopbackBridgeUrl,
   probeAnsysBridge,
+  readStaticStructural,
+  startStaticStructural,
   testRealAnsysConnection,
 } from "./ansysBridge";
 
 const live = {
   status: "ok",
   service: "msku-ansys-local-bridge",
-  version: "0.2.1",
+  version: "0.3.0",
   scope: "localhost_only",
   tokenConfigured: true,
 };
@@ -20,7 +22,7 @@ function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false, s
   return {
     status: "ready",
     service: "msku-ansys-local-bridge",
-    version: "0.2.1",
+    version: "0.3.0",
     transport: "localhost_token_wnua",
     adapter: {
       adapter: "pymechanical",
@@ -63,7 +65,7 @@ function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false, s
         message: verified ? "Gerçek proses doğrulandı." : "Henüz test edilmedi.",
       },
     },
-    warnings: verified ? ["SIMULATION_ENDPOINTS_NOT_IMPLEMENTED"] : ["REAL_ANSYS_NOT_CONNECTED"],
+    warnings: verified ? ["STATIC_STRUCTURAL_REQUIRES_EXPLICIT_LOCAL_ACTION"] : ["REAL_ANSYS_NOT_CONNECTED"],
   };
 }
 
@@ -161,5 +163,60 @@ describe("ANSYS local bridge client", () => {
     await expect(probeAnsysBridge("http://127.0.0.1:8765", "wrong")).resolves.toMatchObject({
       kind: "unauthorized",
     });
+  });
+
+  it("starts Static Structural only through an explicit tokened POST and polls its job", async () => {
+    const job = {
+      jobId: "11111111-1111-4111-8111-111111111111",
+      state: "RUNNING",
+      stage: "meshing",
+      message: "Mesh üretiliyor",
+      startedAt: "2026-10-21T10:00:00Z",
+      completedAt: null,
+      errorCode: null,
+      result: null,
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(job), { status: 202 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(job), { status: 200 }));
+    const input = {
+      geometryPath: "C:\\CAD\\small.agdb",
+      material: "Structural Steel" as const,
+      fixedNamedSelection: "NS_Fixed",
+      forceNamedSelection: "NS_Force",
+      forceAxis: "X" as const,
+      forceN: 1000,
+      meshSizeMm: 25,
+    };
+    const started = await startStaticStructural("http://127.0.0.1:8765", "secure-token", input);
+    const polled = await readStaticStructural("http://127.0.0.1:8765", "secure-token", started.jobId);
+
+    expect(started.state).toBe("RUNNING");
+    expect(polled.result).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      headers: { "X-MSKU-Bridge-Token": "secure-token", "Content-Type": "application/json" },
+    });
+    const requestBody = fetchMock.mock.calls[0]?.[1]?.body;
+    expect(typeof requestBody).toBe("string");
+    expect(JSON.parse(requestBody as string)).toEqual(input);
+  });
+
+  it("rejects a falsely successful Static Structural response without solver evidence", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({
+      jobId: "11111111-1111-4111-8111-111111111111",
+      state: "SUCCEEDED",
+      stage: "done",
+      message: "Success",
+      startedAt: "2026-10-21T10:00:00Z",
+      completedAt: "2026-10-21T10:00:10Z",
+      errorCode: null,
+      result: null,
+    }), { status: 200 }));
+
+    await expect(readStaticStructural(
+      "http://127.0.0.1:8765", "secure-token", "11111111-1111-4111-8111-111111111111",
+    )).rejects.toThrow(/kanıtı/);
   });
 });

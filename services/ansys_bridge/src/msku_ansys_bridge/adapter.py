@@ -7,7 +7,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, TypeVar
 
 from .config import BridgeSettings
 from .discovery import (
@@ -17,6 +17,8 @@ from .discovery import (
     discover_windows_installations,
     pymechanical_compatibility,
 )
+
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +75,8 @@ class MechanicalClient(Protocol):
     def get_product_info(self) -> Any: ...
 
     def run_python_script(self, script: str) -> Any: ...
+
+    def clear(self) -> Any: ...
 
     def exit(self, force: bool = False) -> Any: ...
 
@@ -135,9 +139,7 @@ class PyMechanicalLauncher:
         launch_mechanical = core.launch_mechanical
         return launch_mechanical(
             exec_file=str(installation.executable),
-            additional_envs={
-                f"AWP_ROOT{installation.version_code}": str(installation.root)
-            },
+            additional_envs={f"AWP_ROOT{installation.version_code}": str(installation.root)},
             ip=host,
             port=port,
             batch=True,
@@ -156,6 +158,8 @@ class AnsysAdapter(Protocol):
     def launch_connection(self) -> ConnectionTestResult: ...
 
     def close(self) -> None: ...
+
+    def run_with_owned_client(self, action: Callable[[MechanicalClient], _T]) -> _T: ...
 
 
 def _loopback_port_open(host: str, port: int, timeout_seconds: float) -> bool:
@@ -218,7 +222,7 @@ class LocalAnsysAdapter:
         return discovery, compatibility
 
     def status(self) -> AdapterStatus:
-        if self._connection.process_verified:
+        if self._connection.process_verified and not self._connection_lock.locked():
             client = self._connected_client
             reachable = self._port_probe(
                 "127.0.0.1",
@@ -372,15 +376,17 @@ class LocalAnsysAdapter:
                 )
             product_info = str(client.get_product_info()).strip()
             mechanical_version = str(client.version).strip()
-            read_only = str(
-                client.run_python_script(
-                    "Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode"
+            read_only = (
+                str(
+                    client.run_python_script(
+                        "Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode"
+                    )
                 )
-            ).strip().casefold()
-        except Exception as exc:  # PyMechanical exposes multiple runtime/gRPC exception types.
-            return self._exception_failure(
-                exc, launching=started_by_bridge, client_obtained=True
+                .strip()
+                .casefold()
             )
+        except Exception as exc:  # PyMechanical exposes multiple runtime/gRPC exception types.
+            return self._exception_failure(exc, launching=started_by_bridge, client_obtained=True)
 
         if not product_info or "ansys mechanical" not in product_info.casefold():
             return self._failure(
@@ -573,3 +579,23 @@ class LocalAnsysAdapter:
             finally:
                 self._connected_client = None
                 self._connection = _not_tested(self._settings.mechanical_port)
+
+    def run_with_owned_client(self, action: Callable[[MechanicalClient], _T]) -> _T:
+        # An externally connected Mechanical process may contain unsaved user work.
+        # Static jobs clear a project, so they are allowed only in bridge-owned sessions.
+        with self._connection_lock:
+            client = self._owned_client
+            if (
+                client is None
+                or client is not self._connected_client
+                or not self._connection.process_verified
+                or not self._connection.license_verified
+            ):
+                from .analysis import AnalysisError
+
+                raise AnalysisError(
+                    "BRIDGE_OWNED_SESSION_REQUIRED",
+                    "Analiz için bridge tarafından başlatılmış ve doğrulanmış "
+                    "Mechanical oturumu gerekli.",
+                )
+            return action(client)

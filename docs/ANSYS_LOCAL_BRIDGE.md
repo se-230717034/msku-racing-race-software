@@ -1,8 +1,8 @@
-# ANSYS Local Bridge — Phase 2.1
+# ANSYS Local Bridge — Phase 2 connection and Phase 3 analysis
 
 ## Scope and security
 
-The separate `services/ansys_bridge` process discovers local Mechanical installations, checks PyMechanical compatibility, tests an existing process, and can launch Mechanical when the engineer explicitly requests it. It creates no model, mesh, solve, or result. `simulationsEnabled` is always `false`. The bridge is excluded from the Vercel Python function bundle and runs only on the engineer's Windows computer.
+The separate `services/ansys_bridge` process discovers local Mechanical installations, checks PyMechanical compatibility, tests an existing process, and can launch Mechanical when the engineer explicitly requests it. Phase 3 adds a separately requested Static Structural workflow in a bridge-owned process; see [the Phase 3 guide](./ANSYS_PHASE_3_STATIC_STRUCTURAL.md). `simulationsEnabled` remains `false` in the legacy readiness response to signal that no automatic simulation is enabled. The bridge is excluded from the Vercel Python function bundle and runs only on the engineer's Windows computer.
 
 Phase 1 controls remain: binding to `127.0.0.1:8765`, loopback client checks, an exact browser Origin allowlist, a random session token for protected endpoints, and a strict loopback browser URL. The token remains in browser `sessionStorage`. Mechanical gRPC uses Windows Named User Authentication (`wnua`) at `127.0.0.1`; there is no insecure fallback.
 
@@ -61,8 +61,10 @@ Do not commit tokens or license-server details.
 | `GET` | `/bridge/v1/status` | Installation, compatibility, and last verification |
 | `POST` | `/bridge/v1/connection/test` | Verify existing local Mechanical process |
 | `POST` | `/bridge/v1/connection/launch` | User-triggered explicit-path launch and verification |
+| `POST` | `/bridge/v1/analyses/static-structural` | Explicit local Static Structural job start |
+| `GET` | `/bridge/v1/analyses/static-structural/{jobId}` | Poll submitted job and actual results |
 
-All but `/health/live` require the bridge token. All requests require a loopback socket and allowed browser Origin. There are no job, solve, upload, arbitrary-script, or result endpoints.
+All but `/health/live` require the bridge token. All requests require a loopback socket and allowed browser Origin. The only solve endpoint is the explicit Static Structural job described in the Phase 3 guide. There is no arbitrary-script or general upload endpoint.
 
 ## Student and license limits
 

@@ -2,6 +2,18 @@
 
 Updated: 2026-10-21
 
+## ANSYS local integration — Phase 3 Static Structural
+
+- [x] New `codex/ansys-local-bridge-phase-3` branch based on validated Phase 2
+- [x] Authenticated, localhost-only, explicit Static Structural job start and status polling; no automatic solve or mock fallback
+- [x] Local AGDB/PMDB/STEP import, Structural Steel assignment, distinct named-selection fixed support and component force, mesh generation and Student-size precheck
+- [x] Real Mechanical solve with `Done` gate, SI-unit/finite-result validation, maximum von Mises stress and total deformation, input/CAD hash provenance
+- [x] Turkish analysis inputs, staged progress, results and sanitized failure messages; externally connected user sessions are never cleared
+- [x] Real v261 smoke solve and protected HTTP launch/job/poll/result path on official 17 KB AGDB sample: 4,464 nodes, 840 elements, `Done`; quantitative output and limitations in `docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md`
+- [x] Quality gates: 158 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
+- [ ] Physical correlation, mesh-convergence study, general material library, arbitrary STEP face selection, persisted Mechanical project and cancellation are outside this initial workflow
+- [ ] Current active license edition/academic entitlement remains unproven by installation path; actual process reported `Ansys Mechanical Enterprise`
+
 ## ANSYS Student 2026 R1 startup compatibility
 
 - [x] Verified the installed Mechanical shortcut target and Windows executable description; distinguished `AnsysWBU.exe` from Workbench `RunWB2.exe`
@@ -24,10 +36,10 @@ Updated: 2026-10-21
 - [x] Closed-port, compatibility, authentication, license, product, and version failures remain non-success states with sanitized messages
 - [x] Turkish panel for installation, PyMechanical compatibility, loopback target, and last verified connection result
 - [x] Phase 1 token, origin, loopback socket, PNA, session-storage, and Vercel exclusion controls preserved
-- [x] Structural/model/mesh/solve/result endpoints remain absent and `simulationsEnabled` remains false
+- [x] At Phase 2 completion, structural/model/mesh/solve/result endpoints were absent; Phase 3 added one explicit job endpoint while legacy automatic `simulationsEnabled` remains false
 - [x] Quality gates: 138 Python tests, 54 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
 - [ ] Real-machine correlation with a licensed Ansys Student/Academic Mechanical process — unavailable in CI
-- [ ] Structural simulation workflow — intentionally outside Phase 2
+- [x] Structural simulation workflow — subsequently introduced as the scoped Phase 3 workflow above
 
 ## ANSYS local integration — Phase 1
 

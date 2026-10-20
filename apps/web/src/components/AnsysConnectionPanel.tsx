@@ -6,11 +6,14 @@ import {
   ANSYS_BRIDGE_URL,
   launchRealAnsysConnection,
   probeAnsysBridge,
+  readStaticStructural,
+  startStaticStructural,
   testRealAnsysConnection,
   type AnsysBridgeStatus,
   type AnsysConnectionState,
   type CompatibilityState,
   type ConnectionTestState,
+  type StaticStructuralJob,
 } from "../lib/ansysBridge";
 
 const labels: Record<AnsysConnectionState["kind"], string> = {
@@ -64,6 +67,16 @@ export function AnsysConnectionPanel() {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
   const [state, setState] = useState<AnsysConnectionState>({ kind: "checking" });
+  const [geometryPath, setGeometryPath] = useState("");
+  const [fixedName, setFixedName] = useState("");
+  const [forceName, setForceName] = useState("");
+  const [forceAxis, setForceAxis] = useState<"X" | "Y" | "Z">("Z");
+  const [forceN, setForceN] = useState("100");
+  const [meshSizeMm, setMeshSizeMm] = useState("25");
+  const [analysisJob, setAnalysisJob] = useState<StaticStructuralJob | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const activeJobId = analysisJob?.jobId;
+  const activeJobState = analysisJob?.state;
 
   const checkBridge = async (candidateToken: string) => {
     setState({ kind: "checking" });
@@ -77,6 +90,19 @@ export function AnsysConnectionPanel() {
     });
     return () => { active = false; };
   }, []); // Probe once; real-process testing is always an explicit user action.
+
+  useEffect(() => {
+    if (!activeJobId || !activeJobState || !["QUEUED", "RUNNING"].includes(activeJobState)) return;
+    let active = true;
+    const timer = window.setInterval(() => {
+      void readStaticStructural(ANSYS_BRIDGE_URL, token, activeJobId)
+        .then((next) => { if (active) setAnalysisJob(next); })
+        .catch((error: unknown) => {
+          if (active) setAnalysisError(error instanceof Error ? error.message : "Analiz durumu alınamadı.");
+        });
+    }, 2_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [activeJobId, activeJobState, token]);
 
   const persistToken = (): string | null => {
     const trimmed = token.trim();
@@ -119,12 +145,36 @@ export function AnsysConnectionPanel() {
     void checkBridge("");
   };
 
+  const runAnalysis = () => {
+    const saved = persistToken();
+    if (!saved) return;
+    setAnalysisError(null);
+    setAnalysisJob(null);
+    void startStaticStructural(ANSYS_BRIDGE_URL, saved, {
+      geometryPath: geometryPath.trim(),
+      material: "Structural Steel",
+      fixedNamedSelection: fixedName.trim(),
+      forceNamedSelection: forceName.trim(),
+      forceAxis,
+      forceN: Number(forceN),
+      meshSizeMm: Number(meshSizeMm),
+    }).then(setAnalysisJob).catch((error: unknown) => {
+      setAnalysisError(error instanceof Error ? error.message : "Analiz başlatılamadı.");
+    });
+  };
+
   const status = statusFrom(state);
   const verified = state.kind === "connection_verified";
   const selected = status?.adapter.installation.selected;
   const connection = status?.adapter.connection;
   const canTest = status?.adapter.state === "READY_FOR_CONNECTION_TEST" && state.kind !== "checking";
   const canLaunch = canTest && !verified;
+  const canAnalyze = verified && connection?.startedByBridge === true
+    && geometryPath.trim().length > 0 && fixedName.trim().length > 0
+    && forceName.trim().length > 0 && Number.isFinite(Number(forceN))
+    && Number(forceN) !== 0 && Number.isFinite(Number(meshSizeMm))
+    && Number(meshSizeMm) > 0 && analysisJob?.state !== "QUEUED"
+    && analysisJob?.state !== "RUNNING";
   const message = "message" in state ? state.message : undefined;
 
   return (
@@ -143,7 +193,7 @@ export function AnsysConnectionPanel() {
       {open && (
         <section id="ansys-connection-panel" className="ansys-panel" aria-label="ANSYS yerel bağlantı durumu">
           <header>
-            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR · PHASE 2</span><h2>ANSYS Yerel Köprüsü</h2></div>
+            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR · PHASE 3</span><h2>ANSYS Yerel Köprüsü</h2></div>
             <button type="button" aria-label="Paneli kapat" onClick={() => setOpen(false)}><X size={16} /></button>
           </header>
 
@@ -161,7 +211,7 @@ export function AnsysConnectionPanel() {
             <div><dt>Lisans</dt><dd>{connection?.licenseVerified ? "Aktif ve yazılabilir" : "Doğrulanmadı"}</dd></div>
             <div><dt>Başlatma</dt><dd>{connection?.startedByBridge ? "Açık yoldan yerel bridge" : "Harici veya başlatılmadı"}</dd></div>
             <div><dt>gRPC hedefi</dt><dd>{connection ? `${connection.host}:${connection.port}` : "127.0.0.1:10000"}</dd></div>
-            <div><dt>Simülasyon</dt><dd>Devre dışı</dd></div>
+            <div><dt>Simülasyon</dt><dd>Yalnızca açık kullanıcı eylemiyle</dd></div>
           </dl>
 
           {connection && connection.state !== "NOT_TESTED" && (
@@ -192,10 +242,42 @@ export function AnsysConnectionPanel() {
             <button type="button" onClick={clearToken}>Tokenı unut</button>
           </div>
 
+          <section className="ansys-analysis" aria-label="Static Structural analizi">
+            <h3>Static Structural · yerel analiz</h3>
+            <p>CAD dosyası bu bilgisayarda kalır. Mesnet ve kuvvet yüzeyleri CAD içindeki farklı named selection’lar olmalıdır.</p>
+            <label>CAD yolu (.agdb, .pmdb, .step, .stp)
+              <input value={geometryPath} onChange={(event) => setGeometryPath(event.target.value)} placeholder="C:\\…\\ornek.agdb" />
+            </label>
+            <div className="ansys-analysis-grid">
+              <label>Sabit mesnet seçimi<input value={fixedName} onChange={(event) => setFixedName(event.target.value)} placeholder="NS_FIXED" /></label>
+              <label>Kuvvet yüzeyi seçimi<input value={forceName} onChange={(event) => setForceName(event.target.value)} placeholder="NS_FORCE" /></label>
+              <label>Kuvvet ekseni<select value={forceAxis} onChange={(event) => setForceAxis(event.target.value as "X" | "Y" | "Z")}><option>X</option><option>Y</option><option>Z</option></select></label>
+              <label>Kuvvet (N)<input type="number" value={forceN} onChange={(event) => setForceN(event.target.value)} /></label>
+              <label>Mesh boyutu (mm)<input type="number" min="0.1" value={meshSizeMm} onChange={(event) => setMeshSizeMm(event.target.value)} /></label>
+              <label>Malzeme<input value="Structural Steel" readOnly /></label>
+            </div>
+            <button type="button" onClick={runAnalysis} disabled={!canAnalyze}>Analizi açıkça başlat</button>
+            {analysisError && <p className="ansys-analysis-error" role="alert">{analysisError}</p>}
+            {analysisJob && (
+              <div className="ansys-analysis-result" role="status">
+                <strong>{analysisJob.state} · {analysisJob.stage}</strong>
+                <span>{analysisJob.message}</span>
+                {analysisJob.errorCode && <small>Hata kodu: {analysisJob.errorCode}</small>}
+                {analysisJob.result && <dl>
+                  <div><dt>Maks. von Mises</dt><dd>{(analysisJob.result.maximumVonMisesStressPa / 1e6).toPrecision(5)} MPa</dd></div>
+                  <div><dt>Maks. deformasyon</dt><dd>{(analysisJob.result.maximumTotalDeformationM * 1e3).toPrecision(5)} mm</dd></div>
+                  <div><dt>Çözücü</dt><dd>{analysisJob.result.solverStatus}</dd></div>
+                  <div><dt>Mesh</dt><dd>{analysisJob.result.meshNodes} düğüm · {analysisJob.result.meshElements} eleman</dd></div>
+                </dl>}
+                {analysisJob.result && <small>Sayısal sonuç; fiziksel olarak doğrulanmamıştır. CAD SHA-256: {analysisJob.result.geometrySha256}</small>}
+              </div>
+            )}
+          </section>
+
           <p className="ansys-security-note">
             Başlatma yalnızca kullanıcı düğmeye bastığında, keşfedilmiş <code>AnsysWBU.exe</code> ve sürümlü
             <code> AWP_ROOT</code> ile yapılır. WNUA, normal ANSYS lisans kontrolü ve Student limitleri korunur;
-            analiz çalıştırılmaz. Token Vercel’e gönderilmez.
+            analiz yalnızca yukarıdaki düğmeyle başlatılır. Token ve CAD dosyası Vercel’e gönderilmez.
           </p>
         </section>
       )}

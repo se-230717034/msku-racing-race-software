@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from . import __version__
 from .adapter import AnsysAdapter, ConnectionTestResult, LocalAnsysAdapter
+from .analysis import AnalysisError, StaticAnalysisManager, StaticAnalysisRequest, StaticJobResponse
 from .config import BridgeSettings
 from .models import (
     AdapterStatusResponse,
@@ -46,6 +47,7 @@ def create_app(
 ) -> FastAPI:
     active_settings = settings or BridgeSettings.from_environment()
     active_adapter = adapter or LocalAnsysAdapter(active_settings)
+    analysis_manager = StaticAnalysisManager(active_adapter)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -56,8 +58,8 @@ def create_app(
         title="MSKU Racing ANSYS Local Bridge",
         version=__version__,
         description=(
-            "Localhost-only Phase 2 discovery and verified-connection bridge. This service "
-            "does not run ANSYS simulations and is never a Vercel function."
+            "Localhost-only ANSYS bridge. Static Structural runs only after an explicit "
+            "authenticated request in a bridge-owned Mechanical process; never on Vercel."
         ),
         lifespan=lifespan,
     )
@@ -154,7 +156,7 @@ def create_app(
             ),
             warnings=[
                 *([] if adapter_status.ansys_connected else ["REAL_ANSYS_NOT_CONNECTED"]),
-                "SIMULATION_ENDPOINTS_NOT_IMPLEMENTED",
+                "STATIC_STRUCTURAL_REQUIRES_EXPLICIT_LOCAL_ACTION",
                 "ANSYS_STUDENT_LICENSE_AND_MODEL_LIMITS_APPLY",
                 *adapter_status.discovery.warnings,
             ],
@@ -177,6 +179,32 @@ def create_app(
     async def launch_connection() -> ConnectionTestResponse:
         result = await run_in_threadpool(active_adapter.launch_connection)
         return _connection_response(result)
+
+    @application.post(
+        "/bridge/v1/analyses/static-structural",
+        response_model=StaticJobResponse,
+        status_code=202,
+        dependencies=[Depends(require_bridge_token(active_settings))],
+    )
+    async def start_static_structural(request: StaticAnalysisRequest) -> StaticJobResponse:
+        try:
+            return analysis_manager.start(request)
+        except AnalysisError as exc:
+            raise HTTPException(
+                status_code=409 if exc.code == "ANALYSIS_ALREADY_RUNNING" else 422,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+
+    @application.get(
+        "/bridge/v1/analyses/static-structural/{job_id}",
+        response_model=StaticJobResponse,
+        dependencies=[Depends(require_bridge_token(active_settings))],
+    )
+    async def static_structural_status(job_id: str) -> StaticJobResponse:
+        job = analysis_manager.snapshot(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Analiz işi bulunamadı.")
+        return job
 
     return application
 

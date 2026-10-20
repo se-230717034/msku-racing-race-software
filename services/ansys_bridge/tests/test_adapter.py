@@ -47,6 +47,9 @@ class FakeClient:
         assert script == "Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode"
         return self.read_only
 
+    def clear(self) -> None:
+        pass
+
     def exit(self, force: bool = False) -> None:
         assert force is True
         self.exit_calls += 1
@@ -57,8 +60,8 @@ class FakeConnector:
         self.client = client
         self.calls: list[dict[str, Any]] = []
 
-    def connect(self, **kwargs: Any) -> FakeClient:
-        self.calls.append(kwargs)
+    def connect(self, *, host: str, port: int, timeout_seconds: int) -> FakeClient:
+        self.calls.append({"host": host, "port": port, "timeout_seconds": timeout_seconds})
         return self.client
 
 
@@ -68,8 +71,15 @@ class FakeLauncher:
         self.failure = failure
         self.calls: list[dict[str, Any]] = []
 
-    def launch(self, **kwargs: Any) -> FakeClient:
-        self.calls.append(kwargs)
+    def launch(
+        self, *, installation: AnsysInstallation, host: str, port: int, timeout_seconds: int
+    ) -> FakeClient:
+        self.calls.append({
+            "installation": installation,
+            "host": host,
+            "port": port,
+            "timeout_seconds": timeout_seconds,
+        })
         if self.failure:
             raise self.failure
         return self.client
@@ -128,11 +138,13 @@ def test_success_requires_connection_verification_product_identity_and_matching_
     assert result.license_verified is True
     assert client.verify_calls == 1
     assert client.product_calls == 1
-    assert connector.calls == [{
-        "host": "127.0.0.1",
-        "port": 10000,
-        "timeout_seconds": 8,
-    }]
+    assert connector.calls == [
+        {
+            "host": "127.0.0.1",
+            "port": 10000,
+            "timeout_seconds": 8,
+        }
+    ]
     assert instance.status().ansys_connected is True
 
 
@@ -170,9 +182,7 @@ def test_unexpected_product_or_mismatched_version_is_rejected() -> None:
 
 
 def test_license_and_authentication_errors_are_clear_but_do_not_leak_details() -> None:
-    license_adapter, _, _ = adapter(
-        FakeClient(failure=RuntimeError("license server secret=abc"))
-    )
+    license_adapter, _, _ = adapter(FakeClient(failure=RuntimeError("license server secret=abc")))
     auth_adapter, _, _ = adapter(FakeClient(failure=RuntimeError("WNUA credential rejected")))
 
     license_result = license_adapter.test_connection()
@@ -235,12 +245,14 @@ def test_launch_uses_detected_executable_and_versioned_awp_root() -> None:
     assert result.license_verified is True
     assert result.started_by_bridge is True
     assert connector.calls == []
-    assert launcher.calls == [{
-        "installation": installation,
-        "host": "127.0.0.1",
-        "port": 10000,
-        "timeout_seconds": 180,
-    }]
+    assert launcher.calls == [
+        {
+            "installation": installation,
+            "host": "127.0.0.1",
+            "port": 10000,
+            "timeout_seconds": 180,
+        }
+    ]
     assert client.exit_calls == 0
 
     instance.close()
@@ -291,14 +303,16 @@ def test_pymechanical_launcher_passes_explicit_path_and_awp_root(monkeypatch: An
     )
 
     assert result is expected_client
-    assert calls == [{
-        "exec_file": str(installation.executable),
-        "additional_envs": {"AWP_ROOT261": str(installation.root)},
-        "ip": "127.0.0.1",
-        "port": 10000,
-        "batch": True,
-        "start_timeout": 180,
-        "cleanup_on_exit": True,
-        "keep_connection_alive": True,
-        "transport_mode": "wnua",
-    }]
+    assert calls == [
+        {
+            "exec_file": str(installation.executable),
+            "additional_envs": {"AWP_ROOT261": str(installation.root)},
+            "ip": "127.0.0.1",
+            "port": 10000,
+            "batch": True,
+            "start_timeout": 180,
+            "cleanup_on_exit": True,
+            "keep_connection_alive": True,
+            "transport_mode": "wnua",
+        }
+    ]

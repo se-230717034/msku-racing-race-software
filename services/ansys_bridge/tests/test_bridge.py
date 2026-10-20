@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
 
 from fastapi.testclient import TestClient
 from msku_ansys_bridge.adapter import LocalAnsysAdapter
@@ -32,15 +32,20 @@ class VerifiedClient:
         assert script == "Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode"
         return False
 
+    def clear(self) -> None:
+        pass
+
     def exit(self, force: bool = False) -> None:
         assert force is True
 
 
 class VerifiedConnector:
-    def connect(self, **_: Any) -> VerifiedClient:
+    def connect(self, *, host: str, port: int, timeout_seconds: int) -> VerifiedClient:
         return VerifiedClient()
 
-    def launch(self, **_: Any) -> VerifiedClient:
+    def launch(
+        self, *, installation: AnsysInstallation, host: str, port: int, timeout_seconds: int
+    ) -> VerifiedClient:
         return VerifiedClient()
 
 
@@ -94,7 +99,7 @@ def test_live_health_exposes_only_bridge_readiness() -> None:
     assert response.json() == {
         "status": "ok",
         "service": "msku-ansys-local-bridge",
-        "version": "0.2.1",
+        "version": "0.3.0",
         "scope": "localhost_only",
         "tokenConfigured": True,
     }
@@ -119,7 +124,7 @@ def test_status_reports_installation_and_compatibility_without_claiming_connecti
     assert payload["adapter"]["simulationsEnabled"] is False
     assert payload["adapter"]["connection"]["state"] == "NOT_TESTED"
     assert "REAL_ANSYS_NOT_CONNECTED" in payload["warnings"]
-    assert "SIMULATION_ENDPOINTS_NOT_IMPLEMENTED" in payload["warnings"]
+    assert "STATIC_STRUCTURAL_REQUIRES_EXPLICIT_LOCAL_ACTION" in payload["warnings"]
 
 
 def test_connection_endpoint_reports_verified_only_after_process_checks() -> None:
@@ -162,6 +167,49 @@ def test_explicit_launch_endpoint_verifies_process_and_license() -> None:
         assert payload["startedByBridge"] is True
 
 
+def test_static_analysis_requires_token_and_bridge_owned_session(tmp_path: Path) -> None:
+    geometry = tmp_path / "test.agdb"
+    geometry.write_bytes(b"fake CAD for endpoint contract")
+    body = {
+        "geometryPath": str(geometry),
+        "material": "Structural Steel",
+        "fixedNamedSelection": "NS_Fixed",
+        "forceNamedSelection": "NS_Force",
+        "forceAxis": "X",
+        "forceN": 1000,
+        "meshSizeMm": 25,
+    }
+    path = "/bridge/v1/analyses/static-structural"
+    with client() as bridge:
+        denied = bridge.post(path, json=body, headers={"Origin": ORIGIN})
+        assert denied.status_code == 401
+
+        # An externally connected process is never cleared or modified by analysis.
+        bridge.post(
+            "/bridge/v1/connection/test",
+            headers={"X-MSKU-Bridge-Token": TOKEN, "Origin": ORIGIN},
+        )
+        started = bridge.post(
+            path,
+            json=body,
+            headers={"X-MSKU-Bridge-Token": TOKEN, "Origin": ORIGIN},
+        )
+        assert started.status_code == 202
+        job_id = started.json()["jobId"]
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            job = bridge.get(
+                f"{path}/{job_id}",
+                headers={"X-MSKU-Bridge-Token": TOKEN, "Origin": ORIGIN},
+            ).json()
+            if job["state"] == "FAILED":
+                break
+            time.sleep(0.01)
+        assert job["state"] == "FAILED"
+        assert job["errorCode"] == "BRIDGE_OWNED_SESSION_REQUIRED"
+        assert job["result"] is None
+
+
 def test_authenticated_readiness_does_not_enable_simulations() -> None:
     with client() as bridge:
         response = bridge.get(
@@ -173,7 +221,7 @@ def test_authenticated_readiness_does_not_enable_simulations() -> None:
     assert response.json() == {
         "status": "ready",
         "service": "msku-ansys-local-bridge",
-        "version": "0.2.1",
+        "version": "0.3.0",
         "adapterState": "READY_FOR_CONNECTION_TEST",
         "ansysConnected": False,
         "simulationsEnabled": False,

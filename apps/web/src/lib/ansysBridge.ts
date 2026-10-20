@@ -313,3 +313,108 @@ export async function launchRealAnsysConnection(
     };
   }
 }
+
+export interface StaticStructuralInput {
+  geometryPath: string;
+  material: "Structural Steel";
+  fixedNamedSelection: string;
+  forceNamedSelection: string;
+  forceAxis: "X" | "Y" | "Z";
+  forceN: number;
+  meshSizeMm: number;
+}
+
+export interface StaticStructuralJob {
+  jobId: string;
+  state: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  stage: "queued" | "importing" | "meshing" | "solving" | "extracting" | "done";
+  message: string;
+  startedAt: string;
+  completedAt: string | null;
+  errorCode: string | null;
+  result: null | {
+    solverStatus: string;
+    maximumVonMisesStressPa: number;
+    maximumTotalDeformationM: number;
+    meshNodes: number;
+    meshElements: number;
+    geometrySha256: string;
+    material: string;
+    fixedNamedSelection: string;
+    forceNamedSelection: string;
+    forceAxis: "X" | "Y" | "Z";
+    forceN: number;
+    meshSizeMm: number;
+    mechanicalVersion: string;
+    productInfo: string;
+    units: "SI";
+    validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY";
+    warnings: string[];
+  };
+}
+
+function validateStaticJob(job: StaticStructuralJob): StaticStructuralJob {
+  if (!job.jobId || !["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"].includes(job.state)) {
+    throw new Error("Mechanical analiz yanıtı geçersiz.");
+  }
+  if (job.state === "SUCCEEDED") {
+    const result = job.result;
+    if (
+      !result || result.solverStatus.split(".").at(-1) !== "Done"
+      || result.units !== "SI"
+      || result.validationStatus !== "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY"
+      || !Number.isFinite(result.maximumVonMisesStressPa)
+      || !Number.isFinite(result.maximumTotalDeformationM)
+      || result.maximumVonMisesStressPa < 0
+      || result.maximumTotalDeformationM < 0
+      || result.meshNodes <= 0 || result.meshElements <= 0
+      || !/^[a-f0-9]{64}$/.test(result.geometrySha256)
+      || !result.mechanicalVersion
+      || !result.productInfo.toLocaleLowerCase("en-US").includes("ansys mechanical")
+    ) throw new Error("Mechanical çözüm kanıtı veya sonuç birimleri eksik.");
+  } else if (job.result !== null) {
+    throw new Error("Tamamlanmamış analiz sonuç içeremez.");
+  }
+  return job;
+}
+
+async function staticRequest(url: string, token: string, init?: RequestInit): Promise<StaticStructuralJob> {
+  const normalized = normalizeLoopbackBridgeUrl(url);
+  if (!token.trim()) throw new Error("Analiz için yerel köprü tokenı gerekli.");
+  const response = await fetchWithTimeout(`${normalized}/bridge/v1/analyses/static-structural`, {
+    ...init,
+    headers: { "X-MSKU-Bridge-Token": token.trim(), ...(init?.headers ?? {}) },
+  }, 12_000);
+  if (!response.ok) {
+    const error = await response.json().catch(() => null) as { detail?: { message?: string } } | null;
+    throw new Error(error?.detail?.message ?? `Yerel analiz isteği HTTP ${response.status} döndürdü.`);
+  }
+  return validateStaticJob(await response.json() as StaticStructuralJob);
+}
+
+export async function startStaticStructural(
+  baseUrl: string,
+  token: string,
+  input: StaticStructuralInput,
+): Promise<StaticStructuralJob> {
+  return staticRequest(baseUrl, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function readStaticStructural(
+  baseUrl: string,
+  token: string,
+  jobId: string,
+): Promise<StaticStructuralJob> {
+  if (!/^[a-f0-9-]{36}$/.test(jobId)) throw new Error("Geçersiz analiz iş kimliği.");
+  const normalized = normalizeLoopbackBridgeUrl(baseUrl);
+  if (!token.trim()) throw new Error("Analiz için yerel köprü tokenı gerekli.");
+  const response = await fetchWithTimeout(`${normalized}/bridge/v1/analyses/static-structural/${jobId}`, {
+    headers: { "X-MSKU-Bridge-Token": token.trim() },
+  }, 12_000);
+  if (!response.ok) throw new Error(`Analiz durumu HTTP ${response.status} döndürdü.`);
+  return validateStaticJob(await response.json() as StaticStructuralJob);
+}
