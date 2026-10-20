@@ -65,7 +65,7 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Optimization workspace with variable/bound controls, convergence/Pareto plots, candidate diagnostics, non-mutating geometry preview, and explicit apply.
 - Versioned Vehicle Parameter Manifest records configuration, SI units, source type, measurement state, uncertainty, applicable modules, evidence references, and deterministic content hash. Bundled defaults remain explicitly `SYNTHETIC`.
 - Independent `declared`, `numerically verified`, `reference benchmarked`, and `physically correlated` axes require accepted evidence of their own type; numerical tests and solver success cannot promote physical correlation.
-- Phase 1 ANSYS local integration through a separate localhost-only FastAPI bridge, token-protected browser status panel, and explicit mock adapter. The bridge exposes no simulation endpoint, never runs on Vercel, and never presents mock readiness as a real ANSYS connection.
+- Phase 2 ANSYS local integration through a separate localhost-only FastAPI bridge: Windows Student installation/version discovery, PyMechanical compatibility reporting, and an explicit WNUA test against an already-running Mechanical process. Success requires connection verification, Ansys Mechanical product identity, and a locally detected matching process version. The bridge exposes no simulation endpoint and never runs on Vercel.
 
 See [PROGRESS.md](./PROGRESS.md), the [ANSYS local bridge guide](./docs/ANSYS_LOCAL_BRIDGE.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
@@ -93,13 +93,13 @@ Terminal 2:
 npm run dev
 ```
 
-Optional Terminal 3 for the Phase 1 local ANSYS connection boundary:
+Optional Terminal 3 for the Phase 2 local ANSYS connection boundary:
 
 ```bash
 npm run ansys-bridge:dev
 ```
 
-The command binds only to `http://127.0.0.1:8765` and prints a random session token. Enter it in the **ANSYS YEREL** header panel. The current adapter is mock-only: real ANSYS connection, simulation jobs, and result transfer are intentionally unavailable. See [docs/ANSYS_LOCAL_BRIDGE.md](./docs/ANSYS_LOCAL_BRIDGE.md).
+The command binds only to `http://127.0.0.1:8765` and prints a random session token. Enter it in the **ANSYS YEREL** header panel. Phase 2 can detect compatible Windows installations and explicitly test an already-running local Mechanical gRPC process; it never launches ANSYS automatically. Simulation jobs and result transfer remain intentionally unavailable. See [docs/ANSYS_LOCAL_BRIDGE.md](./docs/ANSYS_LOCAL_BRIDGE.md).
 
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
 
@@ -146,7 +146,7 @@ The web container is exposed on `http://localhost:4173`; the API remains on port
 ```text
 apps/web              React/TypeScript engineering workspace
 services/api          FastAPI boundary and versioned endpoints
-services/ansys_bridge Separate localhost-only ANSYS bridge (Phase 1 mock)
+services/ansys_bridge Separate localhost-only ANSYS bridge (Phase 2 discovery/connection)
 packages/contracts    Shared TypeScript schemas and demo project
 packages/engineering  Pure Python geometry and numerical kinematics core
 docs                  Architecture, model, validation, and deployment records

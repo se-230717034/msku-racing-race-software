@@ -2,6 +2,21 @@
 
 Updated: 2026-10-20
 
+## ANSYS local integration — Phase 2
+
+- [x] Read-only Windows discovery through `AWP_ROOT###` and standard Ansys Student/Ansys install roots
+- [x] Executable-presence validation, revision decoding, Student classification, duplicate suppression, and deterministic selection
+- [x] PyMechanical 0.13.x integration with documented Python 3.12–3.14 and Mechanical v242+ compatibility gate
+- [x] Real adapter that connects only to an already-running `127.0.0.1` Mechanical gRPC process using WNUA
+- [x] Explicit process verification, Ansys Mechanical product identity, and locally detected process-version match before success
+- [x] Closed-port, compatibility, authentication, license, product, and version failures remain non-success states with sanitized messages
+- [x] Turkish panel for installation, PyMechanical compatibility, loopback target, and last verified connection result
+- [x] Phase 1 token, origin, loopback socket, PNA, session-storage, and Vercel exclusion controls preserved
+- [x] Structural/model/mesh/solve/result endpoints remain absent and `simulationsEnabled` remains false
+- [x] Quality gates: 138 Python tests, 54 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Real-machine correlation with a licensed Ansys Student/Academic Mechanical process — unavailable in CI
+- [ ] Structural simulation workflow — intentionally outside Phase 2
+
 ## ANSYS local integration — Phase 1
 
 - [x] Separate `msku-ansys-bridge` FastAPI package with no dependency on or mutation of the engineering solvers
@@ -13,7 +28,7 @@ Updated: 2026-10-20
 - [x] Local bridge excluded from the Vercel Python function bundle and absent from the Vercel API entry point
 - [x] Regression tests for authentication, origin/socket rejection, mock contract, and browser client state handling
 - [x] Quality gates: 126 Python tests, 52 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
-- [ ] Phase 2 real ANSYS installation discovery and adapter — intentionally not implemented
+- [x] Phase 2 real ANSYS installation discovery and adapter — implemented in the section above
 - [ ] ANSYS job execution, result import, and engineering correlation — intentionally not implemented
 
 ## Four-corner GLB visual assembly

@@ -19,6 +19,8 @@ class BridgeSettings:
     token: str | None
     allowed_origins: tuple[str, ...] = DEFAULT_ALLOWED_ORIGINS
     allow_test_client: bool = False
+    mechanical_port: int = 10000
+    connection_timeout_seconds: int = 8
 
     @property
     def token_configured(self) -> bool:
@@ -35,4 +37,15 @@ class BridgeSettings:
             ).split(",")
             if origin.strip()
         )
-        return cls(token=raw_token or None, allowed_origins=origins)
+        mechanical_port = int(os.getenv("MSKU_ANSYS_MECHANICAL_PORT", "10000"))
+        timeout_seconds = int(os.getenv("MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS", "8"))
+        if not 1_024 <= mechanical_port <= 65_535:
+            raise ValueError("MSKU_ANSYS_MECHANICAL_PORT must be between 1024 and 65535.")
+        if not 1 <= timeout_seconds <= 30:
+            raise ValueError("MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS must be between 1 and 30.")
+        return cls(
+            token=raw_token or None,
+            allowed_origins=origins,
+            mechanical_port=mechanical_port,
+            connection_timeout_seconds=timeout_seconds,
+        )

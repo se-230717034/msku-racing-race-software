@@ -74,10 +74,10 @@ button { color: inherit; }
 .ansys-trigger { display: flex; align-items: center; gap: 6px; min-width: 106px; padding: 0 8px; border: 0; border-left: 1px solid var(--line); color: #929baa; background: transparent; font: 650 8px/1 ui-monospace, monospace; letter-spacing: .04em; cursor: pointer; }
 .ansys-trigger:hover, .ansys-trigger[aria-expanded="true"] { color: #edf0f4; background: #11151c; }
 .ansys-trigger i { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--amber); }
-.ansys-trigger.mock_ready i { background: var(--green); box-shadow: 0 0 8px #4ade8080; }
+.ansys-trigger.connection_verified i { background: var(--green); box-shadow: 0 0 8px #4ade8080; }
 .ansys-trigger.offline i, .ansys-trigger.error i, .ansys-trigger.unauthorized i, .ansys-trigger.unconfigured i { background: var(--red); }
 .ansys-trigger.token_required i { background: var(--amber); }
-.ansys-panel { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: min(390px, calc(100vw - 24px)); padding: 15px; border: 1px solid #343c49; border-radius: 5px; background: #10141beF; box-shadow: 0 20px 60px #000b; backdrop-filter: blur(14px); }
+.ansys-panel { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: min(430px, calc(100vw - 24px)); max-height: calc(100vh - 82px); padding: 15px; overflow-y: auto; border: 1px solid #343c49; border-radius: 5px; background: #10141beF; box-shadow: 0 20px 60px #000b; backdrop-filter: blur(14px); }
 .ansys-panel::before { position: absolute; top: -9px; right: 24px; width: 15px; height: 15px; content: ""; transform: rotate(45deg); border-top: 1px solid #343c49; border-left: 1px solid #343c49; background: #10141b; }
 .ansys-panel > header { display: flex; align-items: start; justify-content: space-between; margin-bottom: 12px; }
 .ansys-panel > header h2 { margin: 3px 0 0; font-size: 16px; }
@@ -96,10 +96,13 @@ button { color: inherit; }
 .ansys-token-field > span { display: flex; align-items: center; gap: 5px; color: #aab2bf; font-size: 9px; font-weight: 650; }
 .ansys-token-field input { width: 100%; height: 34px; padding: 0 9px; border: 1px solid #353e4c; border-radius: 3px; color: #eef1f5; background: #090c10; font: 10px/1 ui-monospace, monospace; }
 .ansys-token-field input:focus { outline: 1px solid #8e2c3e; border-color: #8e2c3e; }
-.ansys-panel-actions { display: flex; gap: 7px; margin-top: 9px; }
+.ansys-panel-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
 .ansys-panel-actions button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 0 10px; border: 1px solid #3b4554; border-radius: 3px; color: #dce1e8; background: #1a2029; font-size: 9px; cursor: pointer; }
-.ansys-panel-actions button:first-child { border-color: #8d2638; background: #391620; }
+.ansys-panel-actions button:nth-child(2) { border-color: #8d2638; background: #391620; }
 .ansys-panel-actions button:disabled { opacity: .45; cursor: wait; }
+.ansys-test-result { display: grid; gap: 4px; margin: 0 0 11px; padding: 9px 10px; border: 1px solid #6d2737; border-radius: 3px; color: #ff9cad; background: #251017; font-size: 9px; line-height: 1.4; }
+.ansys-test-result.verified { border-color: #245a3a; color: #7ce3a1; background: #0e2017; }
+.ansys-test-result span, .ansys-test-result small { color: #a8b0bd; }
 .ansys-security-note { margin: 11px 0 0; padding-top: 10px; border-top: 1px solid #252c36; color: #7f8999; font-size: 8px; line-height: 1.55; }
 .ansys-security-note code { color: #c8ced7; }
 

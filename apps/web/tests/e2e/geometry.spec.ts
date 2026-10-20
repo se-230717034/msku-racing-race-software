@@ -2,8 +2,20 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
-test("connects the Turkish status panel only to the Phase 1 localhost mock bridge", async ({ page }) => {
+test("shows installation compatibility and verifies only an explicit real Mechanical process test", async ({ page }) => {
   const token = "browser-session-token";
+  let processVerified = false;
+  const connection = () => ({
+    state: processVerified ? "VERIFIED" : "NOT_TESTED",
+    processVerified,
+    host: "127.0.0.1",
+    port: 10000,
+    checkedAt: processVerified ? "2026-10-20T18:00:00Z" : null,
+    mechanicalVersion: processVerified ? "261" : null,
+    productInfo: processVerified ? "Ansys Mechanical [Student] Product Version:261" : null,
+    errorCode: null,
+    message: processVerified ? "Gerçek Ansys Mechanical prosesi PyMechanical ile doğrulandı." : "Henüz test edilmedi.",
+  });
   await page.route("http://127.0.0.1:8765/bridge/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/health/live")) {
@@ -12,7 +24,7 @@ test("connects the Turkish status panel only to the Phase 1 localhost mock bridg
         body: JSON.stringify({
           status: "ok",
           service: "msku-ansys-local-bridge",
-          version: "0.1.0",
+          version: "0.2.0",
           scope: "localhost_only",
           tokenConfigured: true,
         }),
@@ -20,22 +32,49 @@ test("connects the Turkish status panel only to the Phase 1 localhost mock bridg
       return;
     }
     expect(route.request().headers()["x-msku-bridge-token"]).toBe(token);
+    if (path.endsWith("/connection/test")) {
+      expect(route.request().method()).toBe("POST");
+      processVerified = true;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(connection()) });
+      return;
+    }
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         status: "ready",
         service: "msku-ansys-local-bridge",
-        version: "0.1.0",
-        transport: "localhost_token",
+        version: "0.2.0",
+        transport: "localhost_token_wnua",
         adapter: {
-          adapter: "mock",
-          state: "MOCK_READY",
-          ansysConnected: false,
+          adapter: "pymechanical",
+          state: "READY_FOR_CONNECTION_TEST",
+          ansysConnected: processVerified,
           simulationsEnabled: false,
-          capabilities: ["health_check", "connection_contract"],
-          message: "Mock adapter hazır; gerçek ANSYS bağlantısı ve simülasyonu uygulanmadı.",
+          capabilities: ["windows_installation_detection", "existing_process_connection_test"],
+          message: "Kurulum bulundu; gerçek proses bağlantısı kullanıcı isteğiyle test edilebilir.",
+          installation: {
+            platform: "Windows",
+            state: "FOUND",
+            selected: {
+              versionCode: 261,
+              release: "2026 R1",
+              productKind: "student",
+              executablePath: "C:/Program Files/ANSYS Inc/ANSYS Student/v261/aisol/bin/winx64/AnsysWBU.exe",
+              source: "AWP_ROOT261",
+            },
+            installations: [],
+            warnings: [],
+          },
+          compatibility: {
+            state: "COMPATIBLE",
+            pymechanicalVersion: "0.13.4",
+            pythonVersion: "3.12",
+            minimumMechanicalVersionCode: 242,
+            message: "Uyumlu.",
+          },
+          connection: connection(),
         },
-        warnings: ["MOCK_ADAPTER_ONLY"],
+        warnings: ["SIMULATION_ENDPOINTS_NOT_IMPLEMENTED"],
       }),
     });
   });
@@ -45,13 +84,17 @@ test("connects the Turkish status panel only to the Phase 1 localhost mock bridg
   const panel = page.getByRole("region", { name: "ANSYS yerel bağlantı durumu" });
   await expect(panel.getByRole("status")).toContainText("token gerekli");
   await page.getByPlaceholder("Bridge konsolundaki token").fill(token);
-  await page.getByRole("button", { name: "Bağlantıyı denetle" }).click();
+  await page.getByRole("button", { name: "Durumu yenile" }).click();
 
-  await expect(panel.getByRole("status")).toContainText("mock hazır");
-  await expect(page.getByText("Mock (Phase 1)")).toBeVisible();
-  await expect(page.getByText("Bağlı değil")).toBeVisible();
+  await expect(panel.getByRole("status")).toContainText("köprü hazır");
+  await expect(page.getByText("2026 R1 · Student")).toBeVisible();
+  await expect(page.getByText("0.13.4 · Uyumlu")).toBeVisible();
+  await expect(page.getByText("Test edilmedi")).toBeVisible();
+  await page.getByRole("button", { name: "Gerçek bağlantıyı test et" }).click();
+  await expect(panel.getByRole("status")).toContainText("proses doğrulandı");
+  await expect(page.getByText("Gerçek proses doğrulandı").first()).toBeVisible();
   await expect(page.getByText("Devre dışı")).toBeVisible();
-  await expect(page.getByText("Vercel ANSYS çalıştırmaz", { exact: false })).toBeVisible();
+  await expect(page.getByText("ANSYS’i başlatmaz ve analiz çalıştırmaz", { exact: false })).toBeVisible();
 });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {

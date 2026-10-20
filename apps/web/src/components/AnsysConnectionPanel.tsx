@@ -1,11 +1,15 @@
-import { AlertTriangle, CheckCircle2, Cpu, KeyRound, PlugZap, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Cpu, KeyRound, PlugZap, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
   ANSYS_BRIDGE_TOKEN_STORAGE_KEY,
   ANSYS_BRIDGE_URL,
   probeAnsysBridge,
+  testRealAnsysConnection,
+  type AnsysBridgeStatus,
   type AnsysConnectionState,
+  type CompatibilityState,
+  type ConnectionTestState,
 } from "../lib/ansysBridge";
 
 const labels: Record<AnsysConnectionState["kind"], string> = {
@@ -14,8 +18,29 @@ const labels: Record<AnsysConnectionState["kind"], string> = {
   token_required: "token gerekli",
   unconfigured: "güvensiz yapılandırma",
   unauthorized: "yetki reddedildi",
-  mock_ready: "mock hazır",
+  bridge_ready: "köprü hazır",
+  connection_verified: "proses doğrulandı",
   error: "hata",
+};
+
+const compatibilityLabels: Record<CompatibilityState, string> = {
+  COMPATIBLE: "Uyumlu",
+  NOT_EVALUATED: "Değerlendirilemedi",
+  PYMECHANICAL_NOT_INSTALLED: "PyMechanical kurulu değil",
+  MECHANICAL_VERSION_UNSUPPORTED: "Mechanical sürümü desteklenmiyor",
+  PYTHON_VERSION_UNSUPPORTED: "Python sürümü desteklenmiyor",
+};
+
+const connectionLabels: Record<ConnectionTestState, string> = {
+  NOT_TESTED: "Test edilmedi",
+  VERIFIED: "Gerçek proses doğrulandı",
+  TEST_IN_PROGRESS: "Test devam ediyor",
+  INSTALLATION_NOT_FOUND: "Kurulum bulunamadı",
+  INCOMPATIBLE: "Uyumsuz",
+  PROCESS_NOT_REACHABLE: "Mechanical prosesi erişilemiyor",
+  AUTHENTICATION_FAILED: "Windows kimlik doğrulaması başarısız",
+  LICENSE_ERROR: "Lisans hatası",
+  VERIFICATION_FAILED: "Proses doğrulanamadı",
 };
 
 function initialToken(): string {
@@ -26,12 +51,18 @@ function initialToken(): string {
   }
 }
 
+function statusFrom(state: AnsysConnectionState): AnsysBridgeStatus | undefined {
+  return state.kind === "bridge_ready" || state.kind === "connection_verified"
+    ? state.status
+    : undefined;
+}
+
 export function AnsysConnectionPanel() {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
   const [state, setState] = useState<AnsysConnectionState>({ kind: "checking" });
 
-  const checkConnection = async (candidateToken: string) => {
+  const checkBridge = async (candidateToken: string) => {
     setState({ kind: "checking" });
     setState(await probeAnsysBridge(ANSYS_BRIDGE_URL, candidateToken));
   };
@@ -42,18 +73,30 @@ export function AnsysConnectionPanel() {
       if (active) setState(nextState);
     });
     return () => { active = false; };
-  }, []); // Probe once; repeated checks are explicit so the local service is never polled silently.
+  }, []); // Probe once; real-process testing is always an explicit user action.
 
-  const connect = () => {
+  const persistToken = (): string | null => {
     const trimmed = token.trim();
     try {
       if (trimmed) window.sessionStorage.setItem(ANSYS_BRIDGE_TOKEN_STORAGE_KEY, trimmed);
       else window.sessionStorage.removeItem(ANSYS_BRIDGE_TOKEN_STORAGE_KEY);
     } catch {
       setState({ kind: "error", message: "Token bu tarayıcı oturumunda saklanamadı." });
-      return;
+      return null;
     }
-    void checkConnection(trimmed);
+    return trimmed;
+  };
+
+  const connectBridge = () => {
+    const saved = persistToken();
+    if (saved !== null) void checkBridge(saved);
+  };
+
+  const testConnection = () => {
+    const saved = persistToken();
+    if (saved === null) return;
+    setState({ kind: "checking" });
+    void testRealAnsysConnection(ANSYS_BRIDGE_URL, saved).then(setState);
   };
 
   const clearToken = () => {
@@ -63,10 +106,14 @@ export function AnsysConnectionPanel() {
     } catch {
       // Connection can still be checked without persistence.
     }
-    void checkConnection("");
+    void checkBridge("");
   };
 
-  const ready = state.kind === "mock_ready";
+  const status = statusFrom(state);
+  const verified = state.kind === "connection_verified";
+  const selected = status?.adapter.installation.selected;
+  const connection = status?.adapter.connection;
+  const canTest = status?.adapter.state === "READY_FOR_CONNECTION_TEST" && state.kind !== "checking";
   const message = "message" in state ? state.message : undefined;
 
   return (
@@ -85,22 +132,33 @@ export function AnsysConnectionPanel() {
       {open && (
         <section id="ansys-connection-panel" className="ansys-panel" aria-label="ANSYS yerel bağlantı durumu">
           <header>
-            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR</span><h2>ANSYS Yerel Köprüsü</h2></div>
+            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR · PHASE 2</span><h2>ANSYS Yerel Köprüsü</h2></div>
             <button type="button" aria-label="Paneli kapat" onClick={() => setOpen(false)}><X size={16} /></button>
           </header>
 
-          <div className={`ansys-panel-state ${ready ? "ready" : state.kind}`} role="status">
-            {ready ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          <div className={`ansys-panel-state ${verified ? "ready" : state.kind}`} role="status">
+            {verified ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
             <div><strong>{labels[state.kind]}</strong><span>{message ?? "Yerel servis denetleniyor…"}</span></div>
           </div>
 
           <dl className="ansys-connection-details">
-            <div><dt>Köprü adresi</dt><dd>{ANSYS_BRIDGE_URL}</dd></div>
-            <div><dt>Adapter</dt><dd>{ready ? "Mock (Phase 1)" : "—"}</dd></div>
-            <div><dt>Gerçek ANSYS</dt><dd>{ready ? "Bağlı değil" : "—"}</dd></div>
-            <div><dt>Simülasyon</dt><dd>{ready ? "Devre dışı" : "—"}</dd></div>
-            <div><dt>Sürüm</dt><dd>{ready ? state.status.version : state.kind === "token_required" ? state.version : "—"}</dd></div>
+            <div><dt>Köprü</dt><dd>{status ? `v${status.version} · WNUA` : ANSYS_BRIDGE_URL}</dd></div>
+            <div><dt>Windows kurulumu</dt><dd>{selected ? `${selected.release} · ${selected.productKind === "student" ? "Student" : "Diğer"}` : status ? "Bulunamadı" : "—"}</dd></div>
+            {selected && <div><dt>Çalıştırılabilir dosya</dt><dd title={selected.executablePath}>{selected.executablePath}</dd></div>}
+            <div><dt>PyMechanical</dt><dd>{status ? `${status.adapter.compatibility.pymechanicalVersion ?? "yok"} · ${compatibilityLabels[status.adapter.compatibility.state]}` : "—"}</dd></div>
+            <div><dt>Gerçek Mechanical</dt><dd>{connection ? connectionLabels[connection.state] : "—"}</dd></div>
+            <div><dt>gRPC hedefi</dt><dd>{connection ? `${connection.host}:${connection.port}` : "127.0.0.1:10000"}</dd></div>
+            <div><dt>Simülasyon</dt><dd>Devre dışı</dd></div>
           </dl>
+
+          {connection && connection.state !== "NOT_TESTED" && (
+            <p className={`ansys-test-result ${verified ? "verified" : "failed"}`}>
+              <strong>{connectionLabels[connection.state]}</strong>
+              <span>{connection.message}</span>
+              {connection.checkedAt && <small>{new Date(connection.checkedAt).toLocaleString("tr-TR")}</small>}
+              {connection.productInfo && <small>{connection.productInfo}</small>}
+            </p>
+          )}
 
           <label className="ansys-token-field">
             <span><KeyRound size={12} /> Oturum tokenı</span>
@@ -111,17 +169,18 @@ export function AnsysConnectionPanel() {
               value={token}
               placeholder="Bridge konsolundaki token"
               onChange={(event) => setToken(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") connect(); }}
+              onKeyDown={(event) => { if (event.key === "Enter") connectBridge(); }}
             />
           </label>
           <div className="ansys-panel-actions">
-            <button type="button" onClick={connect} disabled={state.kind === "checking"}><PlugZap size={13} /> Bağlantıyı denetle</button>
+            <button type="button" onClick={connectBridge} disabled={state.kind === "checking"}><RefreshCw size={13} /> Durumu yenile</button>
+            <button type="button" onClick={testConnection} disabled={!canTest}><PlugZap size={13} /> Gerçek bağlantıyı test et</button>
             <button type="button" onClick={clearToken}>Tokenı unut</button>
           </div>
 
           <p className="ansys-security-note">
-            Token yalnızca bu tarayıcı sekmesinde tutulur ve doğrudan <code>127.0.0.1</code> adresine gönderilir.
-            Vercel ANSYS çalıştırmaz ve tokenı almaz. Bu fazda gerçek analiz endpoint’i yoktur.
+            Test yalnızca önceden başlatılmış <code>127.0.0.1</code> Mechanical gRPC prosesine WNUA ile bağlanır;
+            ANSYS’i başlatmaz ve analiz çalıştırmaz. Student lisans/model limitleri geçerlidir. Token Vercel’e gönderilmez.
           </p>
         </section>
       )}

@@ -1,7 +1,7 @@
 """Local-only ANSYS bridge for MSKU Racing Dynamics Studio."""
 
-from .adapter import MockAnsysAdapter
+from .adapter import LocalAnsysAdapter
 from .config import BridgeSettings
 
-__all__ = ["BridgeSettings", "MockAnsysAdapter"]
-__version__ = "0.1.0"
+__all__ = ["BridgeSettings", "LocalAnsysAdapter"]
+__version__ = "0.2.0"
