@@ -20,9 +20,11 @@ export type ConnectionTestState =
   | "NOT_TESTED"
   | "VERIFIED"
   | "TEST_IN_PROGRESS"
+  | "LAUNCH_IN_PROGRESS"
   | "INSTALLATION_NOT_FOUND"
   | "INCOMPATIBLE"
   | "PROCESS_NOT_REACHABLE"
+  | "PROCESS_START_FAILED"
   | "AUTHENTICATION_FAILED"
   | "LICENSE_ERROR"
   | "VERIFICATION_FAILED";
@@ -38,6 +40,8 @@ export interface AnsysInstallation {
 export interface AnsysConnectionTest {
   state: ConnectionTestState;
   processVerified: boolean;
+  licenseVerified: boolean;
+  startedByBridge: boolean;
   host: "127.0.0.1";
   port: number;
   checkedAt: string | null;
@@ -135,6 +139,7 @@ function validateStatus(status: AnsysBridgeStatus): string | null {
   const connection = status.adapter.connection;
   if (connection.state === "VERIFIED" && (
     connection.processVerified !== true
+    || connection.licenseVerified !== true
     || status.adapter.ansysConnected !== true
     || !connection.mechanicalVersion
     || !connection.productInfo?.toLocaleLowerCase("en-US").includes("ansys mechanical")
@@ -245,6 +250,7 @@ export async function testRealAnsysConnection(
     const result = await response.json() as AnsysConnectionTest;
     if (result.state === "VERIFIED" && (
       result.processVerified !== true
+      || result.licenseVerified !== true
       || !result.mechanicalVersion
       || !result.productInfo?.toLocaleLowerCase("en-US").includes("ansys mechanical")
     )) {
@@ -258,6 +264,52 @@ export async function testRealAnsysConnection(
       message: timedOut
         ? "Mechanical bağlantı testi zaman aşımına uğradı."
         : "Yerel bağlantı testi tamamlanamadı.",
+    };
+  }
+}
+
+export async function launchRealAnsysConnection(
+  baseUrl: string,
+  token: string,
+): Promise<AnsysConnectionState> {
+  let normalized: string;
+  try {
+    normalized = normalizeLoopbackBridgeUrl(baseUrl);
+  } catch (error) {
+    return { kind: "error", message: error instanceof Error ? error.message : "Geçersiz adres." };
+  }
+  if (!token.trim()) {
+    return { kind: "unauthorized", message: "Mechanical başlatmak için bridge tokenı gerekli." };
+  }
+  try {
+    const response = await fetchWithTimeout(`${normalized}/bridge/v1/connection/launch`, {
+      method: "POST",
+      headers: { "X-MSKU-Bridge-Token": token.trim() },
+    }, 210_000);
+    if (response.status === 401) {
+      return { kind: "unauthorized", message: "Token geçersiz veya bu bridge oturumuna ait değil." };
+    }
+    if (!response.ok) {
+      return { kind: "error", message: `Mechanical başlatma HTTP ${response.status} döndürdü.` };
+    }
+    const result = await response.json() as AnsysConnectionTest;
+    if (result.state === "VERIFIED" && (
+      result.processVerified !== true
+      || result.licenseVerified !== true
+      || result.startedByBridge !== true
+      || !result.mechanicalVersion
+      || !result.productInfo?.toLocaleLowerCase("en-US").includes("ansys mechanical")
+    )) {
+      return { kind: "error", message: "Başlatılan prosesin bağlantı veya lisans kanıtı eksik." };
+    }
+    return await fetchBridgeStatus(normalized, token);
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === "AbortError";
+    return {
+      kind: "offline",
+      message: timedOut
+        ? "Mechanical başlatma ve doğrulama işlemi zaman aşımına uğradı."
+        : "Mechanical güvenli açık-yol başlatması tamamlanamadı.",
     };
   }
 }

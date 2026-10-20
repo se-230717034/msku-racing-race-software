@@ -28,13 +28,23 @@ class VerifiedClient:
     def get_product_info(self) -> str:
         return "Ansys Mechanical [Ansys Mechanical Student]\nProduct Version:261"
 
+    def run_python_script(self, script: str) -> bool:
+        assert script == "Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode"
+        return False
+
+    def exit(self, force: bool = False) -> None:
+        assert force is True
+
 
 class VerifiedConnector:
     def connect(self, **_: Any) -> VerifiedClient:
         return VerifiedClient()
 
+    def launch(self, **_: Any) -> VerifiedClient:
+        return VerifiedClient()
 
-def fake_adapter(settings: BridgeSettings) -> LocalAnsysAdapter:
+
+def fake_adapter(settings: BridgeSettings, *, port_open: bool = True) -> LocalAnsysAdapter:
     installation = AnsysInstallation(
         version_code=261,
         release="2026 R1",
@@ -52,25 +62,27 @@ def fake_adapter(settings: BridgeSettings) -> LocalAnsysAdapter:
         selected=installation,
         warnings=(),
     )
+    connector = VerifiedConnector()
     return LocalAnsysAdapter(
         settings,
         discovery_provider=lambda: discovery,
         compatibility_provider=lambda value: pymechanical_compatibility(
             value, distribution_version="0.13.4", python_version=(3, 12)
         ),
-        connector=VerifiedConnector(),
-        port_probe=lambda _host, _port, _timeout: True,
+        connector=connector,
+        launcher=connector,
+        port_probe=lambda _host, _port, _timeout: port_open,
     )
 
 
 @contextmanager
-def client(*, token: str | None = TOKEN) -> Iterator[TestClient]:
+def client(*, token: str | None = TOKEN, port_open: bool = True) -> Iterator[TestClient]:
     settings = BridgeSettings(
         token=token,
         allowed_origins=(ORIGIN,),
         allow_test_client=True,
     )
-    with TestClient(create_app(settings, fake_adapter(settings))) as bridge:
+    with TestClient(create_app(settings, fake_adapter(settings, port_open=port_open))) as bridge:
         yield bridge
 
 
@@ -82,7 +94,7 @@ def test_live_health_exposes_only_bridge_readiness() -> None:
     assert response.json() == {
         "status": "ok",
         "service": "msku-ansys-local-bridge",
-        "version": "0.2.0",
+        "version": "0.2.1",
         "scope": "localhost_only",
         "tokenConfigured": True,
     }
@@ -121,6 +133,8 @@ def test_connection_endpoint_reports_verified_only_after_process_checks() -> Non
         payload = response.json()
         assert payload["state"] == "VERIFIED"
         assert payload["processVerified"] is True
+        assert payload["licenseVerified"] is True
+        assert payload["startedByBridge"] is False
         assert payload["mechanicalVersion"] == "261"
         assert "Ansys Mechanical" in payload["productInfo"]
 
@@ -131,6 +145,21 @@ def test_connection_endpoint_reports_verified_only_after_process_checks() -> Non
         assert status["adapter"]["ansysConnected"] is True
         assert status["adapter"]["connection"]["checkedAt"] is not None
         assert "REAL_ANSYS_NOT_CONNECTED" not in status["warnings"]
+
+
+def test_explicit_launch_endpoint_verifies_process_and_license() -> None:
+    with client(port_open=False) as bridge:
+        response = bridge.post(
+            "/bridge/v1/connection/launch",
+            headers={"X-MSKU-Bridge-Token": TOKEN, "Origin": ORIGIN},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["state"] == "VERIFIED"
+        assert payload["processVerified"] is True
+        assert payload["licenseVerified"] is True
+        assert payload["startedByBridge"] is True
 
 
 def test_authenticated_readiness_does_not_enable_simulations() -> None:
@@ -144,7 +173,7 @@ def test_authenticated_readiness_does_not_enable_simulations() -> None:
     assert response.json() == {
         "status": "ready",
         "service": "msku-ansys-local-bridge",
-        "version": "0.2.0",
+        "version": "0.2.1",
         "adapterState": "READY_FOR_CONNECTION_TEST",
         "ansysConnected": False,
         "simulationsEnabled": False,
@@ -155,6 +184,7 @@ def test_status_and_connection_test_reject_missing_or_invalid_token() -> None:
     with client() as bridge:
         assert bridge.get("/bridge/v1/status").status_code == 401
         assert bridge.post("/bridge/v1/connection/test").status_code == 401
+        assert bridge.post("/bridge/v1/connection/launch").status_code == 401
         assert (
             bridge.get(
                 "/bridge/v1/status",

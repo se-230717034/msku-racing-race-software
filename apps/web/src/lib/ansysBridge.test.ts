@@ -1,21 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { normalizeLoopbackBridgeUrl, probeAnsysBridge, testRealAnsysConnection } from "./ansysBridge";
+import {
+  launchRealAnsysConnection,
+  normalizeLoopbackBridgeUrl,
+  probeAnsysBridge,
+  testRealAnsysConnection,
+} from "./ansysBridge";
 
 const live = {
   status: "ok",
   service: "msku-ansys-local-bridge",
-  version: "0.2.0",
+  version: "0.2.1",
   scope: "localhost_only",
   tokenConfigured: true,
 };
 
-function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false) {
+function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false, startedByBridge = false) {
   const verified = connectionState === "VERIFIED" && processVerified;
   return {
     status: "ready",
     service: "msku-ansys-local-bridge",
-    version: "0.2.0",
+    version: "0.2.1",
     transport: "localhost_token_wnua",
     adapter: {
       adapter: "pymechanical",
@@ -47,6 +52,8 @@ function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false) {
       connection: {
         state: connectionState,
         processVerified,
+        licenseVerified: verified,
+        startedByBridge,
         host: "127.0.0.1",
         port: 10000,
         checkedAt: verified ? "2026-10-20T18:00:00Z" : null,
@@ -123,7 +130,26 @@ describe("ANSYS local bridge client", () => {
     expect(state.kind).toBe("connection_verified");
     if (state.kind === "connection_verified") {
       expect(state.status.adapter.connection.processVerified).toBe(true);
+      expect(state.status.adapter.connection.licenseVerified).toBe(true);
       expect(state.status.adapter.simulationsEnabled).toBe(false);
+    }
+  });
+
+  it("accepts explicit-path launch only with process and license proof", async () => {
+    const launched = bridgeStatus("VERIFIED", true, true);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(launched.adapter.connection), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(launched), { status: 200 }));
+
+    const state = await launchRealAnsysConnection(
+      "http://127.0.0.1:8765",
+      "secure-token",
+    );
+
+    expect(state.kind).toBe("connection_verified");
+    if (state.kind === "connection_verified") {
+      expect(state.status.adapter.connection.startedByBridge).toBe(true);
+      expect(state.status.adapter.connection.licenseVerified).toBe(true);
     }
   });
 

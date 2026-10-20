@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -25,6 +28,8 @@ def _connection_response(result: ConnectionTestResult) -> ConnectionTestResponse
     return ConnectionTestResponse(
         state=result.state,
         processVerified=result.process_verified,
+        licenseVerified=result.license_verified,
+        startedByBridge=result.started_by_bridge,
         host=result.host,
         port=result.port,
         checkedAt=result.checked_at,
@@ -41,6 +46,12 @@ def create_app(
 ) -> FastAPI:
     active_settings = settings or BridgeSettings.from_environment()
     active_adapter = adapter or LocalAnsysAdapter(active_settings)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        await run_in_threadpool(active_adapter.close)
+
     application = FastAPI(
         title="MSKU Racing ANSYS Local Bridge",
         version=__version__,
@@ -48,6 +59,7 @@ def create_app(
             "Localhost-only Phase 2 discovery and verified-connection bridge. This service "
             "does not run ANSYS simulations and is never a Vercel function."
         ),
+        lifespan=lifespan,
     )
     application.add_middleware(
         CORSMiddleware,
@@ -155,6 +167,15 @@ def create_app(
     )
     async def test_connection() -> ConnectionTestResponse:
         result = await run_in_threadpool(active_adapter.test_connection)
+        return _connection_response(result)
+
+    @application.post(
+        "/bridge/v1/connection/launch",
+        response_model=ConnectionTestResponse,
+        dependencies=[Depends(require_bridge_token(active_settings))],
+    )
+    async def launch_connection() -> ConnectionTestResponse:
+        result = await run_in_threadpool(active_adapter.launch_connection)
         return _connection_response(result)
 
     return application

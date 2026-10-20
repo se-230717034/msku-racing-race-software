@@ -14,9 +14,11 @@ ConnectionState = Literal[
     "NOT_TESTED",
     "VERIFIED",
     "TEST_IN_PROGRESS",
+    "LAUNCH_IN_PROGRESS",
     "INSTALLATION_NOT_FOUND",
     "INCOMPATIBLE",
     "PROCESS_NOT_REACHABLE",
+    "PROCESS_START_FAILED",
     "AUTHENTICATION_FAILED",
     "LICENSE_ERROR",
     "VERIFICATION_FAILED",
@@ -74,6 +76,8 @@ class ConnectionTestResponse(BaseModel):
 
     state: ConnectionState
     processVerified: bool
+    licenseVerified: bool
+    startedByBridge: bool
     host: Literal["127.0.0.1"]
     port: int
     checkedAt: str | None

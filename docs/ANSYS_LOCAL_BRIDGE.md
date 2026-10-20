@@ -1,136 +1,71 @@
-# ANSYS Local Bridge — Phase 2
+# ANSYS Local Bridge — Phase 2.1
 
-## Scope and safety boundary
+## Scope and security
 
-Phase 2 adds Windows installation discovery, documented-version compatibility checks, and an explicit test against an already-running local Ansys Mechanical process. It does **not** create a Mechanical model, import CAD, mesh, solve, export results, or implement any structural simulation.
+The separate `services/ansys_bridge` process discovers local Mechanical installations, checks PyMechanical compatibility, tests an existing process, and can launch Mechanical when the engineer explicitly requests it. It creates no model, mesh, solve, or result. `simulationsEnabled` is always `false`. The bridge is excluded from the Vercel Python function bundle and runs only on the engineer's Windows computer.
 
-The bridge remains a separate package under `services/ansys_bridge`. It is not imported by `api/index.py`, is excluded from the Vercel Python function bundle, and must run on the engineer's own Windows computer.
+Phase 1 controls remain: binding to `127.0.0.1:8765`, loopback client checks, an exact browser Origin allowlist, a random session token for protected endpoints, and a strict loopback browser URL. The token remains in browser `sessionStorage`. Mechanical gRPC uses Windows Named User Authentication (`wnua`) at `127.0.0.1`; there is no insecure fallback.
 
-Security inherited from Phase 1 remains mandatory:
+## Student 2026 R1 executable and discovery
 
-- Uvicorn binds only to `127.0.0.1:8765`.
-- Non-loopback socket clients and untrusted browser origins are rejected.
-- Protected endpoints require a random per-process `X-MSKU-Bridge-Token`.
-- The browser accepts only HTTP loopback bridge URLs and stores the token in `sessionStorage`.
-- Private Network Access preflight is restricted by the exact CORS allowlist.
-- Vercel receives neither the token nor ANSYS installation/process data.
+The local `Mechanical 2026 R1.lnk` shortcut targets `C:\Program Files\ANSYS Inc\ANSYS Student\v261\aisol\bin\winx64\AnsysWBU.exe` with `-DSApplet`. That executable's Windows file description says `Mechanical 2026 R1`. The separate `RunWB2.exe` shortcut launches Workbench. PyMechanical [supports `launch_mechanical(exec_file=...)`](https://mechanical.docs.pyansys.com/version/stable/getting_started/running_mechanical.html) for an explicit Mechanical executable.
 
-Phase 2 adds two further rules:
+Discovery inspects `AWP_ROOT###`, `C:\Program Files\ANSYS Inc\ANSYS Student\v###`, `C:\Program Files\ANSYS Inc\v###`, and optional `MSKU_ANSYS_MECHANICAL_EXECUTABLE`. The explicit path must be absolute and local, with the `v###\aisol\bin\winx64\AnsysWBU.exe` layout; UNC paths and arbitrary executables are rejected. An explicit valid path takes selection priority. Discovery checks file presence and revision, not runtime or license entitlement.
 
-- The bridge never starts ANSYS automatically. Process testing targets only `127.0.0.1` and the configured local gRPC port.
-- Windows Named User Authentication (`wnua`) is mandatory. The bridge does not silently fall back to insecure gRPC transport.
+For this nested Student installation, `launch_mechanical(exec_file=...)` alone timed out before opening a gRPC port. Passing `AWP_ROOT261=C:\Program Files\ANSYS Inc\ANSYS Student\v261` to the child through PyMechanical's `additional_envs` started the same executable successfully. The bridge derives that variable from the verified installation revision and root. It neither changes license settings nor bypasses license checkout.
 
-## Installation discovery
+## Compatibility and verification
 
-Discovery is read-only and never executes an Ansys binary. On Windows it inspects:
+The bridge uses `ansys-mechanical-core` 0.13.x. Its compatibility gate follows the [PyMechanical installation guide](https://mechanical.docs.pyansys.com/version/stable/getting_started/installation.html): Python 3.12–3.14 and Mechanical v242 (2024 R2) or later. `COMPATIBLE` indicates a version match only.
 
-1. `AWP_ROOT###` environment variables created by Ansys installations.
-2. `C:\Program Files\ANSYS Inc\ANSYS Student\v###`.
-3. `C:\Program Files\ANSYS Inc\v###` for a non-Student installation that may coexist.
+**Gerçek bağlantıyı test et** connects to an existing local gRPC process. **Mechanical'ı başlat** uses the selected executable and versioned `AWP_ROOT###` through `launch_mechanical`, in batch mode with WNUA. The launch action checks that the port is free first; it never replaces an existing listener. Startup can take time and consume an available license. The bridge retains its PyMechanical client during its lifetime and closes only the process it owns on shutdown.
 
-A candidate is accepted only when `aisol\bin\winx64\AnsysWBU.exe` exists. Version codes use Ansys revision notation: `v242` is 2024 R2, `v251` is 2025 R1, and `v261` is 2026 R1. Student installations are preferred when multiple installations are found.
+Both actions require these independent checks before returning `VERIFIED`:
 
-Limitations:
+1. Installation and documented version compatibility.
+2. A real PyMechanical gRPC connection and `verify_valid_connection()` without rejection.
+3. `get_product_info()` identifying Ansys Mechanical.
+4. A process version matching a detected local installation.
+5. Mechanical `ReadOnlyMode=False`, which demonstrates a writable license-backed session at test time.
 
-- Automatic discovery is Windows-only in Phase 2.
-- A custom installation outside the standard directories requires its `AWP_ROOT###` environment variable.
-- A Student-looking directory proves only the installed distribution path. It does not prove the active license edition or entitlement.
-- Discovery does not launch the executable and therefore cannot prove that Mechanical starts successfully.
+The response includes `processVerified`, `licenseVerified`, `startedByBridge`, timestamp, endpoint, process version, and bounded product information. Status refresh rechecks the listener and PyMechanical connection, revoking the verified state if the process is gone. Failed checks yield a non-success state and sanitized errors; raw exceptions can expose local paths or license-server details. A successful test does not prove the active license edition is Student, that automation is permitted under a team's entitlement, or that an engineering result is valid.
 
-## PyMechanical compatibility
+On this Windows machine, direct Python launch and the protected bridge endpoint each verified version `261`, an `Ansys Mechanical` product response, `verify_valid_connection()` without error, and `ReadOnlyMode=False`. The product string was `Ansys Mechanical Enterprise PrepPost` on the first run and `Ansys Mechanical Enterprise` on the final bridge lifecycle run. This is evidence of a licensed Mechanical process, not evidence that a free Student license was active. The final bridge test kept the gRPC listener alive after the launch response and closed it when the bridge shut down. No model was created or solved.
 
-The bridge pins `ansys-mechanical-core` to the supported `0.13.x` line. The compatibility gate follows the current official PyMechanical support statement:
-
-- Python 3.12 through 3.14.
-- Mechanical 2024 R2 (`v242`) or later.
-- Windows for this bridge implementation.
-
-Sources:
-
-- [PyMechanical installation guide](https://mechanical.docs.pyansys.com/version/stable/getting_started/installation.html)
-- [PyMechanical project compatibility](https://github.com/ansys/pymechanical)
-- [PyMechanical known issues and limitations](https://mechanical.docs.pyansys.com/version/stable/kil/index.html)
-
-`COMPATIBLE` means only that the detected versions fall within this documented range. It is not proof that a license is available, that the installed service pack supports the selected transport, or that an engineering analysis is valid.
-
-## Verified connection test
-
-The browser's **Gerçek bağlantıyı test et** action calls `POST /bridge/v1/connection/test`. The adapter then:
-
-1. Re-runs installation and compatibility checks.
-2. Confirms that a TCP listener exists at `127.0.0.1:<port>`.
-3. Connects with PyMechanical `connect_to_mechanical()` using WNUA.
-4. Calls `verify_valid_connection()`.
-5. Queries `get_product_info()` and requires an `Ansys Mechanical` identity.
-6. Reads the process version and requires it to match one of the locally detected installations.
-
-Only after all six checks pass is `processVerified: true` returned. A listener alone, an optimizer/library success flag, or an installation directory can never produce a successful connection state. The result records the verification time, loopback endpoint, process version, and bounded product information. Raw exception text is not returned to the browser because it can contain local or license-server details.
-
-The test does not retain a simulation session, mutate Mechanical state, or call any analysis API. `simulationsEnabled` remains `false` for every response.
-
-## Starting the two local processes
-
-Install dependencies:
+## Local operation
 
 ```powershell
 uv sync --all-packages --all-extras --dev
-```
-
-Start the MSKU bridge:
-
-```powershell
 npm run ansys-bridge:dev
 ```
 
-Copy the printed token into **ANSYS YEREL**. The bridge is available at `http://127.0.0.1:8765`.
-
-The bridge does not start Mechanical. If the engineer explicitly chooses to start a licensed Mechanical gRPC process, use a separate terminal and select the installed revision:
-
-```powershell
-uv run --package msku-ansys-bridge ansys-mechanical --revision 261 --port 10000 --transport-mode wnua
-```
-
-Replace `261` with the detected revision. Starting Mechanical can consume a license and can take significant time. The user remains responsible for accepting Ansys terms, selecting an entitled license, and closing the process.
-
-Optional bridge configuration:
+Enter the printed token in the **ANSYS YEREL** panel. Then choose **Mechanical'ı başlat** to use the discovered executable, or **Gerçek bağlantıyı test et** for a process already listening at the configured port. PyMechanical's `ansys-mechanical --revision 261` CLI may fail to discover this nested Student installation by itself; the bridge uses the supported explicit-path API.
 
 | Environment variable | Default | Constraint |
 | --- | --- | --- |
-| `MSKU_ANSYS_BRIDGE_TOKEN` | Random value from launcher | Minimum 32 characters |
+| `MSKU_ANSYS_BRIDGE_TOKEN` | Random from launcher | At least 32 characters |
 | `MSKU_ANSYS_BRIDGE_ALLOWED_ORIGINS` | Local Vite/preview and official production origins | Exact comma-separated origins |
-| `MSKU_ANSYS_MECHANICAL_PORT` | `10000` | Local port `1024`–`65535` |
+| `MSKU_ANSYS_MECHANICAL_PORT` | `10000` | `1024`–`65535`, loopback only |
 | `MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS` | `8` | `1`–`30` seconds |
+| `MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS` | `180` | `30`–`300` seconds |
+| `MSKU_ANSYS_MECHANICAL_EXECUTABLE` | Discovered path | Absolute local `v###\aisol\bin\winx64\AnsysWBU.exe` |
 
-Do not commit tokens or license-server data to the repository.
+Do not commit tokens or license-server details.
 
-## HTTP contract
+## HTTP endpoints
 
-| Method | Path | Authentication | Purpose |
-| --- | --- | --- | --- |
-| `GET` | `/bridge/v1/health/live` | Loopback socket + allowed Origin | Minimal bridge liveness |
-| `GET` | `/bridge/v1/health/ready` | Loopback + Origin + token | Bridge/adapter readiness; never simulation readiness |
-| `GET` | `/bridge/v1/status` | Loopback + Origin + token | Installation, compatibility, and last verified-process result |
-| `POST` | `/bridge/v1/connection/test` | Loopback + Origin + token | Explicit non-simulation test of an existing Mechanical process |
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/bridge/v1/health/live` | Minimal local liveness |
+| `GET` | `/bridge/v1/health/ready` | Authenticated bridge/adapter readiness |
+| `GET` | `/bridge/v1/status` | Installation, compatibility, and last verification |
+| `POST` | `/bridge/v1/connection/test` | Verify existing local Mechanical process |
+| `POST` | `/bridge/v1/connection/launch` | User-triggered explicit-path launch and verification |
 
-There are no model, job, solve, upload, arbitrary-script, filesystem-write, or result endpoints.
+All but `/health/live` require the bridge token. All requests require a loopback socket and allowed browser Origin. There are no job, solve, upload, arbitrary-script, or result endpoints.
 
-## Student automation and licensing limitations
+## Student and license limits
 
-As of the Phase 2 implementation date, the official Ansys Student page lists a 128K structural node/element limit, no geometry export, and restricted HPC resources. Ansys Student licenses are time-limited and must be renewed with a current release. Exact entitlements can change by release, product, and academic program.
+The [Ansys Student page](https://www.ansys.com/academic/students/ansys-student) lists structural model, geometry export, HPC, and term limits. The exact entitlement can differ for a Student Team Partnership or institutional license; follow the applicable [academic usage terms](https://www.ansys.com/legal/terms-and-conditions/academic-usage). The bridge never selects a license tier, reads a license file, or bypasses licensing. `ReadOnlyMode=False` establishes a usable session, not the terms of that entitlement.
 
-The free Student download and other academic programs have different terms and limits. Academic usage is restricted to the applicable educational/non-commercial scope. Formula Student teams with an Ansys Student Team Partnership or institutional research license must follow the terms for that specific entitlement rather than assuming free Student limits.
-
-Sources:
-
-- [Current Ansys Student download and limits](https://www.ansys.com/academic/students/ansys-student)
-- [Ansys academic usage terms](https://www.ansys.com/legal/terms-and-conditions/academic-usage)
-- [PyMechanical launching and existing-process connection](https://mechanical.docs.pyansys.com/version/stable/getting_started/running_mechanical.html)
-- [PyMechanical connection verification API](https://mechanical.docs.pyansys.com/version/stable/api/ansys/mechanical/core/mechanical/Mechanical.html)
-
-The bridge does not inspect the license file, infer commercial/Student entitlement from product text, bypass license checks, or claim that automation is permitted for a particular team. A successful connection proves only that the local Mechanical process responded through PyMechanical at that time.
-
-## Verification coverage and remaining work
-
-Automated tests cover Student path/version discovery, environment-variable discovery, broken candidates, non-Windows suppression, compatibility boundaries, closed ports, rejected verification, unexpected product identity, process-version mismatch, sanitized license/authentication errors, token/origin/socket security, Private Network Access preflight, API serialization, browser contract rejection, and explicit UI connection flow.
-
-No real ANSYS installation or license is available in CI. Success-path tests use a strict fake at the adapter boundary and cannot be cited as evidence of real ANSYS operation. A real successful connection must be produced only on a machine where the endpoint verifies an actual Mechanical process. Structural simulation remains future work and requires its own input schema, unit/coordinate contract, solver lifecycle, result provenance, failure containment, and independent verification.
+CI uses strict fake clients because it has no Mechanical installation or license. The local real-process evidence above is separate from those automated tests. Structural simulation remains future work and needs its own input contract, result provenance, physical validation, and failure handling.

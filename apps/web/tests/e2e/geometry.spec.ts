@@ -2,12 +2,15 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
-test("shows installation compatibility and verifies only an explicit real Mechanical process test", async ({ page }) => {
+test("shows compatibility and verifies an explicit-path Mechanical launch", async ({ page }) => {
   const token = "browser-session-token";
   let processVerified = false;
+  let startedByBridge = false;
   const connection = () => ({
     state: processVerified ? "VERIFIED" : "NOT_TESTED",
     processVerified,
+    licenseVerified: processVerified,
+    startedByBridge,
     host: "127.0.0.1",
     port: 10000,
     checkedAt: processVerified ? "2026-10-20T18:00:00Z" : null,
@@ -24,7 +27,7 @@ test("shows installation compatibility and verifies only an explicit real Mechan
         body: JSON.stringify({
           status: "ok",
           service: "msku-ansys-local-bridge",
-          version: "0.2.0",
+          version: "0.2.1",
           scope: "localhost_only",
           tokenConfigured: true,
         }),
@@ -38,12 +41,19 @@ test("shows installation compatibility and verifies only an explicit real Mechan
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(connection()) });
       return;
     }
+    if (path.endsWith("/connection/launch")) {
+      expect(route.request().method()).toBe("POST");
+      processVerified = true;
+      startedByBridge = true;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(connection()) });
+      return;
+    }
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         status: "ready",
         service: "msku-ansys-local-bridge",
-        version: "0.2.0",
+        version: "0.2.1",
         transport: "localhost_token_wnua",
         adapter: {
           adapter: "pymechanical",
@@ -90,11 +100,13 @@ test("shows installation compatibility and verifies only an explicit real Mechan
   await expect(page.getByText("2026 R1 · Student")).toBeVisible();
   await expect(page.getByText("0.13.4 · Uyumlu")).toBeVisible();
   await expect(page.getByText("Test edilmedi")).toBeVisible();
-  await page.getByRole("button", { name: "Gerçek bağlantıyı test et" }).click();
+  await page.getByRole("button", { name: "Mechanical'ı başlat" }).click();
   await expect(panel.getByRole("status")).toContainText("proses doğrulandı");
   await expect(page.getByText("Gerçek proses doğrulandı").first()).toBeVisible();
+  await expect(page.getByText("Aktif ve yazılabilir")).toBeVisible();
+  await expect(page.getByText("Açık yoldan yerel bridge")).toBeVisible();
   await expect(page.getByText("Devre dışı")).toBeVisible();
-  await expect(page.getByText("ANSYS’i başlatmaz ve analiz çalıştırmaz", { exact: false })).toBeVisible();
+  await expect(page.getByText("analiz çalıştırılmaz", { exact: false })).toBeVisible();
 });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {

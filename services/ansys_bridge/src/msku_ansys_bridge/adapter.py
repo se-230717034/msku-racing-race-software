@@ -25,14 +25,18 @@ class ConnectionTestResult:
         "NOT_TESTED",
         "VERIFIED",
         "TEST_IN_PROGRESS",
+        "LAUNCH_IN_PROGRESS",
         "INSTALLATION_NOT_FOUND",
         "INCOMPATIBLE",
         "PROCESS_NOT_REACHABLE",
+        "PROCESS_START_FAILED",
         "AUTHENTICATION_FAILED",
         "LICENSE_ERROR",
         "VERIFICATION_FAILED",
     ]
     process_verified: bool
+    license_verified: bool
+    started_by_bridge: bool
     host: Literal["127.0.0.1"]
     port: int
     checked_at: str | None
@@ -68,11 +72,26 @@ class MechanicalClient(Protocol):
 
     def get_product_info(self) -> Any: ...
 
+    def run_python_script(self, script: str) -> Any: ...
+
+    def exit(self, force: bool = False) -> Any: ...
+
 
 class MechanicalConnector(Protocol):
     def connect(
         self,
         *,
+        host: str,
+        port: int,
+        timeout_seconds: int,
+    ) -> MechanicalClient: ...
+
+
+class MechanicalLauncher(Protocol):
+    def launch(
+        self,
+        *,
+        installation: AnsysInstallation,
         host: str,
         port: int,
         timeout_seconds: int,
@@ -101,10 +120,42 @@ class PyMechanicalConnector:
         )
 
 
+class PyMechanicalLauncher:
+    """Launch Mechanical from a verified local executable without changing licensing."""
+
+    def launch(
+        self,
+        *,
+        installation: AnsysInstallation,
+        host: str,
+        port: int,
+        timeout_seconds: int,
+    ) -> MechanicalClient:
+        core = importlib.import_module("ansys.mechanical.core")
+        launch_mechanical = core.launch_mechanical
+        return launch_mechanical(
+            exec_file=str(installation.executable),
+            additional_envs={
+                f"AWP_ROOT{installation.version_code}": str(installation.root)
+            },
+            ip=host,
+            port=port,
+            batch=True,
+            start_timeout=timeout_seconds,
+            cleanup_on_exit=True,
+            keep_connection_alive=True,
+            transport_mode="wnua",
+        )
+
+
 class AnsysAdapter(Protocol):
     def status(self) -> AdapterStatus: ...
 
     def test_connection(self) -> ConnectionTestResult: ...
+
+    def launch_connection(self) -> ConnectionTestResult: ...
+
+    def close(self) -> None: ...
 
 
 def _loopback_port_open(host: str, port: int, timeout_seconds: float) -> bool:
@@ -119,6 +170,8 @@ def _not_tested(port: int) -> ConnectionTestResult:
     return ConnectionTestResult(
         state="NOT_TESTED",
         process_verified=False,
+        license_verified=False,
+        started_by_bridge=False,
         host="127.0.0.1",
         port=port,
         checked_at=None,
@@ -136,20 +189,28 @@ class LocalAnsysAdapter:
         self,
         settings: BridgeSettings,
         *,
-        discovery_provider: Callable[[], InstallationDiscovery] = discover_windows_installations,
+        discovery_provider: Callable[[], InstallationDiscovery] | None = None,
         compatibility_provider: Callable[
             [AnsysInstallation | None], PyMechanicalCompatibility
         ] = pymechanical_compatibility,
         connector: MechanicalConnector | None = None,
+        launcher: MechanicalLauncher | None = None,
         port_probe: Callable[[str, int, float], bool] = _loopback_port_open,
     ) -> None:
         self._settings = settings
-        self._discovery_provider = discovery_provider
+        self._discovery_provider = discovery_provider or (
+            lambda: discover_windows_installations(
+                explicit_executable=settings.mechanical_executable
+            )
+        )
         self._compatibility_provider = compatibility_provider
         self._connector = connector or PyMechanicalConnector()
+        self._launcher = launcher or PyMechanicalLauncher()
         self._port_probe = port_probe
         self._connection = _not_tested(settings.mechanical_port)
         self._connection_lock = threading.Lock()
+        self._owned_client: MechanicalClient | None = None
+        self._connected_client: MechanicalClient | None = None
 
     def _environment(self) -> tuple[InstallationDiscovery, PyMechanicalCompatibility]:
         discovery = self._discovery_provider()
@@ -157,6 +218,29 @@ class LocalAnsysAdapter:
         return discovery, compatibility
 
     def status(self) -> AdapterStatus:
+        if self._connection.process_verified:
+            client = self._connected_client
+            reachable = self._port_probe(
+                "127.0.0.1",
+                self._settings.mechanical_port,
+                min(float(self._settings.connection_timeout_seconds), 1.0),
+            )
+            if client is None or not reachable:
+                self._failure(
+                    "PROCESS_NOT_REACHABLE",
+                    "MECHANICAL_GRPC_PROCESS_NOT_REACHABLE",
+                    "Önceden doğrulanan Mechanical gRPC prosesi artık erişilebilir değil.",
+                )
+            else:
+                try:
+                    if client.verify_valid_connection() is False:
+                        raise ConnectionError("Mechanical connection rejected")
+                except Exception:
+                    self._failure(
+                        "VERIFICATION_FAILED",
+                        "PYMECHANICAL_CONNECTION_LOST",
+                        "Önceden doğrulanan Mechanical bağlantısı artık geçerli değil.",
+                    )
         discovery, compatibility = self._environment()
         state: Literal[
             "READY_FOR_CONNECTION_TEST",
@@ -187,6 +271,7 @@ class LocalAnsysAdapter:
                 "windows_installation_detection",
                 "pymechanical_compatibility_check",
                 "existing_process_connection_test",
+                "explicit_path_process_launch",
             ),
             message=message,
             discovery=discovery,
@@ -200,16 +285,21 @@ class LocalAnsysAdapter:
             "INSTALLATION_NOT_FOUND",
             "INCOMPATIBLE",
             "PROCESS_NOT_REACHABLE",
+            "PROCESS_START_FAILED",
             "AUTHENTICATION_FAILED",
             "LICENSE_ERROR",
             "VERIFICATION_FAILED",
         ],
         code: str,
         message: str,
+        *,
+        started_by_bridge: bool = False,
     ) -> ConnectionTestResult:
         result = ConnectionTestResult(
             state=state,
             process_verified=False,
+            license_verified=False,
+            started_by_bridge=started_by_bridge,
             host="127.0.0.1",
             port=self._settings.mechanical_port,
             checked_at=datetime.now(UTC).isoformat(),
@@ -218,6 +308,134 @@ class LocalAnsysAdapter:
             error_code=code,
             message=message,
         )
+        self._connected_client = None
+        self._connection = result
+        return result
+
+    def _exception_failure(
+        self,
+        exc: Exception,
+        *,
+        launching: bool,
+        client_obtained: bool = False,
+    ) -> ConnectionTestResult:
+        lowered = f"{type(exc).__name__} {exc}".casefold()
+        if "license" in lowered:
+            return self._failure(
+                "LICENSE_ERROR",
+                "ANSYS_LICENSE_UNAVAILABLE",
+                "Mechanical lisansı alınamadı veya mevcut lisans bağlantıya izin vermedi.",
+                started_by_bridge=launching and client_obtained,
+            )
+        if "auth" in lowered or "wnua" in lowered or "credential" in lowered:
+            return self._failure(
+                "AUTHENTICATION_FAILED",
+                "PYMECHANICAL_WNUA_AUTHENTICATION_FAILED",
+                "Windows Named User Authentication ile Mechanical bağlantısı kurulamadı.",
+                started_by_bridge=launching and client_obtained,
+            )
+        if launching:
+            return self._failure(
+                "PROCESS_START_FAILED",
+                "MECHANICAL_EXPLICIT_PATH_LAUNCH_FAILED",
+                (
+                    "Mechanical doğrulanmış açık executable yolu ve AWP_ROOT ile başlatıldı "
+                    "ancak gRPC prosesi doğrulanamadı. Lisans ve Mechanical başlangıç "
+                    "günlüklerini kontrol edin."
+                ),
+                started_by_bridge=client_obtained,
+            )
+        return self._failure(
+            "VERIFICATION_FAILED",
+            "PYMECHANICAL_CONNECTION_FAILED",
+            (
+                "PyMechanical bağlantısı doğrulanamadı. Mechanical gRPC modu, sürüm, "
+                "port ve servis paketi ayarlarını kontrol edin."
+            ),
+        )
+
+    def _verify_client(
+        self,
+        client: MechanicalClient,
+        discovery: InstallationDiscovery,
+        *,
+        started_by_bridge: bool,
+    ) -> ConnectionTestResult:
+        try:
+            verification = client.verify_valid_connection()
+            if verification is False:
+                return self._failure(
+                    "VERIFICATION_FAILED",
+                    "PYMECHANICAL_CONNECTION_REJECTED",
+                    "PyMechanical gerçek Mechanical bağlantısını doğrulamadı.",
+                    started_by_bridge=started_by_bridge,
+                )
+            product_info = str(client.get_product_info()).strip()
+            mechanical_version = str(client.version).strip()
+            read_only = str(
+                client.run_python_script(
+                    "Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode"
+                )
+            ).strip().casefold()
+        except Exception as exc:  # PyMechanical exposes multiple runtime/gRPC exception types.
+            return self._exception_failure(
+                exc, launching=started_by_bridge, client_obtained=True
+            )
+
+        if not product_info or "ansys mechanical" not in product_info.casefold():
+            return self._failure(
+                "VERIFICATION_FAILED",
+                "UNEXPECTED_MECHANICAL_PRODUCT_INFO",
+                "Bağlanan proses doğrulanmış Ansys Mechanical ürün bilgisi döndürmedi.",
+                started_by_bridge=started_by_bridge,
+            )
+        if not mechanical_version:
+            return self._failure(
+                "VERIFICATION_FAILED",
+                "MECHANICAL_VERSION_NOT_REPORTED",
+                "Bağlanan Mechanical prosesi sürüm bilgisi döndürmedi.",
+                started_by_bridge=started_by_bridge,
+            )
+        version_match = re.search(r"(?<!\d)(\d{3})(?!\d)", mechanical_version)
+        detected_codes = {item.version_code for item in discovery.installations}
+        if version_match is None or int(version_match.group(1)) not in detected_codes:
+            return self._failure(
+                "VERIFICATION_FAILED",
+                "MECHANICAL_PROCESS_VERSION_NOT_DETECTED_LOCALLY",
+                (
+                    "Bağlanan prosesin sürümü, bu bilgisayarda tespit edilen Mechanical "
+                    "kurulumlarından biriyle eşleşmedi."
+                ),
+                started_by_bridge=started_by_bridge,
+            )
+        if read_only not in {"false", "0"}:
+            return self._failure(
+                "LICENSE_ERROR",
+                "MECHANICAL_LICENSE_NOT_CHECKED_OUT",
+                (
+                    "Mechanical prosesi yalnızca salt-okunur durumda; kullanılabilir lisans "
+                    "doğrulanamadı. Bridge lisans kontrolünü atlamaz."
+                ),
+                started_by_bridge=started_by_bridge,
+            )
+
+        result = ConnectionTestResult(
+            state="VERIFIED",
+            process_verified=True,
+            license_verified=True,
+            started_by_bridge=started_by_bridge,
+            host="127.0.0.1",
+            port=self._settings.mechanical_port,
+            checked_at=datetime.now(UTC).isoformat(),
+            mechanical_version=mechanical_version,
+            product_info=product_info[:500],
+            error_code=None,
+            message=(
+                "Gerçek Ansys Mechanical prosesi, sürümü ve aktif lisansı PyMechanical ile "
+                "doğrulandı."
+            ),
+        )
+        self._connected_client = client
         self._connection = result
         return result
 
@@ -226,6 +444,8 @@ class LocalAnsysAdapter:
             return ConnectionTestResult(
                 state="TEST_IN_PROGRESS",
                 process_verified=False,
+                license_verified=False,
+                started_by_bridge=False,
                 host="127.0.0.1",
                 port=self._settings.mechanical_port,
                 checked_at=datetime.now(UTC).isoformat(),
@@ -268,74 +488,88 @@ class LocalAnsysAdapter:
                     port=self._settings.mechanical_port,
                     timeout_seconds=self._settings.connection_timeout_seconds,
                 )
-                verification = client.verify_valid_connection()
-                if verification is False:
-                    return self._failure(
-                        "VERIFICATION_FAILED",
-                        "PYMECHANICAL_CONNECTION_REJECTED",
-                        "PyMechanical gerçek Mechanical bağlantısını doğrulamadı.",
-                    )
-                product_info = str(client.get_product_info()).strip()
-                mechanical_version = str(client.version).strip()
             except Exception as exc:  # PyMechanical exposes multiple runtime/gRPC exception types.
-                lowered = f"{type(exc).__name__} {exc}".casefold()
-                if "license" in lowered:
-                    return self._failure(
-                        "LICENSE_ERROR",
-                        "ANSYS_LICENSE_UNAVAILABLE",
-                        "Mechanical lisansı alınamadı veya mevcut lisans bağlantıya izin vermedi.",
-                    )
-                if "auth" in lowered or "wnua" in lowered or "credential" in lowered:
-                    return self._failure(
-                        "AUTHENTICATION_FAILED",
-                        "PYMECHANICAL_WNUA_AUTHENTICATION_FAILED",
-                        "Windows Named User Authentication ile Mechanical bağlantısı kurulamadı.",
-                    )
-                return self._failure(
-                    "VERIFICATION_FAILED",
-                    "PYMECHANICAL_CONNECTION_FAILED",
-                    (
-                        "PyMechanical bağlantısı doğrulanamadı. Mechanical gRPC modu, sürüm, "
-                        "port ve servis paketi ayarlarını kontrol edin."
-                    ),
-                )
+                return self._exception_failure(exc, launching=False)
+            return self._verify_client(client, discovery, started_by_bridge=False)
+        finally:
+            self._connection_lock.release()
 
-            if not product_info or "ansys mechanical" not in product_info.casefold():
-                return self._failure(
-                    "VERIFICATION_FAILED",
-                    "UNEXPECTED_MECHANICAL_PRODUCT_INFO",
-                    "Bağlanan proses doğrulanmış Ansys Mechanical ürün bilgisi döndürmedi.",
-                )
-            if not mechanical_version:
-                return self._failure(
-                    "VERIFICATION_FAILED",
-                    "MECHANICAL_VERSION_NOT_REPORTED",
-                    "Bağlanan Mechanical prosesi sürüm bilgisi döndürmedi.",
-                )
-            version_match = re.search(r"(?<!\d)(\d{3})(?!\d)", mechanical_version)
-            detected_codes = {item.version_code for item in discovery.installations}
-            if version_match is None or int(version_match.group(1)) not in detected_codes:
-                return self._failure(
-                    "VERIFICATION_FAILED",
-                    "MECHANICAL_PROCESS_VERSION_NOT_DETECTED_LOCALLY",
-                    (
-                        "Bağlanan prosesin sürümü, bu bilgisayarda tespit edilen Mechanical "
-                        "kurulumlarından biriyle eşleşmedi."
-                    ),
-                )
-
-            result = ConnectionTestResult(
-                state="VERIFIED",
-                process_verified=True,
+    def launch_connection(self) -> ConnectionTestResult:
+        if not self._connection_lock.acquire(blocking=False):
+            return ConnectionTestResult(
+                state="LAUNCH_IN_PROGRESS",
+                process_verified=False,
+                license_verified=False,
+                started_by_bridge=False,
                 host="127.0.0.1",
                 port=self._settings.mechanical_port,
                 checked_at=datetime.now(UTC).isoformat(),
-                mechanical_version=mechanical_version,
-                product_info=product_info[:500],
-                error_code=None,
-                message="Gerçek Ansys Mechanical prosesi PyMechanical ile doğrulandı.",
+                mechanical_version=None,
+                product_info=None,
+                error_code="MECHANICAL_LAUNCH_IN_PROGRESS",
+                message="Başka bir Mechanical başlatma veya bağlantı testi devam ediyor.",
             )
-            self._connection = result
+        try:
+            discovery, compatibility = self._environment()
+            installation = discovery.selected
+            if installation is None:
+                return self._failure(
+                    "INSTALLATION_NOT_FOUND",
+                    "ANSYS_INSTALLATION_NOT_FOUND",
+                    "Mechanical başlatılmadı; doğrulanmış yerel executable bulunamadı.",
+                )
+            if compatibility.state != "COMPATIBLE":
+                return self._failure(
+                    "INCOMPATIBLE",
+                    compatibility.state,
+                    compatibility.message,
+                )
+            if self._port_probe(
+                "127.0.0.1",
+                self._settings.mechanical_port,
+                min(float(self._settings.connection_timeout_seconds), 1.0),
+            ):
+                return self._failure(
+                    "VERIFICATION_FAILED",
+                    "MECHANICAL_PORT_ALREADY_IN_USE",
+                    (
+                        "Hedef gRPC portu kullanımda; ikinci bir proses başlatılmadı. "
+                        "Mevcut prosesi 'Gerçek bağlantıyı test et' ile doğrulayın."
+                    ),
+                )
+            try:
+                client = self._launcher.launch(
+                    installation=installation,
+                    host="127.0.0.1",
+                    port=self._settings.mechanical_port,
+                    timeout_seconds=self._settings.launch_timeout_seconds,
+                )
+            except Exception as exc:
+                return self._exception_failure(exc, launching=True)
+
+            result = self._verify_client(client, discovery, started_by_bridge=True)
+            if result.process_verified:
+                self._owned_client = client
+            else:
+                try:
+                    client.exit(force=True)
+                except Exception:
+                    pass
             return result
         finally:
             self._connection_lock.release()
+
+    def close(self) -> None:
+        with self._connection_lock:
+            client = self._owned_client
+            self._owned_client = None
+            if client is None:
+                return
+            try:
+                client.exit(force=True)
+            except Exception:
+                # A user may have already closed the Mechanical process.
+                pass
+            finally:
+                self._connected_client = None
+                self._connection = _not_tested(self._settings.mechanical_port)

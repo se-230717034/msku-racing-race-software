@@ -78,6 +78,7 @@ def discover_windows_installations(
     environment: Mapping[str, str] | None = None,
     program_files: Path | None = None,
     system: str | None = None,
+    explicit_executable: Path | None = None,
 ) -> InstallationDiscovery:
     """Discover known Mechanical roots without executing any Ansys binary."""
 
@@ -95,6 +96,34 @@ def discover_windows_installations(
     base = program_files or Path(active_environment.get("ProgramFiles", r"C:\Program Files"))
     candidates: list[tuple[Path, int, str]] = []
     warnings: list[str] = []
+
+    if explicit_executable is not None:
+        explicit_text = str(explicit_executable)
+        try:
+            explicit_root = explicit_executable.parents[3]
+        except IndexError:
+            explicit_root = None
+        explicit_version = (
+            _VERSION_DIRECTORY.fullmatch(explicit_root.name) if explicit_root else None
+        )
+        expected_suffix = Path("aisol") / "bin" / "winx64" / "AnsysWBU.exe"
+        if explicit_text.startswith(r"\\"):
+            warnings.append("EXPLICIT_MECHANICAL_EXECUTABLE_REMOTE_PATH_REJECTED")
+        elif (
+            not explicit_executable.is_absolute()
+            or explicit_root is None
+            or explicit_version is None
+            or explicit_executable.relative_to(explicit_root) != expected_suffix
+        ):
+            warnings.append("EXPLICIT_MECHANICAL_EXECUTABLE_INVALID")
+        else:
+            candidates.append(
+                (
+                    explicit_root,
+                    int(explicit_version.group("code")),
+                    "explicit_executable",
+                )
+            )
 
     for name, value in active_environment.items():
         match = _AWP_ROOT.fullmatch(name)
@@ -128,13 +157,27 @@ def discover_windows_installations(
                 warnings.append(f"MECHANICAL_EXECUTABLE_MISSING:{version_code}")
             continue
         current = installations_by_path.get(key)
-        if current is None or source.startswith("AWP_ROOT"):
+        source_priority = (
+            2 if source == "explicit_executable"
+            else 1 if source.startswith("AWP_ROOT")
+            else 0
+        )
+        current_priority = (
+            2 if current and current.source == "explicit_executable"
+            else 1 if current and current.source.startswith("AWP_ROOT")
+            else 0
+        )
+        if current is None or source_priority > current_priority:
             installations_by_path[key] = installation
 
     installations = tuple(
         sorted(
             installations_by_path.values(),
-            key=lambda item: (item.product_kind == "student", item.version_code),
+            key=lambda item: (
+                item.source == "explicit_executable",
+                item.product_kind == "student",
+                item.version_code,
+            ),
             reverse=True,
         )
     )

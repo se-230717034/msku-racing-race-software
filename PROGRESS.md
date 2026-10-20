@@ -1,6 +1,18 @@
 # Implementation progress
 
-Updated: 2026-10-20
+Updated: 2026-10-21
+
+## ANSYS Student 2026 R1 startup compatibility
+
+- [x] Verified the installed Mechanical shortcut target and Windows executable description; distinguished `AnsysWBU.exe` from Workbench `RunWB2.exe`
+- [x] Isolated missing versioned `AWP_ROOT261` in the Mechanical child environment as the Student nested-path startup failure
+- [x] Added validated explicit executable configuration and user-triggered PyMechanical `launch_mechanical(exec_file=..., additional_envs=...)` with loopback WNUA
+- [x] Required real connection, product, version, and writable license-mode evidence before `VERIFIED`; preserve `simulationsEnabled=false`
+- [x] Retain bridge-owned Mechanical client until bridge shutdown; close only the owned process
+- [x] Verified actual v261 Mechanical process through direct PyMechanical launch and protected bridge endpoint; product responses were `Ansys Mechanical Enterprise PrepPost` and `Ansys Mechanical Enterprise`, with `ReadOnlyMode=False`
+- [x] Checked that the gRPC listener remains alive after the launch response and closes when the bridge shuts down; status revokes stale verification when the listener disappears
+- [x] Quality gates: 147 Python tests, 55 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] License edition and academic entitlement correlation — active product text does not prove the free Student license
 
 ## ANSYS local integration — Phase 2
 

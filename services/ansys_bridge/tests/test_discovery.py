@@ -36,6 +36,66 @@ def test_detects_student_installation_from_awp_root(tmp_path: Path) -> None:
     assert result.selected.source == "AWP_ROOT261"
 
 
+def test_accepts_only_structurally_valid_explicit_mechanical_executable(tmp_path: Path) -> None:
+    student_root = tmp_path / "ANSYS Inc" / "ANSYS Student" / "v261"
+    executable = make_executable(student_root).absolute()
+
+    result = discover_windows_installations(
+        environment={},
+        program_files=tmp_path / "unused",
+        system="Windows",
+        explicit_executable=executable,
+    )
+
+    assert result.selected is not None
+    assert result.selected.executable == executable
+    assert result.selected.source == "explicit_executable"
+
+    invalid = tmp_path / "arbitrary.exe"
+    invalid.write_bytes(b"never executed")
+    rejected = discover_windows_installations(
+        environment={},
+        program_files=tmp_path / "unused",
+        system="Windows",
+        explicit_executable=invalid,
+    )
+    assert rejected.selected is None
+    assert "EXPLICIT_MECHANICAL_EXECUTABLE_INVALID" in rejected.warnings
+
+
+def test_explicit_executable_overrides_default_installation(tmp_path: Path) -> None:
+    program_files = tmp_path / "Program Files"
+    default = make_executable(program_files / "ANSYS Inc" / "ANSYS Student" / "v261")
+    explicit = make_executable(tmp_path / "Custom" / "ANSYS Student" / "v251")
+
+    result = discover_windows_installations(
+        environment={},
+        program_files=program_files,
+        system="Windows",
+        explicit_executable=explicit.absolute(),
+    )
+
+    assert default.is_file()
+    assert result.selected is not None
+    assert result.selected.executable == explicit.absolute()
+
+
+def test_explicit_executable_remains_source_when_awp_root_matches(tmp_path: Path) -> None:
+    student_root = tmp_path / "ANSYS Inc" / "ANSYS Student" / "v261"
+    executable = make_executable(student_root).absolute()
+
+    result = discover_windows_installations(
+        environment={"AWP_ROOT261": str(student_root)},
+        program_files=tmp_path / "unused",
+        system="Windows",
+        explicit_executable=executable,
+    )
+
+    assert result.selected is not None
+    assert result.selected.executable == executable
+    assert result.selected.source == "explicit_executable"
+
+
 def test_prefers_latest_student_installation_and_deduplicates_paths(tmp_path: Path) -> None:
     program_files = tmp_path / "Program Files"
     student = program_files / "ANSYS Inc" / "ANSYS Student" / "v251"
