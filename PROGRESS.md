@@ -1,6 +1,20 @@
 # Implementation progress
 
-Updated: 2026-10-17
+Updated: 2026-10-20
+
+## ANSYS local integration — Phase 1
+
+- [x] Separate `msku-ansys-bridge` FastAPI package with no dependency on or mutation of the engineering solvers
+- [x] Supported launcher bound only to `127.0.0.1:8765` with a cryptographically random per-process token
+- [x] Loopback socket enforcement, trusted-host checks, exact-origin CORS, Private Network Access preflight, and token-protected status
+- [x] Minimal liveness endpoint and explicit mock adapter status endpoint
+- [x] Mock adapter reports real ANSYS disconnected and simulations disabled; no solve/job endpoint exists
+- [x] Turkish frontend status panel with session-only token storage and strict loopback URL validation
+- [x] Local bridge excluded from the Vercel Python function bundle and absent from the Vercel API entry point
+- [x] Regression tests for authentication, origin/socket rejection, mock contract, and browser client state handling
+- [x] Quality gates: 126 Python tests, 52 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Phase 2 real ANSYS installation discovery and adapter — intentionally not implemented
+- [ ] ANSYS job execution, result import, and engineering correlation — intentionally not implemented
 
 ## Four-corner GLB visual assembly
 

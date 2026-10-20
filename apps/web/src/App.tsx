@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { GeometryInspector } from "./components/GeometryInspector";
 import { GeometryToolbar } from "./components/GeometryToolbar";
+import { AnsysConnectionPanel } from "./components/AnsysConnectionPanel";
 import { ProjectActions } from "./components/ProjectActions";
 import { SuspensionViewport } from "./components/SuspensionViewport";
 import { validateProjectGeometry } from "./domain/geometry";
@@ -153,6 +154,7 @@ export function App() {
         </nav>
         <button className="mobile-menu" type="button" aria-label="Gezinmeyi aç"><Menu /></button>
         <div className={`api-state ${apiStatus}`}><i />API {apiStatus === "online" ? "çevrimiçi" : apiStatus === "offline" ? "çevrimdışı" : "kontrol ediliyor"}</div>
+        <AnsysConnectionPanel />
       </header>
 
       <div className="projectbar">

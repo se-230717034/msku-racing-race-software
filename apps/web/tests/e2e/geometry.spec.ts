@@ -2,6 +2,58 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
+test("connects the Turkish status panel only to the Phase 1 localhost mock bridge", async ({ page }) => {
+  const token = "browser-session-token";
+  await page.route("http://127.0.0.1:8765/bridge/v1/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/health/live")) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          service: "msku-ansys-local-bridge",
+          version: "0.1.0",
+          scope: "localhost_only",
+          tokenConfigured: true,
+        }),
+      });
+      return;
+    }
+    expect(route.request().headers()["x-msku-bridge-token"]).toBe(token);
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "ready",
+        service: "msku-ansys-local-bridge",
+        version: "0.1.0",
+        transport: "localhost_token",
+        adapter: {
+          adapter: "mock",
+          state: "MOCK_READY",
+          ansysConnected: false,
+          simulationsEnabled: false,
+          capabilities: ["health_check", "connection_contract"],
+          message: "Mock adapter hazır; gerçek ANSYS bağlantısı ve simülasyonu uygulanmadı.",
+        },
+        warnings: ["MOCK_ADAPTER_ONLY"],
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "ANSYS YEREL" }).click();
+  const panel = page.getByRole("region", { name: "ANSYS yerel bağlantı durumu" });
+  await expect(panel.getByRole("status")).toContainText("token gerekli");
+  await page.getByPlaceholder("Bridge konsolundaki token").fill(token);
+  await page.getByRole("button", { name: "Bağlantıyı denetle" }).click();
+
+  await expect(panel.getByRole("status")).toContainText("mock hazır");
+  await expect(page.getByText("Mock (Phase 1)")).toBeVisible();
+  await expect(page.getByText("Bağlı değil")).toBeVisible();
+  await expect(page.getByText("Devre dışı")).toBeVisible();
+  await expect(page.getByText("Vercel ANSYS çalıştırmaz", { exact: false })).toBeVisible();
+});
+
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("img", { name: "MSKU Racing logosu" })).toBeVisible();
