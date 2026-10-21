@@ -8,9 +8,9 @@ const token = process.env.MSKU_ANSYS_BRIDGE_TOKEN ?? "";
 const cadPath = process.env.MSKU_ANSYS_SMOKE_CAD ?? "";
 const pinnedCadSha = "49756ab321a4736c5ba94a318e5bf38363a032c8a9c210a817ce1910c1a201f8";
 
-test("real browser → local bridge → Mechanical → browser, with failure and warning display", async ({ page }) => {
+test("real browser → local bridge → Mechanical mesh study → browser", async ({ page }) => {
   test.skip(!enabled, "Opt-in; requires a local licensed ANSYS Student installation and bridge.");
-  test.setTimeout(480_000);
+  test.setTimeout(600_000);
   expect(token.length).toBeGreaterThanOrEqual(32);
   expect(createHash("sha256").update(readFileSync(cadPath)).digest("hex")).toBe(pinnedCadSha);
 
@@ -23,6 +23,8 @@ test("real browser → local bridge → Mechanical → browser, with failure and
       geometrySha256: string;
       units: string;
       validationStatus: string;
+      shapeCheckInSolverInput: boolean;
+      meshConvergence: { status: string; points: Array<{ meshElements: number }> } | null;
       warnings: string[];
     } | null;
   } | null = null;
@@ -48,7 +50,8 @@ test("real browser → local bridge → Mechanical → browser, with failure and
   await analysis.getByLabel("Kuvvet yüzeyi seçimi").fill("NS_Face_1");
   await analysis.getByLabel("Kuvvet ekseni").selectOption("X");
   await analysis.getByLabel("Kuvvet (N)").fill("1000");
-  await analysis.getByLabel("Mesh boyutu (mm)").fill("500");
+  await analysis.getByLabel("Mesh boyutu (mm)").fill("300");
+  await analysis.getByRole("checkbox", { name: /Üç kademeli mesh yakınsama/ }).check();
   await analysis.getByLabel("CAD yolu (.agdb, .pmdb, .step, .stp)").fill(`${cadPath}.missing.agdb`);
   await analysis.getByRole("button", { name: "Analizi açıkça başlat" }).click();
   await expect(analysis.getByRole("alert")).toContainText("CAD dosyası okunamadı");
@@ -56,7 +59,7 @@ test("real browser → local bridge → Mechanical → browser, with failure and
 
   await analysis.getByLabel("CAD yolu (.agdb, .pmdb, .step, .stp)").fill(cadPath);
   await analysis.getByRole("button", { name: "Analizi açıkça başlat" }).click();
-  await expect(analysis).toContainText("Mechanical çözümü ve sonuçları doğrulandı.", { timeout: 240_000 });
+  await expect(analysis).toContainText("Mechanical çözümü ve sonuçları doğrulandı.", { timeout: 360_000 });
   expect(completedJob).not.toBeNull();
   const result = completedJob!.result;
   expect(result).not.toBeNull();
@@ -64,14 +67,18 @@ test("real browser → local bridge → Mechanical → browser, with failure and
   expect(result!.geometrySha256).toBe(pinnedCadSha);
   expect(result!.units).toBe("SI");
   expect(result!.validationStatus).toBe("NUMERIC_RESULT_UNVALIDATED_PHYSICALLY");
+  expect(result!.shapeCheckInSolverInput).toBe(true);
+  expect(result!.meshConvergence?.points).toHaveLength(3);
+  expect(result!.meshConvergence?.status).toBe("NOT_CONVERGED");
   expect(result!.maximumVonMisesStressPa).toBeGreaterThan(0);
   expect(result!.maximumTotalDeformationM).toBeGreaterThan(0);
   await expect(analysis).toContainText(`${(result!.maximumVonMisesStressPa / 1e6).toPrecision(5)} MPa`);
   await expect(analysis).toContainText(`${(result!.maximumTotalDeformationM * 1e3).toPrecision(5)} mm`);
   await expect(analysis).toContainText("fiziksel olarak doğrulanmamıştır");
-  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("mesh yakınsaması değildir");
-  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("şekil denetimi kapalı");
-  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("azaltılmış integrasyonlu");
+  await expect(analysis).toContainText("Şekil denetimi");
+  await expect(analysis.getByRole("note", { name: "Mesh yakınsama değerlendirmesi" })).toContainText("yakınsama gösterilemedi");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("sayısal yakınsama ölçütünü karşılamadı");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("MP/TB");
   for (const warning of result!.warnings) {
     await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText(warning);
   }
