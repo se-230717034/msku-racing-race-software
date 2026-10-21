@@ -18,8 +18,11 @@ mock fallback in the real endpoint. Jobs are never started by page load or polli
 3. The first material choice is Mechanical's built-in **Structural Steel**. Force is a
    signed X/Y/Z component in newtons; global mesh size is in millimetres.
 4. Mechanical imports geometry, assigns material to all bodies, adds one Static
-   Structural analysis, fixed support and force, generates mesh, solves, and evaluates
-   equivalent (von Mises) stress and total deformation.
+   Structural analysis, fixed support and force, and generates mesh. Before solving,
+   the bridge uses Mechanical's documented `Project.SaveAs` to move the project to
+   a fresh per-user ASCII path. It then solves and evaluates equivalent (von Mises)
+   stress and total deformation. If an ASCII solver directory cannot be confirmed,
+   it fails before solve; it never reclassifies a partial result as `Done`.
 5. `SUCCEEDED` requires Mechanical solution status `Done`, finite nonnegative result
    values with `[Pa]` and `[m]` units, positive mesh counts, and a verified bridge-owned
    licensed process. Outputs include input settings, CAD SHA-256, Mechanical version,
@@ -57,11 +60,22 @@ At that time, the second script also verified the protected HTTP launch/job/poll
 the same Mechanical-reported `Done` state and numeric values. Both scripts are opt-in
 and never run in CI or in the browser automatically.
 
-**Current status (2026-10-21):** The real smoke now fails with a local structural
-product/element entitlement error after the default four-core HPC request was
-reduced to two. No current stress or deformation result was produced. See the
-[real-solver diagnosis](ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md). The earlier
-numbers above are historical observations, not a pass for the current setup.
+**Current local status (2026-10-21):** A controlled comparison established that
+both standalone and Workbench acquired an Academic Student structural checkout
+and completed MAPDL, yet Mechanical returned `SolveRequiredPartialResultsAvailable`
+when the project/solver path contained `Yaşar`. Saving the same model to a short
+ASCII path made both report `Done`. The updated standalone smoke returned 4,464
+nodes, 840 Mechanical elements, maximum von Mises stress
+`253.53193716800135 [Pa]`, total deformation `7.2507573514766963E-09 [m]`,
+a nonempty `.rst`, and zero MAPDL errors on two cores. This is current local
+**numerical** evidence, not a benchmark or physical correlation. See the
+[root-cause report](ANSYS_PARTIAL_STATUS_ROOT_CAUSE_2026-10-21.md).
+
+If Windows does not provide an ASCII short alias for the per-user TEMP directory,
+set `MSKU_ANSYS_PROJECT_DIRECTORY` to an existing, access-controlled local ASCII
+directory. The bridge leaves Mechanical project files in that directory for
+diagnostics; maintain its disk usage and access permissions. Do not use a shared
+or network path for private CAD.
 
 To use the panel, start `npm run ansys-bridge:dev`, enter its token, click
 **Mechanical'ı başlat**, enter the sample's local AGDB path and the fields above,

@@ -9,16 +9,20 @@ Updated: 2026-10-21
 - [x] Local AGDB/PMDB/STEP import, Structural Steel assignment, distinct named-selection fixed support and component force, mesh generation and Student-size precheck
 - [x] Real Mechanical solve with `Done` gate, SI-unit/finite-result validation, maximum von Mises stress and total deformation, input/CAD hash provenance
 - [x] Turkish analysis inputs, staged progress, results and sanitized failure messages; externally connected user sessions are never cleared
-- [x] Historical v261 smoke solve and protected HTTP path on official 17 KB AGDB sample reported `Done`; this is not reproducible under the currently observed license state
+- [x] Historical v261 smoke solve and protected HTTP path on official 17 KB AGDB sample reported `Done`; a new 2026-10-21 direct smoke now reproduces `Done` after the ASCII project-path fix
 - [x] Investigated current `SolveRequired`: default four-core solve exceeded the included two-core HPC entitlement; foreground solve now verifies a two-core setting and classifies local solver-log failures without returning invented results
-- [x] Added configurable PyMechanical `start_license`; Student v261+ defaults to requesting the historical Academic Student keyword `aa_t_i` with no checkout bypass or automatic license fallback
+- [x] Added configurable PyMechanical `start_license`; `auto` now delegates to ANSYS's actual product selection because the historical `aa_t_i` keyword produced a read-only v261 session; no checkout bypass or fallback
 - [x] Removed IronPython `str(WorkingDir)` from the failed-solve log path and captured Unicode working directory before solve; added Unicode-path and product-selection regressions
-- [ ] Latest real smoke (2026-10-21): Mechanical reported `Ansys Mechanical []`, `ReadOnlyMode=True`; no product checked out and solve did not start. Previous `-p ansys` request was denied with a demo-user limit. See diagnosis.
+- [x] Isolated current `SolveRequiredPartialResultsAvailable` to the Unicode project/solver path on this installation: same CAD, mesh, loads, product and two cores returned `Done` after documented `Project.SaveAs` to an ASCII path in both standalone and Workbench
+- [x] Default local project path uses the per-user Windows short ASCII TEMP alias; an explicit local ASCII directory may be configured. Failed path confirmation stops before solve.
+- [x] New real standalone smoke: `ReadOnlyMode=False`, Academic Student MAPDL checkout, `Done`, 4,464 nodes/840 Mechanical elements, nonempty `.rst`, zero MAPDL errors, finite `253.53193716800135 Pa` maximum von Mises stress and `7.250757351476696e-9 m` maximum total deformation
+- [x] Protected localhost bridge launch/job/poll also returned real `SUCCEEDED/done` with the same Mechanical values; a strict local Workbench journal confirmed `Done`, finite SI values and `.rst`/MAPDL completion on an ASCII project path
+- [x] Post-fix quality gates: 182 Python tests, Ruff, mypy, 57 Vitest tests, ESLint, TypeScript, production build, and 13 Chromium flows
 - [x] Follow-up quality gates: 176 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
-- [ ] Current real Student smoke still fails: MAPDL reports `SOLID186` unavailable for the selected product/entitlement. No current stress or deformation result; see `docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md`
+- [x] Compared the three unchanged MAPDL warnings in the failed Unicode-path and successful ASCII-path runs; they are not the Mechanical partial-status trigger, but still require mesh/material review for engineering use
 - [x] Quality gates after smoke diagnosis: 161 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
 - [ ] Physical correlation, mesh-convergence study, general material library, arbitrary STEP face selection, persisted Mechanical project and cancellation are outside this initial workflow
-- [ ] Structural solver entitlement remains unproven by installation path or writable PrepPost session; the observed `emag` feature did not permit this `SOLID186` solve
+- [ ] A successful Academic Student checkout and example solve do not validate entitlement for other ANSYS products, model sizes, or real-car use
 
 ## ANSYS Student 2026 R1 startup compatibility
 

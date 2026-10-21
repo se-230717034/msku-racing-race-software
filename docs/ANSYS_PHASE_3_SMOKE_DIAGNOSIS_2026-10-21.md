@@ -1,5 +1,9 @@
 # Phase 3 real-solver diagnosis — 2026-10-21
 
+> Historical diagnosis. Later controlled tests obtained an authorized Academic
+> Student checkout and isolated a Unicode project-path/post-solve failure. See
+> [the updated root-cause report](./ANSYS_PARTIAL_STATUS_ROOT_CAUSE_2026-10-21.md).
+
 This is an observation from the local ANSYS Student 2026 R1 installation, not a
 simulation validation certificate. No mock results were substituted.
 

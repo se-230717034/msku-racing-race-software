@@ -324,7 +324,7 @@ def test_pymechanical_launcher_passes_explicit_path_and_awp_root(monkeypatch: An
             "cleanup_on_exit": True,
             "keep_connection_alive": True,
             "transport_mode": "wnua",
-            "start_license": "aa_t_i",
+            "start_license": None,
         }
     ]
 

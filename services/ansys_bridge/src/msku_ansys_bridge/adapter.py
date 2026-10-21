@@ -126,7 +126,7 @@ class PyMechanicalConnector:
 
 
 class PyMechanicalLauncher:
-    """Request an authorized product through PyMechanical's documented -p switch."""
+    """Delegate automatic selection or request an explicit authorized product."""
 
     def launch(
         self,
@@ -138,11 +138,10 @@ class PyMechanicalLauncher:
         start_license: str = "auto",
     ) -> MechanicalClient:
         if start_license == "auto":
-            license_keyword = (
-                "aa_t_i"
-                if installation.product_kind == "student" and installation.version_code >= 261
-                else None
-            )
+            # The historical aa_t_i keyword started this Student v261 install
+            # read-only, while ANSYS's own selection checked out Academic Student.
+            # Delegation never bypasses entitlement: verify the real process.
+            license_keyword = None
         elif start_license == "none":
             license_keyword = None
         elif start_license in {"aa_t_i", "ansys", "mech_1", "mech_2"}:

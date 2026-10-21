@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from msku_ansys_bridge.adapter import PyMechanicalLauncher
 from msku_ansys_bridge.analysis import StaticAnalysisRequest, run_static_structural
 from msku_ansys_bridge.config import BridgeSettings
@@ -42,6 +45,24 @@ def main() -> None:
         )
         result = run_static_structural(
             client, request, lambda stage, message: print(stage + ": " + message, flush=True)
+        )
+        workdir = Path(str(client.run_python_script("MSKU_ANALYSIS.WorkingDir")))
+        result_file = workdir / "file.rst"
+        solver_output = workdir / "solve.out"
+        if not result_file.is_file() or result_file.stat().st_size == 0:
+            raise RuntimeError("Mechanical reported Done without a nonempty file.rst")
+        if not solver_output.is_file():
+            raise RuntimeError("Mechanical reported Done without solve.out")
+        output = solver_output.read_text(errors="replace")
+        if "RUN COMPLETED" not in output or not re.search(
+            r"NUMBER OF ERROR\s+MESSAGES ENCOUNTERED\s*=\s*0\b", output
+        ):
+            raise RuntimeError("MAPDL completion and zero-error evidence are missing")
+        print("Result file bytes: " + str(result_file.stat().st_size), flush=True)
+        warning_count = re.search(r"NUMBER OF WARNING MESSAGES ENCOUNTERED\s*=\s*(\d+)", output)
+        print(
+            "MAPDL warning count: " + (warning_count.group(1) if warning_count else "unknown"),
+            flush=True,
         )
         print(result.model_dump_json(indent=2), flush=True)
     finally:

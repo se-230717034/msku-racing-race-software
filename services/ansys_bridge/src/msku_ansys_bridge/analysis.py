@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import math
+import os
 import re
+import tempfile
 import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -199,6 +202,55 @@ def _solver_failure(working_dir: Path | None, solver_status: str) -> AnalysisErr
     )
 
 
+def _solver_warning_summary(working_dir: Path) -> list[str]:
+    """Surface the MAPDL warning count without exposing raw local solver logs."""
+    try:
+        with (working_dir / "solve.out").open("rb") as source:
+            source.seek(0, os.SEEK_END)
+            source.seek(max(0, source.tell() - 65_536))
+            tail = source.read().decode("utf-8", errors="replace")
+        match = re.search(r"NUMBER OF WARNING MESSAGES ENCOUNTERED\s*=\s*(\d+)", tail)
+        if match and int(match.group(1)) > 0:
+            return [
+                f"MAPDL {int(match.group(1))} uyarı bildirdi; yerel solve.out/file0.err "
+                "dosyalarını mühendislik kullanımından önce inceleyin."
+            ]
+    except OSError:
+        pass
+    return []
+
+
+def _ascii_project_path() -> str:
+    """Choose a local ASCII project path; Mechanical v261 failed post-solve on Unicode paths."""
+    configured = os.getenv("MSKU_ANSYS_PROJECT_DIRECTORY", "").strip()
+    directory = configured or tempfile.gettempdir()
+    if not configured and os.name == "nt":
+        try:
+            function = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+            function.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+            function.restype = ctypes.c_uint32
+            length = function(directory, None, 0)
+            if length:
+                buffer = ctypes.create_unicode_buffer(length + 1)
+                if 0 < function(directory, buffer, len(buffer)) < len(buffer):
+                    directory = buffer.value
+        except (AttributeError, OSError):
+            pass
+    root = Path(directory)
+    if (
+        not directory.isascii()
+        or not root.is_absolute()
+        or directory.startswith("\\\\")
+        or not root.is_dir()
+    ):
+        raise AnalysisError(
+            "ANSYS_ASCII_PROJECT_DIRECTORY_REQUIRED",
+            "Mechanical için var olan, yerel ve yalnızca ASCII karakterli bir proje dizini "
+            "gerekli. MSKU_ANSYS_PROJECT_DIRECTORY ayarını kontrol edin.",
+        )
+    return str(root / f"msku_ansys_{uuid4().hex}.mechdb")
+
+
 def _setup_script(request: StaticAnalysisRequest, path: Path) -> str:
     # repr() produces quoted Python literals, never executable user-supplied source.
     return f"""
@@ -292,13 +344,31 @@ def run_static_structural(
             "Mechanical çözüm çekirdeği sınırı doğrulanamadı; solve başlatılmadı.",
         )
 
-    # Query the raw property before Solve: IronPython str(WorkingDir) can fail
-    # to encode a Unicode Windows profile path after a failed solver run.
+    # This documented standalone Mechanical API relocates the solver project.
+    # On the tested v261 Windows installation a Unicode profile path yielded
+    # an "unknown error"/partial status despite MAPDL completing. A fresh
+    # ASCII path made the same model report Done; never reinterpret partial as Done.
+    project_path = _ascii_project_path()
+    try:
+        client.run_python_script(
+            "ExtAPI.DataModel.Project.SaveAs(" + repr(project_path) + ", False)"
+        )
+    except Exception as exc:
+        raise AnalysisError(
+            "ANSYS_PROJECT_SAVE_FAILED",
+            "Mechanical analizi ASCII proje dizinine kaydedilemedi; çözüm başlatılmadı.",
+        ) from exc
+
     try:
         working_dir_value = client.run_python_script("MSKU_ANALYSIS.WorkingDir")
         working_dir = Path(working_dir_value) if working_dir_value else None
     except Exception:
         working_dir = None
+    if working_dir is None or not working_dir.is_absolute() or not str(working_dir).isascii():
+        raise AnalysisError(
+            "ANSYS_ASCII_WORKDIR_NOT_CONFIRMED",
+            "Mechanical çözüm çalışma dizini ASCII olarak doğrulanamadı; çözüm başlatılmadı.",
+        )
 
     progress("solving", "Static Structural çözümü gerçek Mechanical prosesinde çalışıyor.")
     solved = _payload(
@@ -347,6 +417,7 @@ def run_static_structural(
             "Sonuç yalnızca sayısal çözüm kanıtıdır; fiziksel korelasyon "
             "veya mesh yakınsaması değildir.",
             "Student lisans sınırı solve sırasında eklenen elemanları da kapsayabilir.",
+            *_solver_warning_summary(working_dir),
         ],
     )
 

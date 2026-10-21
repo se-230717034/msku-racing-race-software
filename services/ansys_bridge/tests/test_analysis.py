@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,10 @@ from msku_ansys_bridge.analysis import (
     AnalysisError,
     StaticAnalysisManager,
     StaticAnalysisRequest,
+    _ascii_project_path,
     _si_quantity,
+    _solver_failure,
+    _solver_warning_summary,
     run_static_structural,
 )
 from pydantic import ValidationError
@@ -43,6 +47,7 @@ class FakeMechanical:
         failure: Exception | None = None,
         configured_cores: str = "2",
         working_dir: Path | None = None,
+        save_failure: bool = False,
     ) -> None:
         self.calls: list[str] = []
         self.nodes = nodes
@@ -52,7 +57,10 @@ class FakeMechanical:
         self.deformation = deformation
         self.failure = failure
         self.configured_cores = configured_cores
-        self.working_dir = working_dir
+        self.working_dir = working_dir or Path(
+            "C:/ansys-test" if os.name == "nt" else "/tmp/ansys-test"
+        )
+        self.save_failure = save_failure
 
     def clear(self) -> None:
         self.calls.append("clear")
@@ -67,10 +75,14 @@ class FakeMechanical:
             return json.dumps({"nodes": self.nodes, "elements": self.elements})
         if "SolveConfigurations['My Computer']" in script:
             return self.configured_cores
+        if "Project.SaveAs(" in script:
+            if self.save_failure:
+                raise RuntimeError("SaveAs unavailable")
+            return ""
         if "Solution.Solve(True)" in script:
             return json.dumps({"status": self.solver_status})
         if "MSKU_ANALYSIS.WorkingDir" in script:
-            return str(self.working_dir) if self.working_dir is not None else "?"
+            return str(self.working_dir)
         if "EvaluateAllResults()" in script:
             return json.dumps(
                 {
@@ -120,10 +132,14 @@ def test_real_workflow_contract_extracts_only_solver_values(tmp_path: Path) -> N
     assert "'NS_Force'" in client.calls[1]
     assert "1000.0" in client.calls[1]
     assert any("MaxNumberOfCores = 2" in call for call in client.calls)
+    save_index = next(i for i, call in enumerate(client.calls) if "Project.SaveAs(" in call)
+    solve_index = next(i for i, call in enumerate(client.calls) if "Solution.Solve(True)" in call)
+    assert save_index < solve_index
 
 
-def test_failed_solver_never_returns_results(tmp_path: Path) -> None:
-    client = FakeMechanical(solver_status="Failed")
+@pytest.mark.parametrize("status", ["Failed", "SolveRequiredPartialResultsAvailable"])
+def test_failed_solver_never_returns_results(tmp_path: Path, status: str) -> None:
+    client = FakeMechanical(solver_status=status)
     with pytest.raises(AnalysisError, match="Mechanical çözümü başarıyla tamamlanmadı"):
         run_static_structural(client, request(tmp_path), lambda *_: None)
     assert not any("EvaluateAllResults()" in call for call in client.calls)
@@ -156,17 +172,13 @@ def test_solver_rejects_unconfirmed_core_limit(tmp_path: Path) -> None:
 def test_solver_log_is_classified_without_leaking_raw_details(
     tmp_path: Path, filename: str, log: str, expected_code: str
 ) -> None:
-    secret = "license-server-secret"
-    (tmp_path / filename).write_text(log + secret)
-    client = FakeMechanical(solver_status="SolveRequired", working_dir=tmp_path)
-    with pytest.raises(AnalysisError) as failure:
-        run_static_structural(client, request(tmp_path), lambda *_: None)
-    assert failure.value.code == expected_code
-    assert secret not in failure.value.message
-    assert not any("EvaluateAllResults()" in call for call in client.calls)
+    (tmp_path / filename).write_text(log + "license-server-secret")
+    failure = _solver_failure(tmp_path, "SolveRequired")
+    assert failure.code == expected_code
+    assert "license-server-secret" not in failure.message
 
 
-def test_unicode_working_dir_log_is_read_before_failed_solve(tmp_path: Path) -> None:
+def test_unicode_working_dir_fails_before_solve(tmp_path: Path) -> None:
     working_dir = tmp_path / "Yaşar" / "Mechanical"
     working_dir.mkdir(parents=True)
     (working_dir / "file0.err").write_text(
@@ -177,12 +189,54 @@ def test_unicode_working_dir_log_is_read_before_failed_solve(tmp_path: Path) -> 
     client = FakeMechanical(solver_status="SolveRequired", working_dir=working_dir)
     with pytest.raises(AnalysisError) as failure:
         run_static_structural(client, request(tmp_path), lambda *_: None)
-    assert failure.value.code == "ANSYS_STRUCTURAL_PRODUCT_UNAVAILABLE"
+    assert failure.value.code == "ANSYS_ASCII_WORKDIR_NOT_CONFIRMED"
     assert "MSKU_ANALYSIS.WorkingDir" in client.calls
     assert "str(MSKU_ANALYSIS.WorkingDir)" not in client.calls
-    assert client.calls.index("MSKU_ANALYSIS.WorkingDir") < next(
-        index for index, call in enumerate(client.calls) if "Solution.Solve(True)" in call
+    assert not any("Solution.Solve(True)" in call for call in client.calls)
+
+
+def test_project_directory_rejects_unicode_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = tmp_path / "çalışma"
+    directory.mkdir()
+    monkeypatch.setenv("MSKU_ANSYS_PROJECT_DIRECTORY", str(directory))
+    with pytest.raises(AnalysisError) as failure:
+        _ascii_project_path()
+    assert failure.value.code == "ANSYS_ASCII_PROJECT_DIRECTORY_REQUIRED"
+
+
+def test_default_project_path_is_local_ascii(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MSKU_ANSYS_PROJECT_DIRECTORY", raising=False)
+    project = Path(_ascii_project_path())
+    assert project.is_absolute()
+    assert str(project).isascii()
+    assert project.parent.is_dir()
+    assert project.suffix == ".mechdb"
+
+
+def test_explicit_ascii_project_directory(monkeypatch: pytest.MonkeyPatch) -> None:
+    ascii_directory = str(Path(_ascii_project_path()).parent)
+    monkeypatch.setenv("MSKU_ANSYS_PROJECT_DIRECTORY", ascii_directory)
+    assert Path(_ascii_project_path()).parent == Path(ascii_directory)
+
+
+def test_save_as_failure_stops_before_solve(tmp_path: Path) -> None:
+    client = FakeMechanical(save_failure=True)
+    with pytest.raises(AnalysisError) as failure:
+        run_static_structural(client, request(tmp_path), lambda *_: None)
+    assert failure.value.code == "ANSYS_PROJECT_SAVE_FAILED"
+    assert not any("Solution.Solve(True)" in call for call in client.calls)
+
+
+def test_solver_warning_count_is_sanitized(tmp_path: Path) -> None:
+    (tmp_path / "solve.out").write_text(
+        "license-server-secret\nNUMBER OF WARNING MESSAGES ENCOUNTERED= 3\n"
     )
+    warnings = _solver_warning_summary(tmp_path)
+    assert len(warnings) == 1
+    assert "3 uyarı" in warnings[0]
+    assert "license-server-secret" not in warnings[0]
 
 
 def test_student_mesh_precheck_stops_before_solve(tmp_path: Path) -> None:

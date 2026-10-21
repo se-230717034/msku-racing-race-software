@@ -24,8 +24,8 @@ class BridgeSettings:
     connection_timeout_seconds: int = 8
     launch_timeout_seconds: int = 180
     mechanical_executable: Path | None = None
-    # "auto" requests the Academic Student product on Student 2026 R1+.
-    # "none" leaves product selection to Mechanical; no license is ever bypassed.
+    # "auto" and "none" leave product selection to Mechanical; an actual
+    # writable process and successful solver checkout are checked separately.
     start_license: str = "auto"
 
     @property
