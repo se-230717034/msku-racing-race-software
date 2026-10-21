@@ -1,0 +1,106 @@
+# encoding: utf-8
+# Local-only diagnostic using documented Workbench scripting; no application fallback.
+import json
+import os
+
+SetScriptVersion(Version="26.1.174")
+output_dir = os.environ["MSKU_ANSYS_WB_OUTPUT_DIR"]
+system = GetTemplate(TemplateName="Static Structural", Solver="ANSYS").CreateSystem()
+geometry = system.GetContainer(ComponentName="Geometry")
+geometry.SetFile(FilePath=os.environ["MSKU_ANSYS_SMOKE_CAD"])
+system.GetComponent(Name="Geometry").Update(AllDependencies=True)
+system.GetComponent(Name="Model").Refresh()
+Save(FilePath=os.path.join(output_dir, "same_model.wbpj"), Overwrite=False)
+
+mechanical_script = r'''
+import json
+import math
+import os
+import re
+from System.IO import File
+
+report = {"state": "FAILED"}
+try:
+    ExtAPI.Application.ActiveUnitSystem = MechanicalUnitSystem.StandardMKS
+    report["readOnly"] = str(Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode)
+    if report["readOnly"].lower() != "false":
+        raise RuntimeError("Mechanical is read-only")
+    names = list(Model.NamedSelections.Children)
+    fixed = [x for x in names if x.Name == "NS_Fixed"]
+    loaded = [x for x in names if x.Name == "NS_Face_1"]
+    bodies = Model.Geometry.GetChildren(
+        Ansys.Mechanical.DataModel.Enums.DataModelObjectCategory.Body, True)
+    if len(bodies) != 4 or len(fixed) != 1 or len(loaded) != 1:
+        raise RuntimeError("The expected model geometry or scopes are missing")
+    if not fixed[0].Ids or not loaded[0].Ids:
+        raise RuntimeError("A support or force scope is empty")
+    assignment = Model.Materials.AddMaterialAssignment()
+    assignment.Material = "Structural Steel"
+    selection = ExtAPI.SelectionManager.CreateSelectionInfo(
+        Ansys.ACT.Interfaces.Common.SelectionTypeEnum.GeometryEntities)
+    selection.Ids = [body.GetGeoBody().Id for body in bodies]
+    assignment.Location = selection
+    if len(Model.Analyses) != 1:
+        raise RuntimeError("Expected one Static Structural analysis")
+    analysis = Model.Analyses[0]
+    support = analysis.AddFixedSupport()
+    support.Location = fixed[0]
+    force = analysis.AddForce()
+    force.Location = loaded[0]
+    force.DefineBy = LoadDefineBy.Components
+    force.XComponent.Output.DiscreteValues = [Quantity(1000.0, "N")]
+    deformation = analysis.Solution.AddTotalDeformation()
+    stress = analysis.Solution.AddEquivalentStress()
+    Model.Mesh.ElementSize = Quantity(500.0, "mm")
+    Model.Mesh.GenerateMesh()
+    report["meshNodes"] = int(Model.Mesh.Nodes)
+    report["meshElements"] = int(Model.Mesh.Elements)
+    config = ExtAPI.Application.SolveConfigurations["My Computer"]
+    config.SetAsDefault()
+    config.SolveProcessSettings.MaxNumberOfCores = 2
+    report["configuredCores"] = int(config.SolveProcessSettings.MaxNumberOfCores)
+    if report["configuredCores"] != 2:
+        raise RuntimeError("Two-core setting was not accepted")
+    analysis.Solve(True)
+    analysis.Solution.EvaluateAllResults()
+    report["solverStatus"] = str(analysis.Solution.Status)
+    report["stress"] = str(stress.Maximum)
+    report["deformation"] = str(deformation.Maximum)
+    report["messages"] = [str(x.DisplayString) for x in ExtAPI.Application.Messages]
+    if report["solverStatus"].split(".")[-1] != "Done":
+        raise RuntimeError("Mechanical did not reach Done")
+    for field, unit in (("stress", "Pa"), ("deformation", "m")):
+        match = re.match(r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?) \[" + unit + r"\]$", report[field])
+        if not match:
+            raise RuntimeError("Result unit or number is invalid: " + field)
+        number = float(match.group(1))
+        if math.isnan(number) or math.isinf(number) or number < 0:
+            raise RuntimeError("Result is not finite and nonnegative: " + field)
+    solver_dir = analysis.WorkingDir
+    result_file = os.path.join(solver_dir, "file.rst")
+    output_file = os.path.join(solver_dir, "solve.out")
+    if not os.path.isfile(result_file) or os.path.getsize(result_file) == 0:
+        raise RuntimeError("Nonempty file.rst is missing")
+    if not os.path.isfile(output_file):
+        raise RuntimeError("solve.out is missing")
+    with open(output_file, "r") as source:
+        output = source.read()
+    if "RUN COMPLETED" not in output or not re.search(
+            r"NUMBER OF ERROR\s+MESSAGES ENCOUNTERED\s*=\s*0\b", output):
+        raise RuntimeError("MAPDL completion/zero-error evidence is missing")
+    report["resultFileBytes"] = os.path.getsize(result_file)
+    report["state"] = "SOLVED"
+except Exception as exc:
+    report.pop("stress", None)
+    report.pop("deformation", None)
+    report["error"] = str(exc)[:500]
+finally:
+    File.WriteAllText(
+        os.path.join(os.environ["MSKU_ANSYS_WB_OUTPUT_DIR"], "mechanical_result.json"),
+        json.dumps(report))
+'''
+
+system.GetContainer(ComponentName="Model").SendCommand(
+    Language="Python", Command=mechanical_script
+)
+Save(Overwrite=True)

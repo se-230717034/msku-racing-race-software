@@ -70,6 +70,60 @@ button { color: inherit; }
 .api-state.online i { background: var(--green); box-shadow: 0 0 8px #4ade8080; }
 .api-state.offline i { background: var(--red); }
 
+.ansys-connection { position: relative; display: flex; align-items: stretch; margin-left: 10px; }
+.ansys-trigger { display: flex; align-items: center; gap: 6px; min-width: 106px; padding: 0 8px; border: 0; border-left: 1px solid var(--line); color: #929baa; background: transparent; font: 650 8px/1 ui-monospace, monospace; letter-spacing: .04em; cursor: pointer; }
+.ansys-trigger:hover, .ansys-trigger[aria-expanded="true"] { color: #edf0f4; background: #11151c; }
+.ansys-trigger i { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--amber); }
+.ansys-trigger.connection_verified i { background: var(--green); box-shadow: 0 0 8px #4ade8080; }
+.ansys-trigger.offline i, .ansys-trigger.error i, .ansys-trigger.unauthorized i, .ansys-trigger.unconfigured i { background: var(--red); }
+.ansys-trigger.token_required i { background: var(--amber); }
+.ansys-panel { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: min(430px, calc(100vw - 24px)); max-height: calc(100vh - 82px); padding: 15px; overflow-y: auto; border: 1px solid #343c49; border-radius: 5px; background: #10141beF; box-shadow: 0 20px 60px #000b; backdrop-filter: blur(14px); }
+.ansys-panel::before { position: absolute; top: -9px; right: 24px; width: 15px; height: 15px; content: ""; transform: rotate(45deg); border-top: 1px solid #343c49; border-left: 1px solid #343c49; background: #10141b; }
+.ansys-panel > header { display: flex; align-items: start; justify-content: space-between; margin-bottom: 12px; }
+.ansys-panel > header h2 { margin: 3px 0 0; font-size: 16px; }
+.ansys-panel > header button { display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid #2e3540; border-radius: 3px; background: #171c24; cursor: pointer; }
+.ansys-panel-state { display: flex; align-items: center; gap: 9px; min-height: 48px; padding: 9px 10px; border: 1px solid #654b21; border-radius: 4px; color: #edc16f; background: #21190d; }
+.ansys-panel-state.ready { border-color: #245a3a; color: #71e19b; background: #0e2017; }
+.ansys-panel-state.offline, .ansys-panel-state.error, .ansys-panel-state.unauthorized, .ansys-panel-state.unconfigured { border-color: #6d2737; color: #ff8295; background: #251017; }
+.ansys-panel-state div { min-width: 0; display: grid; gap: 4px; }
+.ansys-panel-state strong { font: 750 10px/1 ui-monospace, monospace; text-transform: uppercase; }
+.ansys-panel-state span { color: #aab2bf; font-size: 9px; line-height: 1.35; }
+.ansys-connection-details { margin: 12px 0; padding: 9px 10px; border: 1px solid #262d38; background: #0c0f14; }
+.ansys-connection-details div { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; }
+.ansys-connection-details dt { color: #747f90; font-size: 9px; }
+.ansys-connection-details dd { margin: 0; overflow-wrap: anywhere; color: #d9dee6; font: 650 9px/1.3 ui-monospace, monospace; text-align: right; }
+.ansys-token-field { display: grid; gap: 6px; }
+.ansys-token-field > span { display: flex; align-items: center; gap: 5px; color: #aab2bf; font-size: 9px; font-weight: 650; }
+.ansys-token-field input { width: 100%; height: 34px; padding: 0 9px; border: 1px solid #353e4c; border-radius: 3px; color: #eef1f5; background: #090c10; font: 10px/1 ui-monospace, monospace; }
+.ansys-token-field input:focus { outline: 1px solid #8e2c3e; border-color: #8e2c3e; }
+.ansys-panel-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.ansys-panel-actions button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 0 10px; border: 1px solid #3b4554; border-radius: 3px; color: #dce1e8; background: #1a2029; font-size: 9px; cursor: pointer; }
+.ansys-panel-actions button:nth-child(2) { border-color: #8d2638; background: #391620; }
+.ansys-panel-actions button:disabled { opacity: .45; cursor: wait; }
+.ansys-test-result { display: grid; gap: 4px; margin: 0 0 11px; padding: 9px 10px; border: 1px solid #6d2737; border-radius: 3px; color: #ff9cad; background: #251017; font-size: 9px; line-height: 1.4; }
+.ansys-test-result.verified { border-color: #245a3a; color: #7ce3a1; background: #0e2017; }
+.ansys-test-result span, .ansys-test-result small { color: #a8b0bd; }
+.ansys-analysis { display: grid; gap: 9px; margin-top: 14px; padding: 11px; border: 1px solid #303947; background: #0d1219; }
+.ansys-analysis h3 { margin: 0; color: #edf0f5; font-size: 12px; }
+.ansys-analysis p { margin: 0; color: #9ba6b7; font-size: 9px; line-height: 1.5; }
+.ansys-analysis label { display: grid; gap: 4px; min-width: 0; color: #aab3c0; font-size: 9px; }
+.ansys-analysis input, .ansys-analysis select { width: 100%; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid #3a4352; border-radius: 3px; color: #e7ebf1; background: #111821; font-size: 10px; }
+.ansys-analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ansys-analysis > button { min-height: 32px; border: 1px solid #8d2638; border-radius: 3px; color: #fff; background: #451b28; font-size: 10px; cursor: pointer; }
+.ansys-analysis > button:disabled { opacity: .45; cursor: not-allowed; }
+.ansys-analysis .ansys-analysis-error { color: #ff8d9d; }
+.ansys-analysis-result { display: grid; gap: 6px; padding: 9px; border: 1px solid #394658; color: #dde5ef; font-size: 9px; }
+.ansys-analysis-result span, .ansys-analysis-result small { overflow-wrap: anywhere; color: #aeb9c8; }
+.ansys-analysis-result dl { margin: 0; }
+.ansys-analysis-result dl div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.ansys-analysis-result dl dd { margin: 0; font-family: ui-monospace, monospace; }
+.ansys-result-warnings { padding: 8px; border: 1px solid #795b2e; border-radius: 3px; color: #f0c47c; background: #221b11; }
+.ansys-result-warnings strong { font-size: 9px; }
+.ansys-result-warnings ul { margin: 5px 0 0; padding-left: 16px; }
+.ansys-result-warnings li + li { margin-top: 4px; }
+.ansys-security-note { margin: 11px 0 0; padding-top: 10px; border-top: 1px solid #252c36; color: #7f8999; font-size: 8px; line-height: 1.55; }
+.ansys-security-note code { color: #c8ced7; }
+
 .projectbar { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--line); background: #0e1117; }
 .project-identity { min-width: 0; display: flex; align-items: center; gap: 12px; }
 .project-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; }
@@ -357,7 +411,7 @@ button { color: inherit; }
 
 @media (max-width: 800px) {
   .app-shell { grid-template-rows: 54px auto minmax(0, 1fr) 25px; }
-  .topbar { padding: 0 12px; }.topbar nav { display: none; }.brand { min-width: 0; }.brand-logo { width: 98px; height: 34px; }.brand-copy span { display: none; }.mobile-menu { display: block; margin-left: auto; }.api-state { min-width: 88px; }
+  .topbar { padding: 0 12px; }.topbar nav { display: none; }.brand { min-width: 0; }.brand-logo { width: 98px; height: 34px; }.brand-copy { display: none; }.mobile-menu { display: block; margin-left: auto; }.api-state { display: none; }.ansys-connection { margin-left: 0; }.ansys-trigger { min-width: 42px; border-left: 0; }.ansys-trigger span { display: none; }.ansys-panel { right: -4px; }
   .projectbar { align-items: stretch; flex-direction: column; padding: 7px 10px 0; }.project-identity b { display: none; }.project-actions { height: 34px; margin-top: 5px; overflow-x: auto; }.project-actions button:first-child { border-left: 0; }
   .geometry-workspace { grid-template-columns: 1fr; grid-template-rows: 38px minmax(320px, 1fr) minmax(0, auto); overflow-y: auto; }.geometry-toolbar { grid-column: 1; }.viewport { min-height: 420px; }.inspector { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
   .vehicle-workspace { grid-template-columns: 1fr; grid-template-rows: 42px 520px auto; overflow-y: auto; }.vehicle-toolbar { grid-column: 1; }.vehicle-main { min-height: 520px; }.vehicle-inspector { overflow: visible; border-left: 0; border-top: 1px solid var(--line); }.solver-motion-note { top: 48px; left: 13px; right: auto; }.reference-disclaimer { bottom: 70px; }

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --all-packages --all-extras --dev
-      - run: uv run ruff check packages/engineering services/api
-      - run: uv run mypy packages/engineering/src services/api/src
+      - run: uv run ruff check packages/engineering services/api services/ansys_bridge
+      - run: uv run mypy packages/engineering/src services/api/src services/ansys_bridge/src
       - run: uv run --package msku-api pytest
 

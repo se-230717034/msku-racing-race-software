@@ -65,8 +65,11 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Optimization workspace with variable/bound controls, convergence/Pareto plots, candidate diagnostics, non-mutating geometry preview, and explicit apply.
 - Versioned Vehicle Parameter Manifest records configuration, SI units, source type, measurement state, uncertainty, applicable modules, evidence references, and deterministic content hash. Bundled defaults remain explicitly `SYNTHETIC`.
 - Independent `declared`, `numerically verified`, `reference benchmarked`, and `physically correlated` axes require accepted evidence of their own type; numerical tests and solver success cannot promote physical correlation.
+- Phase 3 ANSYS local integration through a separate localhost-only FastAPI bridge: Windows installation discovery, verified PyMechanical connection, and an **explicitly started** Static Structural CAD → material → boundary conditions → mesh → solve → stress/deformation workflow. Real results are returned only after Mechanical reports `Done`; failed jobs have no numeric fallback. The bridge never runs on Vercel.
 
-See [PROGRESS.md](./PROGRESS.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
+The ANSYS Student 2026 R1 two-core smoke now reaches Mechanical `Done` and finite SI results after the documented ASCII project-path fix. Three MAPDL engineering warnings remain; neither this smoke nor the browser test physically validates a vehicle model. See the [warning and real-browser verification report](./docs/ANSYS_PHASE_3_WARNING_AND_UI_VERIFICATION_2026-10-21.md) and the historical [real-solver diagnosis](./docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md).
+
+See [PROGRESS.md](./PROGRESS.md), the [ANSYS local bridge guide](./docs/ANSYS_LOCAL_BRIDGE.md), the [Phase 3 Static Structural guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites
 
@@ -92,6 +95,18 @@ Terminal 2:
 npm run dev
 ```
 
+Optional Terminal 3 for the Phase 3 local ANSYS bridge:
+
+```bash
+npm run ansys-bridge:dev
+```
+
+The command binds only to `http://127.0.0.1:8765` and prints a random session token. Enter it in the **ANSYS YEREL** header panel. Click **Mechanical'ı başlat** to launch a verified local executable, then provide a local CAD path and named selections and click **Analizi açıkça başlat**. Student installations under `ANSYS Student\v###` receive the matching `AWP_ROOT###` only in the child process. The workflow is local and opt-in; see [the Phase 3 guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md).
+
+The local bridge's `MSKU_ANSYS_START_LICENSE=auto` delegates product selection to ANSYS; explicit documented `start_license` keywords remain optional and still require real entitlement. On this Student 2026 R1 installation, the prior historical `aa_t_i` request started read-only, while delegated selection obtained an Academic Student structural checkout. The bridge now saves each standalone Mechanical project through its documented `Project.SaveAs` API to a user-local ASCII path before solving; `MSKU_ANSYS_PROJECT_DIRECTORY` can provide an existing local ASCII directory if a Windows short path is unavailable. The real two-core sample smoke reported Mechanical `Done`, a nonempty result file, 0 MAPDL errors, and finite SI results. See [the root-cause report](./docs/ANSYS_PARTIAL_STATUS_ROOT_CAUSE_2026-10-21.md); this is not physical validation.
+
+The ANSYS panel now shows the returned engineering warnings alongside stress in MPa, deformation in mm, and an explicit physical-unvalidation notice. The opt-in unmocked Chromium check in `apps/web/tests/e2e/ansys-real.spec.ts` requires a running local bridge and `MSKU_REAL_ANSYS_E2E=1`, `MSKU_ANSYS_BRIDGE_TOKEN`, and `MSKU_ANSYS_SMOKE_CAD` environment variables; regular CI skips the licensed solve.
+
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
 
 The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*`. Dynamics endpoints are `POST /api/v1/dynamics/quarter-car/simulate`, `POST /api/v1/dynamics/full-car/simulate`, and `POST /api/v1/dynamics/bicycle/simulate`. Optimization uses `POST /api/v1/optimization/run`. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions. Playwright starts both web and API test servers automatically.
@@ -100,8 +115,8 @@ The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints ar
 
 ```bash
 npm run quality
-uv run ruff check packages/engineering services/api
-uv run mypy packages/engineering/src services/api/src
+uv run ruff check packages/engineering services/api services/ansys_bridge
+uv run mypy packages/engineering/src services/api/src services/ansys_bridge/src
 npm run test:python
 ```
 
@@ -114,7 +129,7 @@ npm run test:e2e
 
 ## Vercel deployment
 
-The repository includes a Vite SPA configuration, a same-origin FastAPI entry point at `api/index.py`, production-only Python requirements, and SPA/API rewrites in `vercel.json`.
+The repository includes a Vite SPA configuration, a same-origin FastAPI entry point at `api/index.py`, production-only Python requirements, and SPA/API rewrites in `vercel.json`. The local ANSYS bridge is explicitly excluded from the Vercel function bundle; the deployed site can only contact a bridge that the user separately starts on their own loopback interface.
 
 Production: [https://msku-racing-race-software.vercel.app](https://msku-racing-race-software.vercel.app)
 
@@ -137,6 +152,7 @@ The web container is exposed on `http://localhost:4173`; the API remains on port
 ```text
 apps/web              React/TypeScript engineering workspace
 services/api          FastAPI boundary and versioned endpoints
+services/ansys_bridge Separate localhost-only ANSYS bridge (Phase 3 opt-in structural analysis)
 packages/contracts    Shared TypeScript schemas and demo project
 packages/engineering  Pure Python geometry and numerical kinematics core
 docs                  Architecture, model, validation, and deployment records

@@ -2,6 +2,159 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
+test("shows compatibility and verifies an explicit-path Mechanical launch", async ({ page }) => {
+  const token = "browser-session-token";
+  let processVerified = false;
+  let startedByBridge = false;
+  let analysisStarted = false;
+  const connection = () => ({
+    state: processVerified ? "VERIFIED" : "NOT_TESTED",
+    processVerified,
+    licenseVerified: processVerified,
+    startedByBridge,
+    host: "127.0.0.1",
+    port: 10000,
+    checkedAt: processVerified ? "2026-10-20T18:00:00Z" : null,
+    mechanicalVersion: processVerified ? "261" : null,
+    productInfo: processVerified ? "Ansys Mechanical [Student] Product Version:261" : null,
+    errorCode: null,
+    message: processVerified ? "Gerçek Ansys Mechanical prosesi PyMechanical ile doğrulandı." : "Henüz test edilmedi.",
+  });
+  await page.route("http://127.0.0.1:8765/bridge/v1/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/health/live")) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          service: "msku-ansys-local-bridge",
+          version: "0.3.0",
+          scope: "localhost_only",
+          tokenConfigured: true,
+        }),
+      });
+      return;
+    }
+    expect(route.request().headers()["x-msku-bridge-token"]).toBe(token);
+    if (path.endsWith("/connection/test")) {
+      expect(route.request().method()).toBe("POST");
+      processVerified = true;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(connection()) });
+      return;
+    }
+    if (path.endsWith("/connection/launch")) {
+      expect(route.request().method()).toBe("POST");
+      processVerified = true;
+      startedByBridge = true;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(connection()) });
+      return;
+    }
+    if (path.endsWith("/analyses/static-structural") && route.request().method() === "POST") {
+      analysisStarted = true;
+      expect(route.request().postDataJSON()).toMatchObject({
+        material: "Structural Steel",
+        fixedNamedSelection: "NS_Fixed",
+        forceNamedSelection: "NS_Force",
+        forceN: 1000,
+      });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        jobId: "11111111-1111-4111-8111-111111111111",
+        state: "QUEUED", stage: "queued", message: "İş kuyruğa alındı",
+        startedAt: "2026-10-21T10:00:00Z", completedAt: null, errorCode: null, result: null,
+      }) });
+      return;
+    }
+    if (path.includes("/analyses/static-structural/") && analysisStarted) {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        jobId: "11111111-1111-4111-8111-111111111111",
+        state: "SUCCEEDED", stage: "done", message: "Mechanical çözümü tamamlandı",
+        startedAt: "2026-10-21T10:00:00Z", completedAt: "2026-10-21T10:00:10Z", errorCode: null,
+        result: {
+          solverStatus: "Done", maximumVonMisesStressPa: 1250,
+          maximumTotalDeformationM: 0.0002, meshNodes: 500, meshElements: 200,
+          geometrySha256: "a".repeat(64), material: "Structural Steel",
+          fixedNamedSelection: "NS_Fixed", forceNamedSelection: "NS_Force",
+          forceAxis: "X", forceN: 1000, meshSizeMm: 25,
+          mechanicalVersion: "261", productInfo: "Ansys Mechanical",
+          units: "SI", validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY", warnings: ["MAPDL 3 uyarı bildirdi.", "MAPDL: eleman şekil denetimi kapalı; mesh kalitesi henüz doğrulanmadı.", "MAPDL: azaltılmış integrasyonlu brick elemanlar PCG ile kullanıldı; kalınlık boyunca mesh ve yakınsama henüz doğrulanmadı."],
+        },
+      }) });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "ready",
+        service: "msku-ansys-local-bridge",
+        version: "0.3.0",
+        transport: "localhost_token_wnua",
+        adapter: {
+          adapter: "pymechanical",
+          state: "READY_FOR_CONNECTION_TEST",
+          ansysConnected: processVerified,
+          simulationsEnabled: false,
+          capabilities: ["windows_installation_detection", "existing_process_connection_test"],
+          message: "Kurulum bulundu; gerçek proses bağlantısı kullanıcı isteğiyle test edilebilir.",
+          installation: {
+            platform: "Windows",
+            state: "FOUND",
+            selected: {
+              versionCode: 261,
+              release: "2026 R1",
+              productKind: "student",
+              executablePath: "C:/Program Files/ANSYS Inc/ANSYS Student/v261/aisol/bin/winx64/AnsysWBU.exe",
+              source: "AWP_ROOT261",
+            },
+            installations: [],
+            warnings: [],
+          },
+          compatibility: {
+            state: "COMPATIBLE",
+            pymechanicalVersion: "0.13.4",
+            pythonVersion: "3.12",
+            minimumMechanicalVersionCode: 242,
+            message: "Uyumlu.",
+          },
+          connection: connection(),
+        },
+        warnings: ["STATIC_STRUCTURAL_REQUIRES_EXPLICIT_LOCAL_ACTION"],
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "ANSYS YEREL" }).click();
+  const panel = page.getByRole("region", { name: "ANSYS yerel bağlantı durumu" });
+  await expect(panel.getByRole("status")).toContainText("token gerekli");
+  await page.getByPlaceholder("Bridge konsolundaki token").fill(token);
+  await page.getByRole("button", { name: "Durumu yenile" }).click();
+
+  await expect(panel.getByRole("status")).toContainText("köprü hazır");
+  await expect(page.getByText("2026 R1 · Student")).toBeVisible();
+  await expect(page.getByText("0.13.4 · Uyumlu")).toBeVisible();
+  await expect(page.getByText("Test edilmedi")).toBeVisible();
+  await page.getByRole("button", { name: "Mechanical'ı başlat" }).click();
+  await expect(panel.getByRole("status")).toContainText("proses doğrulandı");
+  await expect(page.getByText("Gerçek proses doğrulandı").first()).toBeVisible();
+  await expect(page.getByText("Aktif ve yazılabilir")).toBeVisible();
+  await expect(page.getByText("Açık yoldan yerel bridge")).toBeVisible();
+  await expect(page.getByText("Yalnızca açık kullanıcı eylemiyle")).toBeVisible();
+  const analysis = page.getByRole("region", { name: "Static Structural analizi" });
+  await analysis.getByLabel("CAD yolu (.agdb, .pmdb, .step, .stp)").fill("C:\\CAD\\small.agdb");
+  await analysis.getByLabel("Sabit mesnet seçimi").fill("NS_Fixed");
+  await analysis.getByLabel("Kuvvet yüzeyi seçimi").fill("NS_Force");
+  await analysis.getByLabel("Kuvvet ekseni").selectOption("X");
+  await analysis.getByLabel("Kuvvet (N)").fill("1000");
+  await analysis.getByRole("button", { name: "Analizi açıkça başlat" }).click();
+  // The UI polls explicit jobs every 2 s; allow slower CI/browser startup.
+  await expect(analysis).toContainText("Mechanical çözümü tamamlandı", { timeout: 15_000 });
+  await expect(analysis).toContainText("0.0012500 MPa");
+  await expect(analysis).toContainText("fiziksel olarak doğrulanmamıştır.");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("MAPDL 3 uyarı bildirdi.");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("şekil denetimi kapalı");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("azaltılmış integrasyonlu");
+});
+
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("img", { name: "MSKU Racing logosu" })).toBeVisible();

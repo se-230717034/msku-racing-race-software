@@ -1,0 +1,26 @@
+[project]
+name = "msku-ansys-bridge"
+version = "0.3.0"
+description = "Local-only ANSYS integration bridge for MSKU Racing Dynamics Studio"
+requires-python = ">=3.12"
+dependencies = [
+  "ansys-mechanical-core>=0.13,<0.14",
+  "fastapi>=0.115,<1",
+  "pydantic>=2.9,<3",
+  "uvicorn[standard]>=0.32,<1",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "mypy>=1.13,<2",
+  "pytest>=8.3,<9",
+  "ruff>=0.8,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/msku_ansys_bridge"]

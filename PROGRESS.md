@@ -1,6 +1,75 @@
 # Implementation progress
 
-Updated: 2026-10-17
+Updated: 2026-10-21
+
+## ANSYS local integration — Phase 3 Static Structural
+
+- [x] Real Chromium frontend → tokened localhost bridge → Student 2026 R1 Mechanical → frontend test with a pinned CAD sample, real `Done` values, SI-to-MPa/mm display, visible physical-unvalidation/MAPDL warnings, and missing-CAD error handling
+- [x] Three remaining MAPDL warnings classified against this run's generated `ds.dat`, `file0.err`, and ANSYS documentation; see `docs/ANSYS_PHASE_3_WARNING_AND_UI_VERIFICATION_2026-10-21.md`
+- [x] Post-check gates: 183 Python tests, Ruff, mypy, ESLint, TypeScript, 58 Vitest tests, production build, 13 regular Chromium flows, and an opt-in real-ANSYS Chromium flow passed
+- [x] Merge-review audit: browser warnings name both high-risk MAPDL conditions; explicit bridge-owned launch; no tracked CAD/solver binaries, private keys, credentials, or personal profile paths
+- [ ] For real-car engineering approval: mesh shape/thickness inspection, convergence, independent benchmark, and measured material/load/CAD correlation
+
+- [x] New `codex/ansys-local-bridge-phase-3` branch based on validated Phase 2
+- [x] Authenticated, localhost-only, explicit Static Structural job start and status polling; no automatic solve or mock fallback
+- [x] Local AGDB/PMDB/STEP import, Structural Steel assignment, distinct named-selection fixed support and component force, mesh generation and Student-size precheck
+- [x] Real Mechanical solve with `Done` gate, SI-unit/finite-result validation, maximum von Mises stress and total deformation, input/CAD hash provenance
+- [x] Turkish analysis inputs, staged progress, results and sanitized failure messages; externally connected user sessions are never cleared
+- [x] Historical v261 smoke solve and protected HTTP path on official 17 KB AGDB sample reported `Done`; a new 2026-10-21 direct smoke now reproduces `Done` after the ASCII project-path fix
+- [x] Investigated current `SolveRequired`: default four-core solve exceeded the included two-core HPC entitlement; foreground solve now verifies a two-core setting and classifies local solver-log failures without returning invented results
+- [x] Added configurable PyMechanical `start_license`; `auto` now delegates to ANSYS's actual product selection because the historical `aa_t_i` keyword produced a read-only v261 session; no checkout bypass or fallback
+- [x] Removed IronPython `str(WorkingDir)` from the failed-solve log path and captured Unicode working directory before solve; added Unicode-path and product-selection regressions
+- [x] Isolated current `SolveRequiredPartialResultsAvailable` to the Unicode project/solver path on this installation: same CAD, mesh, loads, product and two cores returned `Done` after documented `Project.SaveAs` to an ASCII path in both standalone and Workbench
+- [x] Default local project path uses the per-user Windows short ASCII TEMP alias; an explicit local ASCII directory may be configured. Failed path confirmation stops before solve.
+- [x] New real standalone smoke: `ReadOnlyMode=False`, Academic Student MAPDL checkout, `Done`, 4,464 nodes/840 Mechanical elements, nonempty `.rst`, zero MAPDL errors, finite `253.53193716800135 Pa` maximum von Mises stress and `7.250757351476696e-9 m` maximum total deformation
+- [x] Protected localhost bridge launch/job/poll also returned real `SUCCEEDED/done` with the same Mechanical values; a strict local Workbench journal confirmed `Done`, finite SI values and `.rst`/MAPDL completion on an ASCII project path
+- [x] Post-fix quality gates: 182 Python tests, Ruff, mypy, 57 Vitest tests, ESLint, TypeScript, production build, and 13 Chromium flows
+- [x] Follow-up quality gates: 176 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
+- [x] Compared the three unchanged MAPDL warnings in the failed Unicode-path and successful ASCII-path runs; they are not the Mechanical partial-status trigger, but still require mesh/material review for engineering use
+- [x] Quality gates after smoke diagnosis: 161 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
+- [ ] Physical correlation, mesh-convergence study, general material library, arbitrary STEP face selection, persisted Mechanical project and cancellation are outside this initial workflow
+- [ ] A successful Academic Student checkout and example solve do not validate entitlement for other ANSYS products, model sizes, or real-car use
+
+## ANSYS Student 2026 R1 startup compatibility
+
+- [x] Verified the installed Mechanical shortcut target and Windows executable description; distinguished `AnsysWBU.exe` from Workbench `RunWB2.exe`
+- [x] Isolated missing versioned `AWP_ROOT261` in the Mechanical child environment as the Student nested-path startup failure
+- [x] Added validated explicit executable configuration and user-triggered PyMechanical `launch_mechanical(exec_file=..., additional_envs=...)` with loopback WNUA
+- [x] Required real connection, product, version, and writable license-mode evidence before `VERIFIED`; preserve `simulationsEnabled=false`
+- [x] Retain bridge-owned Mechanical client until bridge shutdown; close only the owned process
+- [x] Verified actual v261 Mechanical process through direct PyMechanical launch and protected bridge endpoint; product responses were `Ansys Mechanical Enterprise PrepPost` and `Ansys Mechanical Enterprise`, with `ReadOnlyMode=False`
+- [x] Checked that the gRPC listener remains alive after the launch response and closes when the bridge shuts down; status revokes stale verification when the listener disappears
+- [x] Quality gates: 147 Python tests, 55 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] License edition and academic entitlement correlation — active product text does not prove the free Student license
+
+## ANSYS local integration — Phase 2
+
+- [x] Read-only Windows discovery through `AWP_ROOT###` and standard Ansys Student/Ansys install roots
+- [x] Executable-presence validation, revision decoding, Student classification, duplicate suppression, and deterministic selection
+- [x] PyMechanical 0.13.x integration with documented Python 3.12–3.14 and Mechanical v242+ compatibility gate
+- [x] Real adapter that connects only to an already-running `127.0.0.1` Mechanical gRPC process using WNUA
+- [x] Explicit process verification, Ansys Mechanical product identity, and locally detected process-version match before success
+- [x] Closed-port, compatibility, authentication, license, product, and version failures remain non-success states with sanitized messages
+- [x] Turkish panel for installation, PyMechanical compatibility, loopback target, and last verified connection result
+- [x] Phase 1 token, origin, loopback socket, PNA, session-storage, and Vercel exclusion controls preserved
+- [x] At Phase 2 completion, structural/model/mesh/solve/result endpoints were absent; Phase 3 added one explicit job endpoint while legacy automatic `simulationsEnabled` remains false
+- [x] Quality gates: 138 Python tests, 54 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [ ] Real-machine correlation with a licensed Ansys Student/Academic Mechanical process — unavailable in CI
+- [x] Structural simulation workflow — subsequently introduced as the scoped Phase 3 workflow above
+
+## ANSYS local integration — Phase 1
+
+- [x] Separate `msku-ansys-bridge` FastAPI package with no dependency on or mutation of the engineering solvers
+- [x] Supported launcher bound only to `127.0.0.1:8765` with a cryptographically random per-process token
+- [x] Loopback socket enforcement, trusted-host checks, exact-origin CORS, Private Network Access preflight, and token-protected status
+- [x] Minimal liveness endpoint and explicit mock adapter status endpoint
+- [x] Mock adapter reports real ANSYS disconnected and simulations disabled; no solve/job endpoint exists
+- [x] Turkish frontend status panel with session-only token storage and strict loopback URL validation
+- [x] Local bridge excluded from the Vercel Python function bundle and absent from the Vercel API entry point
+- [x] Regression tests for authentication, origin/socket rejection, mock contract, and browser client state handling
+- [x] Quality gates: 126 Python tests, 52 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript, and production build
+- [x] Phase 2 real ANSYS installation discovery and adapter — implemented in the section above
+- [ ] ANSYS job execution, result import, and engineering correlation — intentionally not implemented
 
 ## Four-corner GLB visual assembly
 

@@ -1,9 +1,9 @@
 [tool.uv.workspace]
-members = ["packages/engineering", "services/api"]
+members = ["packages/engineering", "services/api", "services/ansys_bridge"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
-testpaths = ["packages/engineering/tests", "services/api/tests"]
+testpaths = ["packages/engineering/tests", "services/api/tests", "services/ansys_bridge/tests"]
 
 [tool.ruff]
 line-length = 100
