@@ -58,7 +58,7 @@ failed with `ANSYS_STRUCTURAL_PRODUCT_UNAVAILABLE`. It did **not** return
 `Done`, maximum von Mises stress or deformation. The independent diagnostic
 with the same two-core foreground setting showed `SolveRequired` and the
 `SOLID186` product/entitlement error. Thus the HPC request was corrected, but
-Phase 3 is still blocked by the local solver license/product selection.
+At that point, Phase 3 remained blocked by local solver license/product selection.
 The protected bridge smoke on an isolated local gRPC port also reached `solving`
 and ended `FAILED` with `ANSYS_STRUCTURAL_PRODUCT_UNAVAILABLE`; it returned no
 numeric result. The default port was occupied during its first attempt, so
@@ -75,8 +75,9 @@ licensing interface, that this Student installation has a structural solver
 entitlement suitable for the generated `SOLID186` model and that the correct
 product is selected. We have not changed that selection. Once legitimately
 configured, rerun the opt-in real smoke test and require `Done` plus valid SI
-results before marking Phase 3 functional on this machine. Do not merge or
-deploy a claim of successful structural solving based on the current run.
+results before marking Phase 3 functional on this machine. That failed run
+alone did not justify merging or deploying a successful-solve claim; see the
+later root-cause and real-browser verification reports for current evidence.
 
 ## Follow-up: explicit `start_license` request on 2026-10-21
 

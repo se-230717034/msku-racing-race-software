@@ -179,7 +179,7 @@ def test_solver_log_is_classified_without_leaking_raw_details(
 
 
 def test_unicode_working_dir_fails_before_solve(tmp_path: Path) -> None:
-    working_dir = tmp_path / "Yaşar" / "Mechanical"
+    working_dir = tmp_path / "Ünicode" / "Mechanical"
     working_dir.mkdir(parents=True)
     (working_dir / "file0.err").write_text(
         "The element option SOLID186 was not ordered or the appropriate product "
@@ -237,6 +237,21 @@ def test_solver_warning_count_is_sanitized(tmp_path: Path) -> None:
     assert len(warnings) == 1
     assert "3 uyarı" in warnings[0]
     assert "license-server-secret" not in warnings[0]
+
+
+def test_solver_high_risk_warnings_are_visible_but_raw_log_is_not(tmp_path: Path) -> None:
+    (tmp_path / "solve.out").write_text("NUMBER OF WARNING MESSAGES ENCOUNTERED= 3\n")
+    (tmp_path / "file0.err").write_text(
+        "C:\\private\\CAD\\secret.agdb\n"
+        "Element shape checking is currently inactive. Issue SHPP,ON.\n"
+        "It has been detected that you are using reduced integration brick\n"
+        "elements along with the PCG solver (EQSLV,PCG).\n"
+    )
+    warnings = _solver_warning_summary(tmp_path)
+    assert len(warnings) == 3
+    assert "şekil denetimi kapalı" in warnings[1]
+    assert "azaltılmış integrasyonlu" in warnings[2]
+    assert all("secret.agdb" not in warning for warning in warnings)
 
 
 def test_student_mesh_precheck_stops_before_solve(tmp_path: Path) -> None:

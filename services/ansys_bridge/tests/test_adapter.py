@@ -320,6 +320,7 @@ def test_pymechanical_launcher_passes_explicit_path_and_awp_root(monkeypatch: An
             "ip": "127.0.0.1",
             "port": 10000,
             "batch": True,
+            "start_instance": True,
             "start_timeout": 180,
             "cleanup_on_exit": True,
             "keep_connection_alive": True,

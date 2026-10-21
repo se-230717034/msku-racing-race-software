@@ -203,7 +203,8 @@ def _solver_failure(working_dir: Path | None, solver_status: str) -> AnalysisErr
 
 
 def _solver_warning_summary(working_dir: Path) -> list[str]:
-    """Surface the MAPDL warning count without exposing raw local solver logs."""
+    """Surface known engineering risks without exposing raw local solver logs."""
+    warnings: list[str] = []
     try:
         with (working_dir / "solve.out").open("rb") as source:
             source.seek(0, os.SEEK_END)
@@ -211,13 +212,27 @@ def _solver_warning_summary(working_dir: Path) -> list[str]:
             tail = source.read().decode("utf-8", errors="replace")
         match = re.search(r"NUMBER OF WARNING MESSAGES ENCOUNTERED\s*=\s*(\d+)", tail)
         if match and int(match.group(1)) > 0:
-            return [
+            warnings.append(
                 f"MAPDL {int(match.group(1))} uyarı bildirdi; yerel solve.out/file0.err "
                 "dosyalarını mühendislik kullanımından önce inceleyin."
-            ]
+            )
     except OSError:
         pass
-    return []
+    try:
+        with (working_dir / "file0.err").open("r", errors="replace") as source:
+            error_log = source.read(262_144).casefold()
+        if "element shape checking is currently inactive" in error_log:
+            warnings.append(
+                "MAPDL: eleman şekil denetimi kapalı; mesh kalitesi henüz doğrulanmadı."
+            )
+        if "reduced integration brick" in error_log and "pcg solver" in error_log:
+            warnings.append(
+                "MAPDL: azaltılmış integrasyonlu brick elemanlar PCG ile kullanıldı; "
+                "kalınlık boyunca mesh ve yakınsama henüz doğrulanmadı."
+            )
+    except OSError:
+        pass
+    return warnings
 
 
 def _ascii_project_path() -> str:

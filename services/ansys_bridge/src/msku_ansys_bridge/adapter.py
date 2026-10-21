@@ -158,6 +158,7 @@ class PyMechanicalLauncher:
             ip=host,
             port=port,
             batch=True,
+            start_instance=True,
             start_timeout=timeout_seconds,
             cleanup_on_exit=True,
             keep_connection_alive=True,

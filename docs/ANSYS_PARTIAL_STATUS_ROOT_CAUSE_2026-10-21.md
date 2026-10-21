@@ -16,11 +16,11 @@ model includes 1,113 elements when contact/surface elements are counted.
 
 | Run | Project/solver path | Mechanical message and final `Solution.Status` | MAPDL and postprocessing |
 | --- | --- | --- | --- |
-| Standalone PyMechanical, before fix | Unicode `C:\Users\Yaşar\...\AnsysMech...` | Error: “An unknown error occurred during solution”; `SolveRequiredPartialResultsAvailable`, still partial after `EvaluateAllResults()` | Load step completed; 0 errors, 3 warnings; `.rst` generated; Mechanical could read finite stress and deformation but bridge correctly rejected them |
+| Standalone PyMechanical, before fix | Unicode Windows user-profile project path | Error: “An unknown error occurred during solution”; `SolveRequiredPartialResultsAvailable`, still partial after `EvaluateAllResults()` | Load step completed; 0 errors, 3 warnings; `.rst` generated; Mechanical could read finite stress and deformation but bridge correctly rejected them |
 | Workbench `RunWB2 -B -R`, before fix | Unicode workspace project | Same partial status; `EvaluateAllResults()` did not repair it | Load step completed; 0 errors, 3 warnings; 1,441,792-byte `.rst`; finite diagnostic values, rejected |
-| Standalone, controlled ASCII `Project.SaveAs` | `C:\dev\msku_ansys_ascii_temp\...` | `Done` | Same values, 0 errors, 3 warnings |
-| Standalone, per-user Windows short path | `C:\Users\YAAR~1\AppData\Local\Temp\...` | `Done` | Same values, 0 errors, 3 warnings |
-| Workbench, controlled ASCII project | `C:\dev\msku_ansys_ascii_temp\wb_same_model_20261021\...` | `Done`; no Mechanical error message (only a color-theme information message) | 1,441,792-byte `.rst`; `RUN COMPLETED`; 0 errors, 3 warnings; finite values |
+| Standalone, controlled ASCII `Project.SaveAs` | Local ASCII-only project directory | `Done` | Same values, 0 errors, 3 warnings |
+| Standalone, per-user Windows short path | ASCII 8.3 alias of the per-user TEMP directory | `Done` | Same values, 0 errors, 3 warnings |
+| Workbench, controlled ASCII project | Local ASCII-only Workbench project directory | `Done`; no Mechanical error message (only a color-theme information message) | 1,441,792-byte `.rst`; `RUN COMPLETED`; 0 errors, 3 warnings; finite values |
 
 In the successful ASCII Workbench run, `solve.out` records completed load step
 1/substep 1 and two distributed cores; `file.rst` is nonempty and the Mechanical

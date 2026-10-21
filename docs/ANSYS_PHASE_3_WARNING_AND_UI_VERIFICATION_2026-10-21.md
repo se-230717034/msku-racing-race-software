@@ -44,7 +44,7 @@ The bridge performed a real solve and the browser polled the completed job.
 | Solver/status | Mechanical `Done`; `solve.out` `RUN COMPLETED`, zero errors, three warnings; nonempty `file.rst`. |
 | Maximum von Mises | `253.53193716800135 Pa` from Mechanical; the browser displayed the same response after conversion to **MPa**. |
 | Maximum total deformation | `7.250757351476696e-9 m` from Mechanical; the browser displayed the same response after conversion to **mm**. |
-| Provenance and warnings | Response `units=SI`, pinned CAD hash, `NUMERIC_RESULT_UNVALIDATED_PHYSICALLY`; browser displayed the physical-unvalidation statement and every returned warning, including the MAPDL count. |
+| Provenance and warnings | Response `units=SI`, pinned CAD hash, `NUMERIC_RESULT_UNVALIDATED_PHYSICALLY`; browser displayed the physical-unvalidation statement, MAPDL count, and explicit shape-checking and reduced-integration/PCG risks. |
 | Invalid input | Missing CAD returned a visible error; no stress/deformation card appeared for that request. |
 
 The browser test compares its displayed values to the **actual** bridge job
@@ -52,6 +52,13 @@ response, rather than to fabricated fixtures. The test does not independently
 benchmark stress or deformation physics. The numerical values are not proof of
 material-property correctness, realistic boundary conditions, mesh
 independence, or agreement with measurements.
+
+Before the merge review, the bridge warning summary was extended to name the
+shape-checking and reduced-integration/PCG risks when those exact phrases occur
+in the local `file0.err`. Only fixed, sanitized messages cross the HTTP
+boundary; raw logs and local CAD paths remain local. The opt-in browser test
+asserts that both risk statements and the physical-unvalidation notice are
+visible. This does not resolve either warning.
 
 ## Remaining gate before engineering approval
 
@@ -64,9 +71,35 @@ The software feature may be mergeable after its automated gates pass; that is
 
 ## Software quality gates
 
-The real licensed Chromium flow passed once (one actual ANSYS solve). The
+The real licensed Chromium flow passed again after the merge-review changes
+(one additional actual ANSYS solve). The
 regular Chromium suite passed 13 tests and intentionally skipped that opt-in
-licensed case. The full Python suite passed 182 tests; Ruff and mypy passed.
+licensed case. The full Python suite passed 183 tests; Ruff and mypy passed.
 Frontend lint, TypeScript, 58 unit tests, and the production build passed. The build
 retained a large-chunk advisory, and Python tests retained one upstream
 Starlette `httpx` deprecation warning. Neither changed the solver result.
+
+## Merge-preparation security and repository review
+
+The full feature diff against `main` was reviewed. The local bridge binds to
+loopback, requires an exact allowed browser origin and a session token for all
+non-live endpoints, uses Windows Named User Authentication, and never runs as
+a Vercel function. Structural jobs require a newly bridge-owned process;
+`start_instance=True` now explicitly prevents PyMechanical from adopting an
+existing user session. Solver exceptions are sanitized before HTTP responses.
+There is no arbitrary Python-script API or mock fallback for real jobs.
+
+No token, private key, license-server detail, solver result binary, CAD file,
+or generated test/build artifact is tracked in the feature diff. Personal
+user-profile paths were removed from historical reports; the remaining ANSYS
+installation path is a documented generic layout. The source's fixed tokens
+are isolated test fixtures, not operational credentials. Generated Mechanical
+projects remain local and require disk/access management by the engineer.
+
+Student compliance is conditional on the user's actual entitlement and usage.
+The bridge uses documented PyMechanical launch parameters, delegates automatic
+product selection to ANSYS, checks for a writable real process and an actual
+completed solve, caps the requested solve at two cores, and rejects oversized
+pre-solve meshes at 128K nodes/elements. The solver can add elements and remains
+the final licensing authority. Neither a successful checkout nor this software
+review certifies the team's legal rights or a physically validated model.

@@ -6,7 +6,8 @@ Updated: 2026-10-21
 
 - [x] Real Chromium frontend → tokened localhost bridge → Student 2026 R1 Mechanical → frontend test with a pinned CAD sample, real `Done` values, SI-to-MPa/mm display, visible physical-unvalidation/MAPDL warnings, and missing-CAD error handling
 - [x] Three remaining MAPDL warnings classified against this run's generated `ds.dat`, `file0.err`, and ANSYS documentation; see `docs/ANSYS_PHASE_3_WARNING_AND_UI_VERIFICATION_2026-10-21.md`
-- [x] Post-check gates: 182 Python tests, Ruff, mypy, ESLint, TypeScript, 58 Vitest tests, production build, 13 regular Chromium flows, and one opt-in real-ANSYS Chromium flow passed
+- [x] Post-check gates: 183 Python tests, Ruff, mypy, ESLint, TypeScript, 58 Vitest tests, production build, 13 regular Chromium flows, and an opt-in real-ANSYS Chromium flow passed
+- [x] Merge-review audit: browser warnings name both high-risk MAPDL conditions; explicit bridge-owned launch; no tracked CAD/solver binaries, private keys, credentials, or personal profile paths
 - [ ] For real-car engineering approval: mesh shape/thickness inspection, convergence, independent benchmark, and measured material/load/CAD correlation
 
 - [x] New `codex/ansys-local-bridge-phase-3` branch based on validated Phase 2

@@ -70,6 +70,8 @@ test("real browser → local bridge → Mechanical → browser, with failure and
   await expect(analysis).toContainText(`${(result!.maximumTotalDeformationM * 1e3).toPrecision(5)} mm`);
   await expect(analysis).toContainText("fiziksel olarak doğrulanmamıştır");
   await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("mesh yakınsaması değildir");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("şekil denetimi kapalı");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("azaltılmış integrasyonlu");
   for (const warning of result!.warnings) {
     await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText(warning);
   }

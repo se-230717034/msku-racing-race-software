@@ -63,7 +63,7 @@ and never run in CI or in the browser automatically.
 **Current local status (2026-10-21):** A controlled comparison established that
 both standalone and Workbench acquired an Academic Student structural checkout
 and completed MAPDL, yet Mechanical returned `SolveRequiredPartialResultsAvailable`
-when the project/solver path contained `Yaşar`. Saving the same model to a short
+when the project/solver path contained non-ASCII user-profile characters. Saving the same model to a short
 ASCII path made both report `Done`. The updated standalone smoke returned 4,464
 nodes, 840 Mechanical elements, maximum von Mises stress
 `253.53193716800135 [Pa]`, total deformation `7.2507573514766963E-09 [m]`,

@@ -76,7 +76,7 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
           fixedNamedSelection: "NS_Fixed", forceNamedSelection: "NS_Force",
           forceAxis: "X", forceN: 1000, meshSizeMm: 25,
           mechanicalVersion: "261", productInfo: "Ansys Mechanical",
-          units: "SI", validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY", warnings: ["MAPDL 3 uyarı bildirdi."],
+          units: "SI", validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY", warnings: ["MAPDL 3 uyarı bildirdi.", "MAPDL: eleman şekil denetimi kapalı; mesh kalitesi henüz doğrulanmadı.", "MAPDL: azaltılmış integrasyonlu brick elemanlar PCG ile kullanıldı; kalınlık boyunca mesh ve yakınsama henüz doğrulanmadı."],
         },
       }) });
       return;
@@ -151,6 +151,8 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
   await expect(analysis).toContainText("0.0012500 MPa");
   await expect(analysis).toContainText("fiziksel olarak doğrulanmamıştır.");
   await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("MAPDL 3 uyarı bildirdi.");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("şekil denetimi kapalı");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("azaltılmış integrasyonlu");
 });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {
