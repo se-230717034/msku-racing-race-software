@@ -103,6 +103,8 @@ npm run ansys-bridge:dev
 
 The command binds only to `http://127.0.0.1:8765` and prints a random session token. Enter it in the **ANSYS YEREL** header panel. Click **Mechanical'ı başlat** to launch a verified local executable, then provide a local CAD path and named selections and click **Analizi açıkça başlat**. Student installations under `ANSYS Student\v###` receive the matching `AWP_ROOT###` only in the child process. The workflow is local and opt-in; see [the Phase 3 guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md).
 
+The local bridge's `MSKU_ANSYS_START_LICENSE=auto` requests the Academic Student product keyword only for Student v261+ through PyMechanical's documented `start_license` API; `none` leaves selection to ANSYS. ANSYS still decides whether checkout succeeds. On the current machine, the real smoke test reported an empty product and read-only Mechanical, so **no current solve result is available**; see [the diagnosis](./docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md).
+
 Open `http://localhost:5173`. The API is served at `http://localhost:8000` and its OpenAPI UI at `http://localhost:8000/docs`.
 
 The kinematics endpoint is `POST /api/v1/kinematics/sweep`. Phase 3 endpoints are under `POST /api/v1/quasi-static/*`. Dynamics endpoints are `POST /api/v1/dynamics/quarter-car/simulate`, `POST /api/v1/dynamics/full-car/simulate`, and `POST /api/v1/dynamics/bicycle/simulate`. Optimization uses `POST /api/v1/optimization/run`. Inputs and outputs use SI units; the interface applies explicitly labeled display conversions. Playwright starts both web and API test servers automatically.

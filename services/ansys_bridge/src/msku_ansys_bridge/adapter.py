@@ -99,6 +99,7 @@ class MechanicalLauncher(Protocol):
         host: str,
         port: int,
         timeout_seconds: int,
+        start_license: str,
     ) -> MechanicalClient: ...
 
 
@@ -125,7 +126,7 @@ class PyMechanicalConnector:
 
 
 class PyMechanicalLauncher:
-    """Launch Mechanical from a verified local executable without changing licensing."""
+    """Request an authorized product through PyMechanical's documented -p switch."""
 
     def launch(
         self,
@@ -134,7 +135,22 @@ class PyMechanicalLauncher:
         host: str,
         port: int,
         timeout_seconds: int,
+        start_license: str = "auto",
     ) -> MechanicalClient:
+        if start_license == "auto":
+            license_keyword = (
+                "aa_t_i"
+                if installation.product_kind == "student" and installation.version_code >= 261
+                else None
+            )
+        elif start_license == "none":
+            license_keyword = None
+        elif start_license in {"aa_t_i", "ansys", "mech_1", "mech_2"}:
+            if installation.version_code < 261:
+                raise ValueError("Explicit Mechanical start_license requires 2026 R1 or later")
+            license_keyword = start_license
+        else:
+            raise ValueError("Unsupported Mechanical start_license keyword")
         core = importlib.import_module("ansys.mechanical.core")
         launch_mechanical = core.launch_mechanical
         return launch_mechanical(
@@ -147,6 +163,7 @@ class PyMechanicalLauncher:
             cleanup_on_exit=True,
             keep_connection_alive=True,
             transport_mode="wnua",
+            start_license=license_keyword,
         )
 
 
@@ -395,6 +412,16 @@ class LocalAnsysAdapter:
                 "Bağlanan proses doğrulanmış Ansys Mechanical ürün bilgisi döndürmedi.",
                 started_by_bridge=started_by_bridge,
             )
+        if started_by_bridge and (
+            "preppost" in product_info.casefold()
+            or "ansys mechanical []" in product_info.casefold()
+        ):
+            return self._failure(
+                "LICENSE_ERROR",
+                "MECHANICAL_STRUCTURAL_LICENSE_NOT_CHECKED_OUT",
+                "Mechanical PrepPost veya boş ürün bildirdi; yapısal çözücü lisansı doğrulanmadı.",
+                started_by_bridge=True,
+            )
         if not mechanical_version:
             return self._failure(
                 "VERIFICATION_FAILED",
@@ -551,6 +578,7 @@ class LocalAnsysAdapter:
                     host="127.0.0.1",
                     port=self._settings.mechanical_port,
                     timeout_seconds=self._settings.launch_timeout_seconds,
+                    start_license=self._settings.start_license,
                 )
             except Exception as exc:
                 return self._exception_failure(exc, launching=True)

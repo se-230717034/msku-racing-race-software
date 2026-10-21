@@ -146,7 +146,8 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
   await analysis.getByLabel("Kuvvet ekseni").selectOption("X");
   await analysis.getByLabel("Kuvvet (N)").fill("1000");
   await analysis.getByRole("button", { name: "Analizi açıkça başlat" }).click();
-  await expect(analysis).toContainText("Mechanical çözümü tamamlandı");
+  // The UI polls explicit jobs every 2 s; allow slower CI/browser startup.
+  await expect(analysis).toContainText("Mechanical çözümü tamamlandı", { timeout: 15_000 });
   await expect(analysis).toContainText("0.0012500 MPa");
 });
 

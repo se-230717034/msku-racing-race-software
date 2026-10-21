@@ -24,6 +24,9 @@ class BridgeSettings:
     connection_timeout_seconds: int = 8
     launch_timeout_seconds: int = 180
     mechanical_executable: Path | None = None
+    # "auto" requests the Academic Student product on Student 2026 R1+.
+    # "none" leaves product selection to Mechanical; no license is ever bypassed.
+    start_license: str = "auto"
 
     @property
     def token_configured(self) -> bool:
@@ -44,12 +47,17 @@ class BridgeSettings:
         timeout_seconds = int(os.getenv("MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS", "8"))
         launch_timeout_seconds = int(os.getenv("MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS", "180"))
         executable_value = os.getenv("MSKU_ANSYS_MECHANICAL_EXECUTABLE", "").strip()
+        start_license = os.getenv("MSKU_ANSYS_START_LICENSE", "auto").strip().lower()
         if not 1_024 <= mechanical_port <= 65_535:
             raise ValueError("MSKU_ANSYS_MECHANICAL_PORT must be between 1024 and 65535.")
         if not 1 <= timeout_seconds <= 30:
             raise ValueError("MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS must be between 1 and 30.")
         if not 30 <= launch_timeout_seconds <= 300:
             raise ValueError("MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS must be between 30 and 300.")
+        if start_license not in {"auto", "none", "aa_t_i", "ansys", "mech_1", "mech_2"}:
+            raise ValueError(
+                "MSKU_ANSYS_START_LICENSE must be auto, none, aa_t_i, ansys, mech_1, or mech_2."
+            )
         return cls(
             token=raw_token or None,
             allowed_origins=origins,
@@ -57,4 +65,5 @@ class BridgeSettings:
             connection_timeout_seconds=timeout_seconds,
             launch_timeout_seconds=launch_timeout_seconds,
             mechanical_executable=Path(executable_value) if executable_value else None,
+            start_license=start_license,
         )

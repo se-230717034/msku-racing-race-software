@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import msku_ansys_bridge.adapter as adapter_module
+import pytest
 from msku_ansys_bridge.adapter import LocalAnsysAdapter, PyMechanicalLauncher
 from msku_ansys_bridge.config import BridgeSettings
 from msku_ansys_bridge.discovery import (
@@ -72,13 +73,20 @@ class FakeLauncher:
         self.calls: list[dict[str, Any]] = []
 
     def launch(
-        self, *, installation: AnsysInstallation, host: str, port: int, timeout_seconds: int
+        self,
+        *,
+        installation: AnsysInstallation,
+        host: str,
+        port: int,
+        timeout_seconds: int,
+        start_license: str,
     ) -> FakeClient:
         self.calls.append({
             "installation": installation,
             "host": host,
             "port": port,
             "timeout_seconds": timeout_seconds,
+            "start_license": start_license,
         })
         if self.failure:
             raise self.failure
@@ -252,6 +260,7 @@ def test_launch_uses_detected_executable_and_versioned_awp_root() -> None:
             "host": "127.0.0.1",
             "port": 10000,
             "timeout_seconds": 180,
+            "start_license": "auto",
         }
     ]
     assert client.exit_calls == 0
@@ -315,5 +324,67 @@ def test_pymechanical_launcher_passes_explicit_path_and_awp_root(monkeypatch: An
             "cleanup_on_exit": True,
             "keep_connection_alive": True,
             "transport_mode": "wnua",
+            "start_license": "aa_t_i",
         }
     ]
+
+
+def test_explicit_license_is_forwarded_without_fallback(monkeypatch: Any) -> None:
+    installation = installation_discovery().selected
+    assert installation is not None
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        adapter_module.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(launch_mechanical=lambda **kwargs: calls.append(kwargs)),
+    )
+    PyMechanicalLauncher().launch(
+        installation=installation,
+        host="127.0.0.1",
+        port=10000,
+        timeout_seconds=180,
+        start_license="mech_2",
+    )
+    assert calls[0]["start_license"] == "mech_2"
+    assert calls[0]["additional_envs"] == {"AWP_ROOT261": str(installation.root)}
+
+
+def test_old_mechanical_rejects_explicit_start_license_before_launch() -> None:
+    installation = installation_discovery().selected
+    assert installation is not None
+    older = AnsysInstallation(
+        version_code=251,
+        release="2025 R1",
+        root=installation.root,
+        executable=installation.executable,
+        product_kind="student",
+        source="fixture",
+    )
+    with pytest.raises(ValueError, match="2026 R1"):
+        PyMechanicalLauncher().launch(
+            installation=older,
+            host="127.0.0.1",
+            port=10000,
+            timeout_seconds=180,
+            start_license="aa_t_i",
+        )
+
+
+@pytest.mark.parametrize(
+    "product_info",
+    [
+        "Ansys Mechanical Enterprise PrepPost\nProduct Version:261",
+        "Ansys Mechanical []\nProduct Version:261",
+    ],
+)
+def test_owned_nonstructural_product_is_not_accepted_as_structural_license(
+    product_info: str,
+) -> None:
+    instance, _, _ = adapter(
+        FakeClient(product_info=product_info),
+        port_open=False,
+    )
+    result = instance.launch_connection()
+    assert result.state == "LICENSE_ERROR"
+    assert result.error_code == "MECHANICAL_STRUCTURAL_LICENSE_NOT_CHECKED_OUT"
+    assert result.process_verified is False

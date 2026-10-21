@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import tempfile
 from pathlib import Path
 
@@ -12,6 +13,15 @@ EXPECTED_SHA256 = "49756ab321a4736c5ba94a318e5bf38363a032c8a9c210a817ce1910c1a20
 
 
 def official_example_cad() -> str:
+    configured = os.getenv("MSKU_ANSYS_SMOKE_CAD", "").strip()
+    if configured:
+        candidate = Path(configured)
+        if (
+            not candidate.is_file()
+            or hashlib.sha256(candidate.read_bytes()).hexdigest() != EXPECTED_SHA256
+        ):
+            raise RuntimeError("Configured smoke CAD is missing or differs from the pinned fixture")
+        return str(candidate)
     cached = Path(tempfile.gettempdir()) / "pymechanical" / "00_basic" / "example_01_geometry.agdb"
     if cached.is_file() and hashlib.sha256(cached.read_bytes()).hexdigest() == EXPECTED_SHA256:
         return str(cached)

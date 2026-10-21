@@ -12,13 +12,13 @@ The local `Mechanical 2026 R1.lnk` shortcut targets `C:\Program Files\ANSYS Inc\
 
 Discovery inspects `AWP_ROOT###`, `C:\Program Files\ANSYS Inc\ANSYS Student\v###`, `C:\Program Files\ANSYS Inc\v###`, and optional `MSKU_ANSYS_MECHANICAL_EXECUTABLE`. The explicit path must be absolute and local, with the `v###\aisol\bin\winx64\AnsysWBU.exe` layout; UNC paths and arbitrary executables are rejected. An explicit valid path takes selection priority. Discovery checks file presence and revision, not runtime or license entitlement.
 
-For this nested Student installation, `launch_mechanical(exec_file=...)` alone timed out before opening a gRPC port. Passing `AWP_ROOT261=C:\Program Files\ANSYS Inc\ANSYS Student\v261` to the child through PyMechanical's `additional_envs` started the same executable successfully. The bridge derives that variable from the verified installation revision and root. It neither changes license settings nor bypasses license checkout.
+For this nested Student installation, `launch_mechanical(exec_file=...)` alone timed out before opening a gRPC port. Passing `AWP_ROOT261=C:\Program Files\ANSYS Inc\ANSYS Student\v261` to the child through PyMechanical's `additional_envs` started the same executable successfully. The bridge derives that variable from the verified installation revision and root. It does not bypass license checkout.
 
 ## Compatibility and verification
 
 The bridge uses `ansys-mechanical-core` 0.13.x. Its compatibility gate follows the [PyMechanical installation guide](https://mechanical.docs.pyansys.com/version/stable/getting_started/installation.html): Python 3.12–3.14 and Mechanical v242 (2024 R2) or later. `COMPATIBLE` indicates a version match only.
 
-**Gerçek bağlantıyı test et** connects to an existing local gRPC process. **Mechanical'ı başlat** uses the selected executable and versioned `AWP_ROOT###` through `launch_mechanical`, in batch mode with WNUA. The launch action checks that the port is free first; it never replaces an existing listener. Startup can take time and consume an available license. The bridge retains its PyMechanical client during its lifetime and closes only the process it owns on shutdown.
+**Gerçek bağlantıyı test et** connects to an existing local gRPC process. **Mechanical'ı başlat** uses the selected executable and versioned `AWP_ROOT###` through `launch_mechanical`, in batch mode with WNUA. For a detected Student v261+ installation, `auto` requests the documented Academic Student product keyword `aa_t_i` through PyMechanical's [`start_license`](https://mechanical.docs.pyansys.com/version/stable/api/ansys/mechanical/core/mechanical/index.html) (`-p`). The [Ansys Academic product table](https://storage.ansys.com/corp/2016/February/images/academic_features.pdf) names `aa_t_i`; that historical table does not prove support in this specific 2026 R1 installation. There is no automatic fallback if ANSYS denies checkout. The launch action checks that the port is free first; it never replaces an existing listener. Startup can take time and consume an available license. The bridge retains its PyMechanical client during its lifetime and closes only the process it owns on shutdown.
 
 Both actions require these independent checks before returning `VERIFIED`:
 
@@ -49,6 +49,7 @@ Enter the printed token in the **ANSYS YEREL** panel. Then choose **Mechanical'�
 | `MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS` | `8` | `1`–`30` seconds |
 | `MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS` | `180` | `30`–`300` seconds |
 | `MSKU_ANSYS_MECHANICAL_EXECUTABLE` | Discovered path | Absolute local `v###\aisol\bin\winx64\AnsysWBU.exe` |
+| `MSKU_ANSYS_START_LICENSE` | `auto` | `auto` requests `aa_t_i` only on Student v261+; `none` delegates selection to ANSYS; explicit `aa_t_i`, `ansys`, `mech_1`, `mech_2` are accepted on v261+ but require real entitlement |
 
 Do not commit tokens or license-server details.
 
@@ -68,6 +69,6 @@ All but `/health/live` require the bridge token. All requests require a loopback
 
 ## Student and license limits
 
-The [Ansys Student page](https://www.ansys.com/academic/students/ansys-student) lists structural model, geometry export, HPC, and term limits. The exact entitlement can differ for a Student Team Partnership or institutional license; follow the applicable [academic usage terms](https://www.ansys.com/legal/terms-and-conditions/academic-usage). The bridge never selects a license tier, reads a license file, or bypasses licensing. `ReadOnlyMode=False` establishes a usable session, not the terms of that entitlement.
+The [Ansys Student page](https://www.ansys.com/academic/students/ansys-student) lists structural model, geometry export, HPC, and term limits. The exact entitlement can differ for a Student Team Partnership or institutional license; follow the applicable [academic usage terms](https://www.ansys.com/legal/terms-and-conditions/academic-usage). The bridge requests the configured product through ANSYS's standard checkout path, never reads or modifies a license file, and never bypasses licensing. `ReadOnlyMode=False` establishes a usable session, not structural solver entitlement or the terms of that entitlement. A bridge-owned PrepPost or empty-product report is rejected.
 
-CI uses strict fake clients because it has no Mechanical installation or license. The local real-process evidence above is separate from those automated tests. Structural simulation remains future work and needs its own input contract, result provenance, physical validation, and failure handling.
+CI uses strict fake clients because it has no Mechanical installation or license. The earlier real-process evidence above is historical; the 2026-10-21 `start_license` smoke attempts are documented in [the updated diagnosis](./ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md). Phase 3 provides an opt-in Static Structural workflow, but a current successful solve on this machine remains unverified.

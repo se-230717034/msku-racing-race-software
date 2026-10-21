@@ -73,3 +73,41 @@ product is selected. We have not changed that selection. Once legitimately
 configured, rerun the opt-in real smoke test and require `Done` plus valid SI
 results before marking Phase 3 functional on this machine. Do not merge or
 deploy a claim of successful structural solving based on the current run.
+
+## Follow-up: explicit `start_license` request on 2026-10-21
+
+PyMechanical 0.13.4 documents `launch_mechanical(start_license=...)`, which
+passes `-p <keyword>` to Mechanical. The local bridge now exposes
+`MSKU_ANSYS_START_LICENSE`. For a detected Student v261+ installation its
+`auto` setting requests `aa_t_i`, listed as Academic Student in an older
+[Ansys product table](https://storage.ansys.com/corp/2016/February/images/academic_features.pdf).
+The old table does not establish that the feature exists or can be checked out
+in this 2026 R1 installation. Explicit `ansys`/`mech_1`/`mech_2` and `none`
+are configurable; no rejected request silently falls back to another product.
+The conservative two-core foreground solver setting is unchanged.
+
+The first real run with `-p ansys` launched Mechanical v261 but returned
+`Ansys Mechanical []` and failed CAD import with `Cannot import while
+Mechanical is in read-only mode`. The local ANSYS licensing debug log records
+`DENIED ansys` with `Maximum licensed number of demo users already reached`.
+The second real run with `-p aa_t_i` also returned `Ansys Mechanical []` and
+`ReadOnlyMode=True`; the smoke script stopped before CAD import/mesh/solve.
+No `aa_t_i` checkout or denial was visible in the inspected MECH licensing
+log. Thus the **actual checked-out product was none**, and the **current solve
+status is not attempted** (not `Done` or `SolveRequired`). There are no current
+stress, deformation, or mesh result values. This is a licensing/startup
+limitation, not a physically validated analysis.
+
+The smoke CAD was the same official `example_01_geometry.agdb`, pinned by
+SHA-256. `MSKU_ANSYS_SMOKE_CAD` now permits that already-cached file to be
+referenced explicitly when a sandbox's temporary directory differs or GitHub
+is unreachable; its hash must still match. The first sandboxed launch failed
+with Windows `WinError 623` before ANSYS started. The two actual ANSYS runs
+used the normal local Windows process context. The current license outcome
+must be resolved through authorized ANSYS Student licensing/support before
+rerunning a solve. Neither result may be treated as a successful Phase 3 solve.
+
+Regression checks after this change: 176 Python tests, Ruff, mypy, 57 Vitest
+tests, ESLint, TypeScript, production Vite build, and 13 Chromium flows passed.
+The Unicode-path log regression is synthetic and verifies log classification;
+the current real run stopped before a solver working directory was created.

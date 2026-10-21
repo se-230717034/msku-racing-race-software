@@ -44,8 +44,15 @@ class VerifiedConnector:
         return VerifiedClient()
 
     def launch(
-        self, *, installation: AnsysInstallation, host: str, port: int, timeout_seconds: int
+        self,
+        *,
+        installation: AnsysInstallation,
+        host: str,
+        port: int,
+        timeout_seconds: int,
+        start_license: str,
     ) -> VerifiedClient:
+        assert start_license == "auto"
         return VerifiedClient()
 
 

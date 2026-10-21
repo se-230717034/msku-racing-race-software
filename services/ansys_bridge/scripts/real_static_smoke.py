@@ -20,8 +20,18 @@ def main() -> None:
         host="127.0.0.1",
         port=settings.mechanical_port,
         timeout_seconds=settings.launch_timeout_seconds,
+        start_license=settings.start_license,
     )
     try:
+        print("Mechanical product report: " + str(client.get_product_info()), flush=True)
+        read_only = str(
+            client.run_python_script(
+                "Ansys.ACT.Mechanical.MechanicalAPI.Instance.ReadOnlyMode"
+            )
+        ).strip().casefold()
+        print("Mechanical read-only: " + read_only, flush=True)
+        if read_only not in {"false", "0"}:
+            raise RuntimeError("Mechanical did not check out a writable license")
         request = StaticAnalysisRequest(
             geometryPath=sample,
             fixedNamedSelection="NS_Fixed",

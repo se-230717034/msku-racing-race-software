@@ -166,6 +166,25 @@ def test_solver_log_is_classified_without_leaking_raw_details(
     assert not any("EvaluateAllResults()" in call for call in client.calls)
 
 
+def test_unicode_working_dir_log_is_read_before_failed_solve(tmp_path: Path) -> None:
+    working_dir = tmp_path / "Yaşar" / "Mechanical"
+    working_dir.mkdir(parents=True)
+    (working_dir / "file0.err").write_text(
+        "The element option SOLID186 was not ordered or the appropriate product "
+        "was not selected for this session.",
+        encoding="utf-8",
+    )
+    client = FakeMechanical(solver_status="SolveRequired", working_dir=working_dir)
+    with pytest.raises(AnalysisError) as failure:
+        run_static_structural(client, request(tmp_path), lambda *_: None)
+    assert failure.value.code == "ANSYS_STRUCTURAL_PRODUCT_UNAVAILABLE"
+    assert "MSKU_ANALYSIS.WorkingDir" in client.calls
+    assert "str(MSKU_ANALYSIS.WorkingDir)" not in client.calls
+    assert client.calls.index("MSKU_ANALYSIS.WorkingDir") < next(
+        index for index, call in enumerate(client.calls) if "Solution.Solve(True)" in call
+    )
+
+
 def test_student_mesh_precheck_stops_before_solve(tmp_path: Path) -> None:
     client = FakeMechanical(nodes=128_001)
     with pytest.raises(AnalysisError) as failure:

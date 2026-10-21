@@ -11,6 +11,10 @@ Updated: 2026-10-21
 - [x] Turkish analysis inputs, staged progress, results and sanitized failure messages; externally connected user sessions are never cleared
 - [x] Historical v261 smoke solve and protected HTTP path on official 17 KB AGDB sample reported `Done`; this is not reproducible under the currently observed license state
 - [x] Investigated current `SolveRequired`: default four-core solve exceeded the included two-core HPC entitlement; foreground solve now verifies a two-core setting and classifies local solver-log failures without returning invented results
+- [x] Added configurable PyMechanical `start_license`; Student v261+ defaults to requesting the historical Academic Student keyword `aa_t_i` with no checkout bypass or automatic license fallback
+- [x] Removed IronPython `str(WorkingDir)` from the failed-solve log path and captured Unicode working directory before solve; added Unicode-path and product-selection regressions
+- [ ] Latest real smoke (2026-10-21): Mechanical reported `Ansys Mechanical []`, `ReadOnlyMode=True`; no product checked out and solve did not start. Previous `-p ansys` request was denied with a demo-user limit. See diagnosis.
+- [x] Follow-up quality gates: 176 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
 - [ ] Current real Student smoke still fails: MAPDL reports `SOLID186` unavailable for the selected product/entitlement. No current stress or deformation result; see `docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md`
 - [x] Quality gates after smoke diagnosis: 161 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
 - [ ] Physical correlation, mesh-convergence study, general material library, arbitrary STEP face selection, persisted Mechanical project and cancellation are outside this initial workflow

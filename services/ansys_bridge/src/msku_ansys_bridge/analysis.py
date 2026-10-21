@@ -168,11 +168,10 @@ def _si_quantity(value: object, expected_unit: str) -> float:
     return numeric
 
 
-def _solver_failure(client: MechanicalClient, solver_status: str) -> AnalysisError:
+def _solver_failure(working_dir: Path | None, solver_status: str) -> AnalysisError:
     """Classify local solver logs without returning paths or license details to HTTP clients."""
     try:
-        working_dir = Path(str(client.run_python_script("str(MSKU_ANALYSIS.WorkingDir)")))
-        if not working_dir.is_absolute():
+        if working_dir is None or not working_dir.is_absolute():
             raise ValueError("Mechanical did not return an absolute working directory")
         excerpts: list[str] = []
         for name in ("solve.out", "file0.err"):
@@ -293,6 +292,14 @@ def run_static_structural(
             "Mechanical çözüm çekirdeği sınırı doğrulanamadı; solve başlatılmadı.",
         )
 
+    # Query the raw property before Solve: IronPython str(WorkingDir) can fail
+    # to encode a Unicode Windows profile path after a failed solver run.
+    try:
+        working_dir_value = client.run_python_script("MSKU_ANALYSIS.WorkingDir")
+        working_dir = Path(working_dir_value) if working_dir_value else None
+    except Exception:
+        working_dir = None
+
     progress("solving", "Static Structural çözümü gerçek Mechanical prosesinde çalışıyor.")
     solved = _payload(
         client.run_python_script(
@@ -303,7 +310,7 @@ def run_static_structural(
     )
     solver_status = str(solved.get("status", ""))
     if solver_status.split(".")[-1] != "Done":
-        raise _solver_failure(client, solver_status)
+        raise _solver_failure(working_dir, solver_status)
 
     progress("extracting", "Gerçek von Mises gerilmesi ve toplam deformasyon okunuyor.")
     results = _payload(
