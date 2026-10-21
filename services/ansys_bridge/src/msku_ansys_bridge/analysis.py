@@ -23,6 +23,9 @@ SUPPORTED_CAD_SUFFIXES = frozenset({".agdb", ".pmdb", ".step", ".stp"})
 # Published Student structural limit is 128K nodes/elements. Mesh counts can undercount
 # solver-generated entities, so this is a preflight rejection, not a license guarantee.
 STUDENT_MESH_PRECHECK_LIMIT = 128_000
+# Student's included solver entitlement allowed two cores on the tested v261 install.
+# A lower core count is a solve-process setting, not a substitute for a solver license.
+STUDENT_SAFE_SOLVE_CORES = 2
 _QUANTITY = re.compile(
     r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*\[\s*([^\]]+)\s*\]\s*$"
 )
@@ -165,6 +168,38 @@ def _si_quantity(value: object, expected_unit: str) -> float:
     return numeric
 
 
+def _solver_failure(client: MechanicalClient, solver_status: str) -> AnalysisError:
+    """Classify local solver logs without returning paths or license details to HTTP clients."""
+    try:
+        working_dir = Path(str(client.run_python_script("str(MSKU_ANALYSIS.WorkingDir)")))
+        if not working_dir.is_absolute():
+            raise ValueError("Mechanical did not return an absolute working directory")
+        excerpts: list[str] = []
+        for name in ("solve.out", "file0.err"):
+            candidate = working_dir / name
+            if candidate.is_file():
+                with candidate.open("r", errors="replace") as source:
+                    excerpts.append(source.read(262_144).casefold())
+        output = "\n".join(excerpts)
+    except Exception:  # Mechanical RPC can fail after solve; never expose raw log details.
+        output = ""
+    if "insufficient hpc licenses" in output or "insufficient flexnet publisher" in output:
+        return AnalysisError(
+            "ANSYS_HPC_LICENSE_LIMIT",
+            "Mechanical çözümü için istenen çekirdek sayısı mevcut HPC lisansını aşıyor.",
+        )
+    if "element option solid186" in output and "appropriate product" in output:
+        return AnalysisError(
+            "ANSYS_STRUCTURAL_PRODUCT_UNAVAILABLE",
+            "Mechanical solver, SOLID186 için uygun yapısal ürün yetkisini bulamadı. "
+            "Yerel ANSYS lisans/ürün seçimini kontrol edin.",
+        )
+    return AnalysisError(
+        "SOLVER_NOT_DONE",
+        "Mechanical çözümü başarıyla tamamlanmadı: " + solver_status[:80],
+    )
+
+
 def _setup_script(request: StaticAnalysisRequest, path: Path) -> str:
     # repr() produces quoted Python literals, never executable user-supplied source.
     return f"""
@@ -243,6 +278,21 @@ def run_static_structural(
             "Mesh 128.000 düğüm/eleman ön kontrolünü aştı; solve başlatılmadı.",
         )
 
+    configured_cores = str(
+        client.run_python_script(
+            "MSKU_SOLVE_CONFIG = ExtAPI.Application.SolveConfigurations['My Computer']\n"
+            "MSKU_SOLVE_CONFIG.SetAsDefault()\n"
+            "MSKU_SOLVE_CONFIG.SolveProcessSettings.MaxNumberOfCores = "
+            f"{STUDENT_SAFE_SOLVE_CORES}\n"
+            "str(MSKU_SOLVE_CONFIG.SolveProcessSettings.MaxNumberOfCores)"
+        )
+    ).strip()
+    if configured_cores != str(STUDENT_SAFE_SOLVE_CORES):
+        raise AnalysisError(
+            "SOLVE_CORE_CONFIGURATION_FAILED",
+            "Mechanical çözüm çekirdeği sınırı doğrulanamadı; solve başlatılmadı.",
+        )
+
     progress("solving", "Static Structural çözümü gerçek Mechanical prosesinde çalışıyor.")
     solved = _payload(
         client.run_python_script(
@@ -253,9 +303,7 @@ def run_static_structural(
     )
     solver_status = str(solved.get("status", ""))
     if solver_status.split(".")[-1] != "Done":
-        raise AnalysisError(
-            "SOLVER_NOT_DONE", "Mechanical çözümü başarıyla tamamlanmadı: " + solver_status[:80]
-        )
+        raise _solver_failure(client, solver_status)
 
     progress("extracting", "Gerçek von Mises gerilmesi ve toplam deformasyon okunuyor.")
     results = _payload(

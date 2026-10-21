@@ -41,6 +41,8 @@ class FakeMechanical:
         stress: str = "1250 [Pa]",
         deformation: str = "0.0002 [m]",
         failure: Exception | None = None,
+        configured_cores: str = "2",
+        working_dir: Path | None = None,
     ) -> None:
         self.calls: list[str] = []
         self.nodes = nodes
@@ -49,6 +51,8 @@ class FakeMechanical:
         self.stress = stress
         self.deformation = deformation
         self.failure = failure
+        self.configured_cores = configured_cores
+        self.working_dir = working_dir
 
     def clear(self) -> None:
         self.calls.append("clear")
@@ -61,8 +65,12 @@ class FakeMechanical:
             return json.dumps({"bodies": 1, "fixedFaces": 1, "forceFaces": 1})
         if "GenerateMesh()" in script:
             return json.dumps({"nodes": self.nodes, "elements": self.elements})
+        if "SolveConfigurations['My Computer']" in script:
+            return self.configured_cores
         if "Solution.Solve(True)" in script:
             return json.dumps({"status": self.solver_status})
+        if "MSKU_ANALYSIS.WorkingDir" in script:
+            return str(self.working_dir) if self.working_dir is not None else "?"
         if "EvaluateAllResults()" in script:
             return json.dumps(
                 {
@@ -111,12 +119,50 @@ def test_real_workflow_contract_extracts_only_solver_values(tmp_path: Path) -> N
     assert "'NS_Fixed'" in client.calls[1]
     assert "'NS_Force'" in client.calls[1]
     assert "1000.0" in client.calls[1]
+    assert any("MaxNumberOfCores = 2" in call for call in client.calls)
 
 
 def test_failed_solver_never_returns_results(tmp_path: Path) -> None:
     client = FakeMechanical(solver_status="Failed")
     with pytest.raises(AnalysisError, match="Mechanical çözümü başarıyla tamamlanmadı"):
         run_static_structural(client, request(tmp_path), lambda *_: None)
+    assert not any("EvaluateAllResults()" in call for call in client.calls)
+
+
+def test_solver_rejects_unconfirmed_core_limit(tmp_path: Path) -> None:
+    client = FakeMechanical(configured_cores="4")
+    with pytest.raises(AnalysisError) as failure:
+        run_static_structural(client, request(tmp_path), lambda *_: None)
+    assert failure.value.code == "SOLVE_CORE_CONFIGURATION_FAILED"
+    assert not any("Solution.Solve(True)" in call for call in client.calls)
+
+
+@pytest.mark.parametrize(
+    ("filename", "log", "expected_code"),
+    [
+        (
+            "solve.out",
+            "*** ERROR - Insufficient HPC licenses available.",
+            "ANSYS_HPC_LICENSE_LIMIT",
+        ),
+        (
+            "file0.err",
+            "The element option SOLID186 was either not ordered with this Ansys "
+            "installation or the appropriate product was not selected for this session.",
+            "ANSYS_STRUCTURAL_PRODUCT_UNAVAILABLE",
+        ),
+    ],
+)
+def test_solver_log_is_classified_without_leaking_raw_details(
+    tmp_path: Path, filename: str, log: str, expected_code: str
+) -> None:
+    secret = "license-server-secret"
+    (tmp_path / filename).write_text(log + secret)
+    client = FakeMechanical(solver_status="SolveRequired", working_dir=tmp_path)
+    with pytest.raises(AnalysisError) as failure:
+        run_static_structural(client, request(tmp_path), lambda *_: None)
+    assert failure.value.code == expected_code
+    assert secret not in failure.value.message
     assert not any("EvaluateAllResults()" in call for call in client.calls)
 
 

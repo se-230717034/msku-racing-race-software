@@ -9,10 +9,12 @@ Updated: 2026-10-21
 - [x] Local AGDB/PMDB/STEP import, Structural Steel assignment, distinct named-selection fixed support and component force, mesh generation and Student-size precheck
 - [x] Real Mechanical solve with `Done` gate, SI-unit/finite-result validation, maximum von Mises stress and total deformation, input/CAD hash provenance
 - [x] Turkish analysis inputs, staged progress, results and sanitized failure messages; externally connected user sessions are never cleared
-- [x] Real v261 smoke solve and protected HTTP launch/job/poll/result path on official 17 KB AGDB sample: 4,464 nodes, 840 elements, `Done`; quantitative output and limitations in `docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md`
-- [x] Quality gates: 158 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
+- [x] Historical v261 smoke solve and protected HTTP path on official 17 KB AGDB sample reported `Done`; this is not reproducible under the currently observed license state
+- [x] Investigated current `SolveRequired`: default four-core solve exceeded the included two-core HPC entitlement; foreground solve now verifies a two-core setting and classifies local solver-log failures without returning invented results
+- [ ] Current real Student smoke still fails: MAPDL reports `SOLID186` unavailable for the selected product/entitlement. No current stress or deformation result; see `docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md`
+- [x] Quality gates after smoke diagnosis: 161 Python tests, 57 Vitest tests, 13 Chromium flows, Ruff, mypy, ESLint, TypeScript and production build
 - [ ] Physical correlation, mesh-convergence study, general material library, arbitrary STEP face selection, persisted Mechanical project and cancellation are outside this initial workflow
-- [ ] Current active license edition/academic entitlement remains unproven by installation path; actual process reported `Ansys Mechanical Enterprise`
+- [ ] Structural solver entitlement remains unproven by installation path or writable PrepPost session; the observed `emag` feature did not permit this `SOLID186` solve
 
 ## ANSYS Student 2026 R1 startup compatibility
 

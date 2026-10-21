@@ -67,6 +67,8 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Independent `declared`, `numerically verified`, `reference benchmarked`, and `physically correlated` axes require accepted evidence of their own type; numerical tests and solver success cannot promote physical correlation.
 - Phase 3 ANSYS local integration through a separate localhost-only FastAPI bridge: Windows installation discovery, verified PyMechanical connection, and an **explicitly started** Static Structural CAD → material → boundary conditions → mesh → solve → stress/deformation workflow. Real results are returned only after Mechanical reports `Done`; failed jobs have no numeric fallback. The bridge never runs on Vercel.
 
+The current ANSYS Student 2026 R1 smoke test is **not passing**: after correcting a four-core HPC request to two cores, MAPDL reports that the selected product cannot use `SOLID186`. No current stress or deformation result is available. See the [real-solver diagnosis](./docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md) before relying on the ANSYS panel.
+
 See [PROGRESS.md](./PROGRESS.md), the [ANSYS local bridge guide](./docs/ANSYS_LOCAL_BRIDGE.md), the [Phase 3 Static Structural guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites

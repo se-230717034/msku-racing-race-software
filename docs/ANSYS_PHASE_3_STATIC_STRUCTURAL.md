@@ -37,15 +37,15 @@ authoritative; no license setting is bypassed. The local installation being unde
 PyMechanical's [official basic Static Structural example](https://examples.mechanical.docs.pyansys.com/examples/00_basic/example_01_simple_structural_solve.html)
 provides `example_01_geometry.agdb` (~17 KB) with named selections `NS_Fixed` and
 `NS_Face_1`. The opt-in local scripts download this sample to the OS temp directory
-and run a **real** Mechanical solve:
+(or reuse its pinned-hash local cache when offline) and run a **real** Mechanical solve:
 
 ```powershell
 .\.venv\Scripts\python.exe services/ansys_bridge/scripts/real_static_smoke.py
 .\.venv\Scripts\python.exe services/ansys_bridge/scripts/real_bridge_smoke.py
 ```
 
-On this Windows installation (Mechanical v261, reported product `Ansys Mechanical
-Enterprise`), one smoke run used `NS_Fixed`, `NS_Face_1`, X force +1000 N, mesh size
+An earlier run on this Windows installation (Mechanical v261, then reported
+product `Ansys Mechanical Enterprise`) used `NS_Fixed`, `NS_Face_1`, X force +1000 N, mesh size
 500 mm and Structural Steel. Mechanical reported `Done`, 4,464 nodes and 840 elements,
 maximum von Mises stress **253.5319345691811 Pa**, and maximum total deformation
 **7.250757351470993e-9 m**. CAD SHA-256 was
@@ -53,9 +53,15 @@ maximum von Mises stress **253.5319345691811 Pa**, and maximum total deformation
 These are observations from that one run, not reference expected values; no mesh
 convergence or independent physical correlation was performed. Other ANSYS versions,
 licenses, machines, CAD, loads or mesh settings may give different results or fail.
-The second script also verified the protected HTTP launch/job/poll/result path with
+At that time, the second script also verified the protected HTTP launch/job/poll/result path with
 the same Mechanical-reported `Done` state and numeric values. Both scripts are opt-in
 and never run in CI or in the browser automatically.
+
+**Current status (2026-10-21):** The real smoke now fails with a local structural
+product/element entitlement error after the default four-core HPC request was
+reduced to two. No current stress or deformation result was produced. See the
+[real-solver diagnosis](ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md). The earlier
+numbers above are historical observations, not a pass for the current setup.
 
 To use the panel, start `npm run ansys-bridge:dev`, enter its token, click
 **Mechanical'ı başlat**, enter the sample's local AGDB path and the fields above,

@@ -136,6 +136,7 @@ def test_success_requires_connection_verification_product_identity_and_matching_
     assert result.state == "VERIFIED"
     assert result.process_verified is True
     assert result.license_verified is True
+    assert "solver lisansı ancak gerçek çözümde" in result.message
     assert client.verify_calls == 1
     assert client.product_calls == 1
     assert connector.calls == [

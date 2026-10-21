@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-import tempfile
-
-from ansys.mechanical.core.examples import download_file
 from msku_ansys_bridge.adapter import PyMechanicalLauncher
 from msku_ansys_bridge.analysis import StaticAnalysisRequest, run_static_structural
 from msku_ansys_bridge.config import BridgeSettings
 from msku_ansys_bridge.discovery import discover_windows_installations
+from sample_cad import official_example_cad
 
 
 def main() -> None:
-    sample = download_file(
-        "example_01_geometry.agdb", "pymechanical", "00_basic", destination=tempfile.gettempdir()
-    )
+    sample = official_example_cad()
     settings = BridgeSettings.from_environment()
     discovery = discover_windows_installations(explicit_executable=settings.mechanical_executable)
     if discovery.selected is None:

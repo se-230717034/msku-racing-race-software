@@ -428,6 +428,8 @@ class LocalAnsysAdapter:
         result = ConnectionTestResult(
             state="VERIFIED",
             process_verified=True,
+            # ReadOnlyMode only establishes a writable editor session. The solver's
+            # structural/HPC entitlement is checked by the real solve, not here.
             license_verified=True,
             started_by_bridge=started_by_bridge,
             host="127.0.0.1",
@@ -437,8 +439,8 @@ class LocalAnsysAdapter:
             product_info=product_info[:500],
             error_code=None,
             message=(
-                "Gerçek Ansys Mechanical prosesi, sürümü ve aktif lisansı PyMechanical ile "
-                "doğrulandı."
+                "Gerçek Mechanical prosesi ve yazılabilir düzenleme oturumu doğrulandı; "
+                "yapısal solver lisansı ancak gerçek çözümde doğrulanabilir."
             ),
         )
         self._connected_client = client

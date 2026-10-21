@@ -2,33 +2,38 @@
 
 from __future__ import annotations
 
-import tempfile
 import time
 
-from ansys.mechanical.core.examples import download_file
 from fastapi.testclient import TestClient
 from msku_ansys_bridge.config import BridgeSettings
 from msku_ansys_bridge.main import create_app
+from sample_cad import official_example_cad
 
 
 def main() -> None:
-    sample = download_file(
-        "example_01_geometry.agdb", "pymechanical", "00_basic", destination=tempfile.gettempdir()
-    )
+    sample = official_example_cad()
     token = "local-phase-three-smoke-token-000000000000"
     origin = "http://127.0.0.1:5173"
     headers = {"X-MSKU-Bridge-Token": token, "Origin": origin}
+    local_settings = BridgeSettings.from_environment()
     settings = BridgeSettings(
         token=token,
         allowed_origins=(origin,),
         allow_test_client=True,
-        mechanical_executable=BridgeSettings.from_environment().mechanical_executable,
+        mechanical_port=local_settings.mechanical_port,
+        mechanical_executable=local_settings.mechanical_executable,
     )
     with TestClient(create_app(settings)) as bridge:
         connection = bridge.post("/bridge/v1/connection/launch", headers=headers)
         connection.raise_for_status()
         if connection.json()["state"] != "VERIFIED":
-            raise RuntimeError("Mechanical launch was not verified: " + connection.json()["state"])
+            raise RuntimeError(
+                "Mechanical launch was not verified: "
+                + connection.json()["state"]
+                + " ("
+                + str(connection.json().get("errorCode"))
+                + ")"
+            )
         started = bridge.post(
             "/bridge/v1/analyses/static-structural",
             headers=headers,
