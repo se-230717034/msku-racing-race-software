@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -35,13 +36,15 @@ def main() -> None:
         print("Mechanical read-only: " + read_only, flush=True)
         if read_only not in {"false", "0"}:
             raise RuntimeError("Mechanical did not check out a writable license")
+        mesh_study = os.getenv("MSKU_ANSYS_SMOKE_MESH_STUDY") == "1"
         request = StaticAnalysisRequest(
             geometryPath=sample,
             fixedNamedSelection="NS_Fixed",
             forceNamedSelection="NS_Face_1",
             forceAxis="X",
             forceN=1000.0,
-            meshSizeMm=500.0,
+            meshSizeMm=300.0 if mesh_study else 500.0,
+            meshConvergenceSizesMm=[500.0, 400.0, 300.0] if mesh_study else None,
         )
         result = run_static_structural(
             client, request, lambda stage, message: print(stage + ": " + message, flush=True)
@@ -64,6 +67,40 @@ def main() -> None:
             "MAPDL warning count: " + (warning_count.group(1) if warning_count else "unknown"),
             flush=True,
         )
+        error_file = workdir / "file0.err"
+        error_text = (
+            error_file.read_text(errors="replace").casefold() if error_file.is_file() else ""
+        )
+        solver_input = workdir / "ds.dat"
+        input_text = (
+            solver_input.read_text(errors="replace").upper() if solver_input.is_file() else ""
+        )
+        print(
+            "Shape-check snippet in solver input: "
+            + str("SHPP,ON,ALL" in input_text and "CHECK" in input_text),
+            flush=True,
+        )
+        print(
+            "High-risk warning flags: shape_inactive="
+            + str("element shape checking is currently inactive" in error_text)
+            + ", reduced_integration_pcg="
+            + str("reduced integration brick" in error_text and "pcg solver" in error_text),
+            flush=True,
+        )
+        print(
+            "Remaining warning categories: missing_surface_material="
+            + str(
+                re.search(
+                    r"material number\s+\d+.*?at least\s+one mp or one tb",
+                    error_text,
+                    re.DOTALL,
+                ) is not None
+            )
+            + ", element_shape_error="
+            + str("element shape" in error_text and "error" in error_text),
+            flush=True,
+        )
+        print("Sparse/direct solver log marker: " + str("SPARSE" in output.upper()), flush=True)
         print(result.model_dump_json(indent=2), flush=True)
     finally:
         client.exit(force=True)

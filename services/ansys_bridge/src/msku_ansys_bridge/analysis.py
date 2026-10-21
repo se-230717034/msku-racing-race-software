@@ -29,6 +29,7 @@ STUDENT_MESH_PRECHECK_LIMIT = 128_000
 # Student's included solver entitlement allowed two cores on the tested v261 install.
 # A lower core count is a solve-process setting, not a substitute for a solver license.
 STUDENT_SAFE_SOLVE_CORES = 2
+MESH_CONVERGENCE_TOLERANCE_RELATIVE = 0.05
 _QUANTITY = re.compile(
     r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*\[\s*([^\]]+)\s*\]\s*$"
 )
@@ -44,6 +45,7 @@ class StaticAnalysisRequest(BaseModel):
     forceAxis: Literal["X", "Y", "Z"] = "Z"
     forceN: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
     meshSizeMm: float = Field(ge=0.1, le=1_000, allow_inf_nan=False)
+    meshConvergenceSizesMm: list[float] | None = Field(default=None, min_length=3, max_length=3)
 
     @field_validator("fixedNamedSelection", "forceNamedSelection")
     @classmethod
@@ -60,7 +62,36 @@ class StaticAnalysisRequest(BaseModel):
             raise ValueError("Kuvvet sıfır olamaz.")
         if self.fixedNamedSelection == self.forceNamedSelection:
             raise ValueError("Mesnet ve kuvvet için farklı named selection gerekir.")
+        sizes = self.meshConvergenceSizesMm
+        if sizes is not None:
+            if any(not math.isfinite(size) or size < 0.1 or size > 1_000 for size in sizes):
+                raise ValueError("Yakınsama mesh boyutları 0,1–1000 mm aralığında olmalı.")
+            if not (sizes[0] > sizes[1] > sizes[2] == self.meshSizeMm):
+                raise ValueError(
+                    "Üç mesh boyutu azalan sırada olmalı; sonuncusu ana mesh boyutu olmalı."
+                )
         return self
+
+
+class MeshConvergencePoint(BaseModel):
+    meshSizeMm: float
+    meshNodes: int
+    meshElements: int
+    maximumVonMisesStressPa: float
+    maximumTotalDeformationM: float
+    solverStatus: Literal["Done"] = "Done"
+    warnings: list[str] = Field(default_factory=list)
+
+
+class MeshConvergenceAssessment(BaseModel):
+    status: Literal["PASSED_NUMERICALLY", "NOT_CONVERGED"]
+    toleranceRelative: float
+    coarseToMediumStressChangeRelative: float
+    coarseToMediumDeformationChangeRelative: float
+    stressChangeRelative: float
+    deformationChangeRelative: float
+    meshCountsIncrease: bool
+    points: list[MeshConvergencePoint]
 
 
 class StaticAnalysisResult(BaseModel):
@@ -84,6 +115,8 @@ class StaticAnalysisResult(BaseModel):
     validationStatus: Literal["NUMERIC_RESULT_UNVALIDATED_PHYSICALLY"] = (
         "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY"
     )
+    shapeCheckInSolverInput: bool = False
+    meshConvergence: MeshConvergenceAssessment | None = None
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -230,9 +263,78 @@ def _solver_warning_summary(working_dir: Path) -> list[str]:
                 "MAPDL: azaltılmış integrasyonlu brick elemanlar PCG ile kullanıldı; "
                 "kalınlık boyunca mesh ve yakınsama henüz doğrulanmadı."
             )
+        if re.search(
+            r"material number\s+\d+.*?should normally have at least\s+one mp or one tb",
+            error_log,
+            re.DOTALL,
+        ):
+            warnings.append(
+                "MAPDL: bir elemanın malzeme tanımı MP/TB içermiyor; malzemeye göre enerji "
+                "çıktısı güvenilir olmayabilir. Eleman tipini yerel ds.dat üzerinden denetleyin."
+            )
     except OSError:
         pass
     return warnings
+
+
+def _shape_check_in_solver_input(working_dir: Path) -> bool:
+    """Confirm that the submitted APDL input contains both documented checks."""
+    try:
+        with (working_dir / "ds.dat").open("r", errors="replace") as source:
+            solver_input = source.read(2_000_000).upper()
+    except OSError:
+        return False
+    return "SHPP,ON,ALL" in solver_input and re.search(r"(?m)^CHECK\s*$", solver_input) is not None
+
+
+def _relative_change(previous: float, current: float) -> float:
+    if current == 0:
+        if previous != 0:
+            raise AnalysisError(
+                "MESH_CHANGE_UNDEFINED",
+                "İnce mesh sonucu sıfır; göreli yakınsama farkı hesaplanamadı.",
+            )
+        return 0.0
+    return abs(current - previous) / abs(current)
+
+
+def _assess_mesh_convergence(points: list[MeshConvergencePoint]) -> MeshConvergenceAssessment:
+    if len(points) != 3:
+        raise AnalysisError("MESH_STUDY_INCOMPLETE", "Üç gerçek mesh çözümü tamamlanmadı.")
+    coarse, middle, fine = points
+    coarse_stress_change = _relative_change(
+        coarse.maximumVonMisesStressPa, middle.maximumVonMisesStressPa
+    )
+    coarse_deformation_change = _relative_change(
+        coarse.maximumTotalDeformationM, middle.maximumTotalDeformationM
+    )
+    stress_change = _relative_change(
+        middle.maximumVonMisesStressPa, fine.maximumVonMisesStressPa
+    )
+    deformation_change = _relative_change(
+        middle.maximumTotalDeformationM, fine.maximumTotalDeformationM
+    )
+    counts_increase = all(
+        left.meshElements < right.meshElements and left.meshNodes < right.meshNodes
+        for left, right in zip(points[:-1], points[1:], strict=True)
+    )
+    passed = (
+        counts_increase
+        and stress_change <= MESH_CONVERGENCE_TOLERANCE_RELATIVE
+        and deformation_change <= MESH_CONVERGENCE_TOLERANCE_RELATIVE
+        and stress_change <= coarse_stress_change
+        and deformation_change <= coarse_deformation_change
+    )
+    return MeshConvergenceAssessment(
+        status="PASSED_NUMERICALLY" if passed else "NOT_CONVERGED",
+        toleranceRelative=MESH_CONVERGENCE_TOLERANCE_RELATIVE,
+        coarseToMediumStressChangeRelative=coarse_stress_change,
+        coarseToMediumDeformationChangeRelative=coarse_deformation_change,
+        stressChangeRelative=stress_change,
+        deformationChangeRelative=deformation_change,
+        meshCountsIncrease=counts_increase,
+        points=points,
+    )
 
 
 def _ascii_project_path() -> str:
@@ -298,6 +400,11 @@ MSKU_SELECTION = ExtAPI.SelectionManager.CreateSelectionInfo(MSKU_GEOMETRY_ENTIT
 MSKU_SELECTION.Ids = [body.GetGeoBody().Id for body in MSKU_BODIES]
 MSKU_MATERIAL.Location = MSKU_SELECTION
 MSKU_ANALYSIS = Model.AddStaticStructuralAnalysis()
+MSKU_ANALYSIS.AnalysisSettings.SolverType = SolverType.Direct
+if str(MSKU_ANALYSIS.AnalysisSettings.SolverType).split('.')[-1] != 'Direct':
+    raise RuntimeError('MSKU_DIRECT_SOLVER_NOT_CONFIRMED')
+MSKU_SHAPE_CHECK = MSKU_ANALYSIS.AddCommandSnippet()
+MSKU_SHAPE_CHECK.Input = '/PREP7\\nSHPP,ON,ALL\\nCHECK\\n/SOLU'
 MSKU_SUPPORT = MSKU_ANALYSIS.AddFixedSupport()
 MSKU_SUPPORT.Location = MSKU_FIXED[0]
 MSKU_FORCE = MSKU_ANALYSIS.AddForce()
@@ -307,7 +414,8 @@ MSKU_FORCE.{request.forceAxis}Component.Output.DiscreteValues = [Quantity({reque
 MSKU_DEFORMATION = MSKU_ANALYSIS.Solution.AddTotalDeformation()
 MSKU_STRESS = MSKU_ANALYSIS.Solution.AddEquivalentStress()
 json.dumps({{"bodies": len(MSKU_BODIES), "fixedFaces": len(MSKU_FIXED[0].Ids),
-            "forceFaces": len(MSKU_FORCE_SCOPE[0].Ids)}})
+            "forceFaces": len(MSKU_FORCE_SCOPE[0].Ids),
+            "solverType": str(MSKU_ANALYSIS.AnalysisSettings.SolverType)}})
 """.strip()
 
 
@@ -325,23 +433,10 @@ def run_static_structural(
     _count(setup.get("bodies"), "gövde")
     _count(setup.get("fixedFaces"), "mesnet yüzeyi")
     _count(setup.get("forceFaces"), "kuvvet yüzeyi")
-
-    progress("meshing", "Mechanical ağı üretiyor; Student boyut ön kontrolü yapılacak.")
-    mesh = _payload(
-        client.run_python_script(
-            "Model.Mesh.ElementSize = Quantity(" + repr(request.meshSizeMm) + ", 'mm')\n"
-            "Model.Mesh.GenerateMesh()\n"
-            "import json\njson.dumps({'nodes': int(Model.Mesh.Nodes), "
-            "'elements': int(Model.Mesh.Elements)})"
-        ),
-        "mesh",
-    )
-    nodes = _count(mesh.get("nodes"), "düğüm")
-    elements = _count(mesh.get("elements"), "eleman")
-    if nodes > STUDENT_MESH_PRECHECK_LIMIT or elements > STUDENT_MESH_PRECHECK_LIMIT:
+    if str(setup.get("solverType", "")).split(".")[-1] != "Direct":
         raise AnalysisError(
-            "STUDENT_MESH_LIMIT_PRECHECK",
-            "Mesh 128.000 düğüm/eleman ön kontrolünü aştı; solve başlatılmadı.",
+            "DIRECT_SOLVER_NOT_CONFIRMED",
+            "Sparse/Direct çözücü ayarı doğrulanamadı; çözüm başlatılmadı.",
         )
 
     configured_cores = str(
@@ -385,40 +480,102 @@ def run_static_structural(
             "Mechanical çözüm çalışma dizini ASCII olarak doğrulanamadı; çözüm başlatılmadı.",
         )
 
-    progress("solving", "Static Structural çözümü gerçek Mechanical prosesinde çalışıyor.")
-    solved = _payload(
-        client.run_python_script(
-            "MSKU_ANALYSIS.Solution.Solve(True)\n"
-            "import json\njson.dumps({'status': str(MSKU_ANALYSIS.Solution.Status)})"
-        ),
-        "solve",
-    )
-    solver_status = str(solved.get("status", ""))
-    if solver_status.split(".")[-1] != "Done":
-        raise _solver_failure(working_dir, solver_status)
-
-    progress("extracting", "Gerçek von Mises gerilmesi ve toplam deformasyon okunuyor.")
-    results = _payload(
-        client.run_python_script(
-            "MSKU_ANALYSIS.Solution.EvaluateAllResults()\n"
-            "import json\njson.dumps({'stress': str(MSKU_STRESS.Maximum), "
-            "'deformation': str(MSKU_DEFORMATION.Maximum), "
-            "'status': str(MSKU_ANALYSIS.Solution.Status)})"
-        ),
-        "sonuç",
-    )
-    if str(results.get("status", "")).split(".")[-1] != "Done":
-        raise AnalysisError(
-            "SOLVER_STATUS_CHANGED", "Sonuç alınırken Mechanical çözüm durumu değişti."
+    sizes = request.meshConvergenceSizesMm or [request.meshSizeMm]
+    points: list[MeshConvergencePoint] = []
+    for index, size in enumerate(sizes):
+        progress(
+            "meshing",
+            f"Mechanical mesh {index + 1}/{len(sizes)} üretiyor; Student sınırı denetleniyor.",
         )
-    stress_pa = _si_quantity(results.get("stress"), "Pa")
-    deformation_m = _si_quantity(results.get("deformation"), "m")
+        clear = "Model.Mesh.ClearGeneratedData()\n" if index else ""
+        mesh = _payload(
+            client.run_python_script(
+                clear + "Model.Mesh.ElementSize = Quantity(" + repr(size) + ", 'mm')\n"
+                "Model.Mesh.GenerateMesh()\n"
+                "import json\njson.dumps({'nodes': int(Model.Mesh.Nodes), "
+                "'elements': int(Model.Mesh.Elements)})"
+            ),
+            "mesh",
+        )
+        nodes = _count(mesh.get("nodes"), "düğüm")
+        elements = _count(mesh.get("elements"), "eleman")
+        if nodes > STUDENT_MESH_PRECHECK_LIMIT or elements > STUDENT_MESH_PRECHECK_LIMIT:
+            raise AnalysisError(
+                "STUDENT_MESH_LIMIT_PRECHECK",
+                "Mesh 128.000 düğüm/eleman ön kontrolünü aştı; solve başlatılmadı.",
+            )
+
+        progress("solving", f"Static Structural çözümü {index + 1}/{len(sizes)} çalışıyor.")
+        solved = _payload(
+            client.run_python_script(
+                "MSKU_ANALYSIS.Solution.Solve(True)\n"
+                "import json\njson.dumps({'status': str(MSKU_ANALYSIS.Solution.Status)})"
+            ),
+            "solve",
+        )
+        solver_status = str(solved.get("status", ""))
+        if solver_status.split(".")[-1] != "Done":
+            raise _solver_failure(working_dir, solver_status)
+
+        progress("extracting", f"Gerilme ve deformasyon {index + 1}/{len(sizes)} okunuyor.")
+        results = _payload(
+            client.run_python_script(
+                "MSKU_ANALYSIS.Solution.EvaluateAllResults()\n"
+                "import json\njson.dumps({'stress': str(MSKU_STRESS.Maximum), "
+                "'deformation': str(MSKU_DEFORMATION.Maximum), "
+                "'status': str(MSKU_ANALYSIS.Solution.Status)})"
+            ),
+            "sonuç",
+        )
+        if str(results.get("status", "")).split(".")[-1] != "Done":
+            raise AnalysisError(
+                "SOLVER_STATUS_CHANGED", "Sonuç alınırken Mechanical çözüm durumu değişti."
+            )
+        step_warnings = _solver_warning_summary(working_dir)
+        if any("PCG ile kullanıldı" in warning for warning in step_warnings):
+            raise AnalysisError(
+                "DIRECT_SOLVER_NOT_USED",
+                "MAPDL Direct/Sparse yerine PCG kullandı; sonuç kabul edilmedi.",
+            )
+        points.append(
+            MeshConvergencePoint(
+                meshSizeMm=size,
+                meshNodes=nodes,
+                meshElements=elements,
+                maximumVonMisesStressPa=_si_quantity(results.get("stress"), "Pa"),
+                maximumTotalDeformationM=_si_quantity(results.get("deformation"), "m"),
+                warnings=step_warnings,
+            )
+        )
+
+    final = points[-1]
+    convergence = _assess_mesh_convergence(points) if request.meshConvergenceSizesMm else None
+    shape_check_in_input = _shape_check_in_solver_input(working_dir)
+    warnings = [
+        "Sonuç yalnızca sayısal çözüm kanıtıdır; fiziksel korelasyon değildir.",
+        "Student lisans sınırı solve sırasında eklenen elemanları da kapsayabilir.",
+    ]
+    if convergence is None:
+        warnings.append("Mesh yakınsaması çalıştırılmadı; sonuç mesh-bağımsızlığı göstermez.")
+    elif convergence.status != "PASSED_NUMERICALLY":
+        warnings.append("Üç kademeli mesh çalışması sayısal yakınsama ölçütünü karşılamadı.")
+    else:
+        warnings.append(
+            "Üç kademeli mesh çalışması yalnızca seçilen küresel çıktılar için sayısal "
+            "ölçütü karşıladı; yerel gerilme tekillikleri ve fiziksel geçerlilik ayrıca "
+            "incelenmeli."
+        )
+    warnings.extend(dict.fromkeys(warning for point in points for warning in point.warnings))
+    if not shape_check_in_input:
+        warnings.append(
+            "APDL şekil denetimi solver girdisinde doğrulanamadı; mesh kalitesi belirsiz."
+        )
     return StaticAnalysisResult(
         solverStatus=solver_status,
-        maximumVonMisesStressPa=stress_pa,
-        maximumTotalDeformationM=deformation_m,
-        meshNodes=nodes,
-        meshElements=elements,
+        maximumVonMisesStressPa=final.maximumVonMisesStressPa,
+        maximumTotalDeformationM=final.maximumTotalDeformationM,
+        meshNodes=final.meshNodes,
+        meshElements=final.meshElements,
         geometrySha256=digest,
         material=request.material,
         fixedNamedSelection=request.fixedNamedSelection,
@@ -428,12 +585,9 @@ def run_static_structural(
         meshSizeMm=request.meshSizeMm,
         mechanicalVersion=str(client.version),
         productInfo=str(client.get_product_info())[:500],
-        warnings=[
-            "Sonuç yalnızca sayısal çözüm kanıtıdır; fiziksel korelasyon "
-            "veya mesh yakınsaması değildir.",
-            "Student lisans sınırı solve sırasında eklenen elemanları da kapsayabilir.",
-            *_solver_warning_summary(working_dir),
-        ],
+        shapeCheckInSolverInput=shape_check_in_input,
+        meshConvergence=convergence,
+        warnings=warnings,
     )
 
 

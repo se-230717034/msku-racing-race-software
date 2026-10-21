@@ -322,6 +322,7 @@ export interface StaticStructuralInput {
   forceAxis: "X" | "Y" | "Z";
   forceN: number;
   meshSizeMm: number;
+  meshConvergenceSizesMm?: [number, number, number];
 }
 
 export interface StaticStructuralJob {
@@ -349,6 +350,25 @@ export interface StaticStructuralJob {
     productInfo: string;
     units: "SI";
     validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY";
+    shapeCheckInSolverInput: boolean;
+    meshConvergence: null | {
+      status: "PASSED_NUMERICALLY" | "NOT_CONVERGED";
+      toleranceRelative: number;
+      coarseToMediumStressChangeRelative: number;
+      coarseToMediumDeformationChangeRelative: number;
+      stressChangeRelative: number;
+      deformationChangeRelative: number;
+      meshCountsIncrease: boolean;
+      points: Array<{
+        meshSizeMm: number;
+        meshNodes: number;
+        meshElements: number;
+        maximumVonMisesStressPa: number;
+        maximumTotalDeformationM: number;
+        solverStatus: "Done";
+        warnings: string[];
+      }>;
+    };
     warnings: string[];
   };
 }
@@ -373,6 +393,22 @@ function validateStaticJob(job: StaticStructuralJob): StaticStructuralJob {
       || !result.warnings.every((warning) => typeof warning === "string")
       || !result.mechanicalVersion
       || !result.productInfo.toLocaleLowerCase("en-US").includes("ansys mechanical")
+      || (result.meshConvergence != null && (
+        !["PASSED_NUMERICALLY", "NOT_CONVERGED"].includes(result.meshConvergence.status)
+        || !Number.isFinite(result.meshConvergence.coarseToMediumStressChangeRelative)
+        || !Number.isFinite(result.meshConvergence.coarseToMediumDeformationChangeRelative)
+        || !Number.isFinite(result.meshConvergence.stressChangeRelative)
+        || !Number.isFinite(result.meshConvergence.deformationChangeRelative)
+        || typeof result.meshConvergence.meshCountsIncrease !== "boolean"
+        || result.meshConvergence.points.length !== 3
+        || !result.meshConvergence.points.every((point) =>
+          point.solverStatus === "Done" && point.meshNodes > 0 && point.meshElements > 0
+          && Number.isFinite(point.maximumVonMisesStressPa)
+          && Number.isFinite(point.maximumTotalDeformationM)
+          && point.maximumVonMisesStressPa >= 0 && point.maximumTotalDeformationM >= 0
+          && Array.isArray(point.warnings)
+        )
+      ))
     ) throw new Error("Mechanical çözüm kanıtı veya sonuç birimleri eksik.");
   } else if (job.result !== null) {
     throw new Error("Tamamlanmamış analiz sonuç içeremez.");

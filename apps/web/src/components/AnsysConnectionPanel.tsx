@@ -73,6 +73,7 @@ export function AnsysConnectionPanel() {
   const [forceAxis, setForceAxis] = useState<"X" | "Y" | "Z">("Z");
   const [forceN, setForceN] = useState("100");
   const [meshSizeMm, setMeshSizeMm] = useState("25");
+  const [meshStudy, setMeshStudy] = useState(false);
   const [analysisJob, setAnalysisJob] = useState<StaticStructuralJob | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const activeJobId = analysisJob?.jobId;
@@ -158,6 +159,13 @@ export function AnsysConnectionPanel() {
       forceAxis,
       forceN: Number(forceN),
       meshSizeMm: Number(meshSizeMm),
+      ...(meshStudy ? {
+        meshConvergenceSizesMm: [
+          Number(meshSizeMm) * 1.6,
+          Number(meshSizeMm) * 1.25,
+          Number(meshSizeMm),
+        ] as [number, number, number],
+      } : {}),
     }).then(setAnalysisJob).catch((error: unknown) => {
       setAnalysisError(error instanceof Error ? error.message : "Analiz başlatılamadı.");
     });
@@ -174,6 +182,7 @@ export function AnsysConnectionPanel() {
     && forceName.trim().length > 0 && Number.isFinite(Number(forceN))
     && Number(forceN) !== 0 && Number.isFinite(Number(meshSizeMm))
     && Number(meshSizeMm) > 0 && analysisJob?.state !== "QUEUED"
+    && (!meshStudy || (Number(meshSizeMm) >= 0.1 && Number(meshSizeMm) * 1.6 <= 1_000))
     && analysisJob?.state !== "RUNNING";
   const message = "message" in state ? state.message : undefined;
 
@@ -193,7 +202,7 @@ export function AnsysConnectionPanel() {
       {open && (
         <section id="ansys-connection-panel" className="ansys-panel" aria-label="ANSYS yerel bağlantı durumu">
           <header>
-            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR · PHASE 3</span><h2>ANSYS Yerel Köprüsü</h2></div>
+            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR · PHASE 4</span><h2>ANSYS Yerel Köprüsü</h2></div>
             <button type="button" aria-label="Paneli kapat" onClick={() => setOpen(false)}><X size={16} /></button>
           </header>
 
@@ -256,6 +265,11 @@ export function AnsysConnectionPanel() {
               <label>Mesh boyutu (mm)<input type="number" min="0.1" value={meshSizeMm} onChange={(event) => setMeshSizeMm(event.target.value)} /></label>
               <label>Malzeme<input value="Structural Steel" readOnly /></label>
             </div>
+            <label>
+              <input type="checkbox" checked={meshStudy} onChange={(event) => setMeshStudy(event.target.checked)} />
+              Üç kademeli mesh yakınsama taraması (1,6× / 1,25× / 1×; üç gerçek çözüm)
+            </label>
+            <p>Direct/Sparse çözücü ve eleman şekli denetimi istenir. %5 fark yalnızca seçilen küresel sonuçlar için sayısal taramadır; fiziksel onay değildir.</p>
             <button type="button" onClick={runAnalysis} disabled={!canAnalyze}>Analizi açıkça başlat</button>
             {analysisError && <p className="ansys-analysis-error" role="alert">{analysisError}</p>}
             {analysisJob && (
@@ -268,8 +282,18 @@ export function AnsysConnectionPanel() {
                   <div><dt>Maks. deformasyon</dt><dd>{(analysisJob.result.maximumTotalDeformationM * 1e3).toPrecision(5)} mm</dd></div>
                   <div><dt>Çözücü</dt><dd>{analysisJob.result.solverStatus}</dd></div>
                   <div><dt>Mesh</dt><dd>{analysisJob.result.meshNodes} düğüm · {analysisJob.result.meshElements} eleman</dd></div>
+                  <div><dt>Şekil denetimi</dt><dd>{analysisJob.result.shapeCheckInSolverInput ? "APDL girdisinde var" : "Doğrulanamadı"}</dd></div>
                 </dl>}
                 {analysisJob.result && <small>Sayısal sonuç; fiziksel olarak doğrulanmamıştır. CAD SHA-256: {analysisJob.result.geometrySha256}</small>}
+                {analysisJob.result?.meshConvergence && (
+                  <div className="ansys-result-warnings" role="note" aria-label="Mesh yakınsama değerlendirmesi">
+                    <strong>Mesh yakınsaması: {analysisJob.result.meshConvergence.status === "PASSED_NUMERICALLY" ? "sayısal ölçüt karşılandı" : "yakınsama gösterilemedi"}</strong>
+                    <p>Kaba → orta / orta → ince farkları: gerilme %{(analysisJob.result.meshConvergence.coarseToMediumStressChangeRelative * 100).toPrecision(3)} / %{(analysisJob.result.meshConvergence.stressChangeRelative * 100).toPrecision(3)}; deformasyon %{(analysisJob.result.meshConvergence.coarseToMediumDeformationChangeRelative * 100).toPrecision(3)} / %{(analysisJob.result.meshConvergence.deformationChangeRelative * 100).toPrecision(3)}. Son farklar azalmalı ve %{(analysisJob.result.meshConvergence.toleranceRelative * 100).toPrecision(3)} sınırının altında kalmalı. Eleman/düğüm sayısı artışı: {analysisJob.result.meshConvergence.meshCountsIncrease ? "evet" : "hayır"}.</p>
+                    <ul>{analysisJob.result.meshConvergence.points.map((point) => (
+                      <li key={point.meshSizeMm}>{point.meshSizeMm} mm · {point.meshNodes} düğüm · {point.meshElements} eleman · {(point.maximumVonMisesStressPa / 1e6).toPrecision(5)} MPa · {(point.maximumTotalDeformationM * 1e3).toPrecision(5)} mm</li>
+                    ))}</ul>
+                  </div>
+                )}
                 {analysisJob.result && analysisJob.result.warnings.length > 0 && (
                   <div className="ansys-result-warnings" role="note" aria-label="Analiz uyarıları">
                     <strong>Mühendislik uyarıları</strong>

@@ -1,6 +1,19 @@
 # Implementation progress
 
-Updated: 2026-10-21
+Updated: 2026-10-22
+
+## ANSYS local integration — Phase 4 solver/mesh verification
+
+- [x] New `codex/ansys-local-bridge-phase-4` branch from completed Phase 3; no main merge
+- [x] Direct/Sparse Mechanical solver requested and verified before solve; a residual reduced-integration/PCG warning rejects results
+- [x] Fixed bridge-authored `SHPP,ON,ALL` + `CHECK` command snippet; emitted solver input is checked and shape-check uncertainty remains visible if evidence is absent
+- [x] Opt-in three-real-solve mesh study with Student precheck at every step, per-step warnings, finite SI results and conservative trend-aware numerical screening
+- [x] Real v261 sample: all three solves `Done`, old shape-inactive/PCG warnings absent; maximum-stress trend **NOT_CONVERGED** despite fine-pair 4.969% difference
+- [x] Remaining duplicated material/energy warning surfaced; no physical validation claim
+- [ ] Real MSKU Racing CAD, through-thickness/element-quality inspection, spatial stress convergence, independent benchmark and physical correlation
+- [x] Full quality gates and UI regression verification: 192 Python tests, Ruff, mypy, ESLint, TypeScript, 59 frontend unit tests, production build, 13 regular Chromium tests and one opt-in real Student three-mesh Chromium flow
+
+See `docs/ANSYS_PHASE_4_MESH_VERIFICATION_2026-10-21.md` for actual values and limitations.
 
 ## ANSYS local integration — Phase 3 Static Structural
 

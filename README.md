@@ -67,7 +67,15 @@ Kinematics solver `2.5.0`, quasi-static solver `3.0.0`, quarter-car solver `4.0.
 - Independent `declared`, `numerically verified`, `reference benchmarked`, and `physically correlated` axes require accepted evidence of their own type; numerical tests and solver success cannot promote physical correlation.
 - Phase 3 ANSYS local integration through a separate localhost-only FastAPI bridge: Windows installation discovery, verified PyMechanical connection, and an **explicitly started** Static Structural CAD → material → boundary conditions → mesh → solve → stress/deformation workflow. Real results are returned only after Mechanical reports `Done`; failed jobs have no numeric fallback. The bridge never runs on Vercel.
 
-The ANSYS Student 2026 R1 two-core smoke now reaches Mechanical `Done` and finite SI results after the documented ASCII project-path fix. Three MAPDL engineering warnings remain; neither this smoke nor the browser test physically validates a vehicle model. See the [warning and real-browser verification report](./docs/ANSYS_PHASE_3_WARNING_AND_UI_VERIFICATION_2026-10-21.md) and the historical [real-solver diagnosis](./docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md).
+The Phase 3 ANSYS Student 2026 R1 two-core smoke reached Mechanical `Done` and finite SI results after the documented ASCII project-path fix, with three MAPDL engineering warnings at that baseline. Neither that smoke nor its browser test physically validated a vehicle model. See the [warning and real-browser verification report](./docs/ANSYS_PHASE_3_WARNING_AND_UI_VERIFICATION_2026-10-21.md) and the historical [real-solver diagnosis](./docs/ANSYS_PHASE_3_SMOKE_DIAGNOSIS_2026-10-21.md).
+
+Phase 4 on `codex/ansys-local-bridge-phase-4` keeps the bridge local and adds
+Direct/Sparse solver selection, an APDL shape-check command, and an opt-in
+three-mesh numerical screening study. The pinned Student sample no longer
+emits the two prior high-risk warnings, but its measured maximum-stress trend
+is **NOT_CONVERGED**; two material-energy warnings remain. These controls do
+not physically validate a vehicle model. See the
+[Phase 4 mesh verification report](./docs/ANSYS_PHASE_4_MESH_VERIFICATION_2026-10-21.md).
 
 See [PROGRESS.md](./PROGRESS.md), the [ANSYS local bridge guide](./docs/ANSYS_LOCAL_BRIDGE.md), the [Phase 3 Static Structural guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 

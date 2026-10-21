@@ -203,6 +203,34 @@ describe("ANSYS local bridge client", () => {
     expect(JSON.parse(requestBody as string)).toEqual(input);
   });
 
+  it("sends a mesh study only when explicitly requested", async () => {
+    const job = {
+      jobId: "11111111-1111-4111-8111-111111111111",
+      state: "QUEUED",
+      stage: "queued",
+      message: "Queued",
+      startedAt: "2026-10-21T10:00:00Z",
+      completedAt: null,
+      errorCode: null,
+      result: null,
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(job), { status: 202 }));
+    await startStaticStructural("http://127.0.0.1:8765", "secure-token", {
+      geometryPath: "C:\\CAD\\small.agdb",
+      material: "Structural Steel",
+      fixedNamedSelection: "NS_Fixed",
+      forceNamedSelection: "NS_Force",
+      forceAxis: "X",
+      forceN: 1000,
+      meshSizeMm: 25,
+      meshConvergenceSizesMm: [40, 31.25, 25],
+    });
+    const body = fetchMock.mock.calls[0]?.[1]?.body;
+    const posted = JSON.parse(body as string) as { meshConvergenceSizesMm?: number[] };
+    expect(posted.meshConvergenceSizesMm).toEqual([40, 31.25, 25]);
+  });
+
   it("rejects a falsely successful Static Structural response without solver evidence", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({
       jobId: "11111111-1111-4111-8111-111111111111",
