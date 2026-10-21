@@ -6,7 +6,7 @@
   "functions": {
     "api/**/*.py": {
       "maxDuration": 60,
-      "excludeFiles": "{.git/**,.python/**,.venv/**,apps/**,docs/**,node_modules/**,packages/contracts/**,packages/engineering/tests/**,services/ansys_bridge/**,services/api/tests/**,**/__pycache__/**,**/*.pyc,playwright-report/**,test-results/**}"
+      "excludeFiles": "{.git/**,.github/**,.python/**,.venv/**,apps/**,docs/**,images/**,node_modules/**,packages/contracts/**,packages/engineering/tests/**,services/ansys_bridge/**,services/api/tests/**,**/__pycache__/**,**/*.pyc,playwright-report/**,test-results/**,package-lock.json,README.md,PROGRESS.md,docker-compose.yml,tsconfig.base.json}"
     }
   },
   "rewrites": [
