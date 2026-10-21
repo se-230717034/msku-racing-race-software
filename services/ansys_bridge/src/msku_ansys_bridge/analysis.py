@@ -241,7 +241,7 @@ def _ascii_project_path() -> str:
     directory = configured or tempfile.gettempdir()
     if not configured and os.name == "nt":
         try:
-            function = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+            function = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW  # type: ignore[attr-defined]
             function.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
             function.restype = ctypes.c_uint32
             length = function(directory, None, 0)
