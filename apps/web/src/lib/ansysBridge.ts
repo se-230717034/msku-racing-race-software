@@ -369,6 +369,8 @@ function validateStaticJob(job: StaticStructuralJob): StaticStructuralJob {
       || result.maximumTotalDeformationM < 0
       || result.meshNodes <= 0 || result.meshElements <= 0
       || !/^[a-f0-9]{64}$/.test(result.geometrySha256)
+      || !Array.isArray(result.warnings)
+      || !result.warnings.every((warning) => typeof warning === "string")
       || !result.mechanicalVersion
       || !result.productInfo.toLocaleLowerCase("en-US").includes("ansys mechanical")
     ) throw new Error("Mechanical çözüm kanıtı veya sonuç birimleri eksik.");

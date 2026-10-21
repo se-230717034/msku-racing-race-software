@@ -76,7 +76,7 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
           fixedNamedSelection: "NS_Fixed", forceNamedSelection: "NS_Force",
           forceAxis: "X", forceN: 1000, meshSizeMm: 25,
           mechanicalVersion: "261", productInfo: "Ansys Mechanical",
-          units: "SI", validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY", warnings: [],
+          units: "SI", validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY", warnings: ["MAPDL 3 uyarı bildirdi."],
         },
       }) });
       return;
@@ -149,6 +149,8 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
   // The UI polls explicit jobs every 2 s; allow slower CI/browser startup.
   await expect(analysis).toContainText("Mechanical çözümü tamamlandı", { timeout: 15_000 });
   await expect(analysis).toContainText("0.0012500 MPa");
+  await expect(analysis).toContainText("fiziksel olarak doğrulanmamıştır.");
+  await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("MAPDL 3 uyarı bildirdi.");
 });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {

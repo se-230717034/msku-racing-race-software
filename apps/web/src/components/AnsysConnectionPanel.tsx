@@ -270,6 +270,12 @@ export function AnsysConnectionPanel() {
                   <div><dt>Mesh</dt><dd>{analysisJob.result.meshNodes} düğüm · {analysisJob.result.meshElements} eleman</dd></div>
                 </dl>}
                 {analysisJob.result && <small>Sayısal sonuç; fiziksel olarak doğrulanmamıştır. CAD SHA-256: {analysisJob.result.geometrySha256}</small>}
+                {analysisJob.result && analysisJob.result.warnings.length > 0 && (
+                  <div className="ansys-result-warnings" role="note" aria-label="Analiz uyarıları">
+                    <strong>Mühendislik uyarıları</strong>
+                    <ul>{analysisJob.result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                  </div>
+                )}
               </div>
             )}
           </section>

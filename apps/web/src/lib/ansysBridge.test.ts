@@ -219,4 +219,38 @@ describe("ANSYS local bridge client", () => {
       "http://127.0.0.1:8765", "secure-token", "11111111-1111-4111-8111-111111111111",
     )).rejects.toThrow(/kanıtı/);
   });
+
+  it("rejects a completed job without a warning list before rendering results", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({
+      jobId: "11111111-1111-4111-8111-111111111111",
+      state: "SUCCEEDED",
+      stage: "done",
+      message: "Mechanical completed",
+      startedAt: "2026-10-21T10:00:00Z",
+      completedAt: "2026-10-21T10:00:10Z",
+      errorCode: null,
+      result: {
+        solverStatus: "Done",
+        maximumVonMisesStressPa: 1,
+        maximumTotalDeformationM: 1e-6,
+        meshNodes: 10,
+        meshElements: 2,
+        geometrySha256: "a".repeat(64),
+        material: "Structural Steel",
+        fixedNamedSelection: "NS_Fixed",
+        forceNamedSelection: "NS_Force",
+        forceAxis: "X",
+        forceN: 100,
+        meshSizeMm: 25,
+        mechanicalVersion: "261",
+        productInfo: "Ansys Mechanical",
+        units: "SI",
+        validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY",
+      },
+    }), { status: 200 }));
+
+    await expect(readStaticStructural(
+      "http://127.0.0.1:8765", "secure-token", "11111111-1111-4111-8111-111111111111",
+    )).rejects.toThrow(/kanıtı/);
+  });
 });

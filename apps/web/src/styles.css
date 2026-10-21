@@ -117,6 +117,10 @@ button { color: inherit; }
 .ansys-analysis-result dl { margin: 0; }
 .ansys-analysis-result dl div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
 .ansys-analysis-result dl dd { margin: 0; font-family: ui-monospace, monospace; }
+.ansys-result-warnings { padding: 8px; border: 1px solid #795b2e; border-radius: 3px; color: #f0c47c; background: #221b11; }
+.ansys-result-warnings strong { font-size: 9px; }
+.ansys-result-warnings ul { margin: 5px 0 0; padding-left: 16px; }
+.ansys-result-warnings li + li { margin-top: 4px; }
 .ansys-security-note { margin: 11px 0 0; padding-top: 10px; border-top: 1px solid #252c36; color: #7f8999; font-size: 8px; line-height: 1.55; }
 .ansys-security-note code { color: #c8ced7; }
 

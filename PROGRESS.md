@@ -4,6 +4,11 @@ Updated: 2026-10-21
 
 ## ANSYS local integration — Phase 3 Static Structural
 
+- [x] Real Chromium frontend → tokened localhost bridge → Student 2026 R1 Mechanical → frontend test with a pinned CAD sample, real `Done` values, SI-to-MPa/mm display, visible physical-unvalidation/MAPDL warnings, and missing-CAD error handling
+- [x] Three remaining MAPDL warnings classified against this run's generated `ds.dat`, `file0.err`, and ANSYS documentation; see `docs/ANSYS_PHASE_3_WARNING_AND_UI_VERIFICATION_2026-10-21.md`
+- [x] Post-check gates: 182 Python tests, Ruff, mypy, ESLint, TypeScript, 58 Vitest tests, production build, 13 regular Chromium flows, and one opt-in real-ANSYS Chromium flow passed
+- [ ] For real-car engineering approval: mesh shape/thickness inspection, convergence, independent benchmark, and measured material/load/CAD correlation
+
 - [x] New `codex/ansys-local-bridge-phase-3` branch based on validated Phase 2
 - [x] Authenticated, localhost-only, explicit Static Structural job start and status polling; no automatic solve or mock fallback
 - [x] Local AGDB/PMDB/STEP import, Structural Steel assignment, distinct named-selection fixed support and component force, mesh generation and Student-size precheck
