@@ -77,6 +77,19 @@ is **NOT_CONVERGED**; two material-energy warnings remain. These controls do
 not physically validate a vehicle model. See the
 [Phase 4 mesh verification report](./docs/ANSYS_PHASE_4_MESH_VERIFICATION_2026-10-21.md).
 
+Phase 5 adds an explicitly triggered **local** Mechanical Modal analysis (1–6
+natural frequencies in Hz), measured element-quality summaries where available,
+and an optional Studio corner hardpoint/load-input transfer. The Studio→CAD
+frame requires three independently declared CAD anchors; the returned evidence
+checks the declared transform but does **not** verify CAD topology. Quasi-static
+external force inputs are rotated into CAD axes, and nonzero moments are
+rejected. The current ANSYS material remains library Structural Steel, not a
+measured MSKU Racing material; the local GLB visuals are not solid FEA CAD.
+Real Student 2026 R1 small-sample static and modal solves returned `Done`, but
+modal mesh convergence and physical correlation remain unassessed. Existing
+`NOT_CONVERGED` static warnings are retained. See the
+[Phase 5 evidence report](./docs/ANSYS_PHASE_5_MODAL_STUDIO_INTEGRATION_2026-10-22.md).
+
 See [PROGRESS.md](./PROGRESS.md), the [ANSYS local bridge guide](./docs/ANSYS_LOCAL_BRIDGE.md), the [Phase 3 Static Structural guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites

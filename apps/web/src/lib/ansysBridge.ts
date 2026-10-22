@@ -1,3 +1,7 @@
+import type { Vec3 } from "@msku/contracts";
+
+import type { StudioTransferInput } from "./ansysStudioTransfer";
+
 export const ANSYS_BRIDGE_URL = "http://127.0.0.1:8765";
 export const ANSYS_BRIDGE_TOKEN_STORAGE_KEY = "msku.ansysBridge.token";
 
@@ -321,8 +325,30 @@ export interface StaticStructuralInput {
   forceNamedSelection: string;
   forceAxis: "X" | "Y" | "Z";
   forceN: number;
+  forceComponentsN?: Vec3;
+  forceInputSha256?: string;
   meshSizeMm: number;
   meshConvergenceSizesMm?: [number, number, number];
+  studioTransfer?: StudioTransferInput;
+}
+
+export interface MeshQualityEvidence {
+  status: "MEASURED_BY_MECHANICAL" | "UNAVAILABLE";
+  metric: "ElementQuality";
+  minimum: number | null;
+  average: number | null;
+  maximum: number | null;
+}
+
+export interface StudioTransferEvidence {
+  projectId: string;
+  cornerId: "front_left" | "front_right" | "rear_left" | "rear_right";
+  dataClassification: "demonstration" | "team_private";
+  geometrySource: "independent" | "mirrored_assumption" | "synthetic_demo";
+  sourceLabel: string;
+  hardpointsCadMm: Record<string, Vec3>;
+  maxDeclaredAnchorResidualMm: number;
+  status: "DECLARED_ANCHORS_MATCHED_NOT_CAD_VERIFIED";
 }
 
 export interface StaticStructuralJob {
@@ -345,12 +371,16 @@ export interface StaticStructuralJob {
     forceNamedSelection: string;
     forceAxis: "X" | "Y" | "Z";
     forceN: number;
+    forceComponentsN?: Vec3 | null;
+    forceInputSha256?: string | null;
     meshSizeMm: number;
     mechanicalVersion: string;
     productInfo: string;
     units: "SI";
     validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY";
     shapeCheckInSolverInput: boolean;
+    meshQuality?: MeshQualityEvidence;
+    studioTransfer?: StudioTransferEvidence | null;
     meshConvergence: null | {
       status: "PASSED_NUMERICALLY" | "NOT_CONVERGED";
       toleranceRelative: number;
@@ -369,6 +399,44 @@ export interface StaticStructuralJob {
         warnings: string[];
       }>;
     };
+    warnings: string[];
+  };
+}
+
+export interface ModalAnalysisInput {
+  geometryPath: string;
+  material: "Structural Steel";
+  fixedNamedSelection: string;
+  meshSizeMm: number;
+  modeCount: number;
+  studioTransfer?: StudioTransferInput;
+}
+
+export interface ModalAnalysisJob {
+  jobId: string;
+  state: StaticStructuralJob["state"];
+  stage: StaticStructuralJob["stage"];
+  message: string;
+  startedAt: string;
+  completedAt: string | null;
+  errorCode: string | null;
+  result: null | {
+    solverStatus: "Done";
+    modes: Array<{ modeNumber: number; frequencyHz: number }>;
+    meshNodes: number;
+    meshElements: number;
+    meshSizeMm: number;
+    meshQuality: MeshQualityEvidence;
+    geometrySha256: string;
+    material: string;
+    fixedNamedSelection: string;
+    mechanicalVersion: string;
+    productInfo: string;
+    shapeCheckInSolverInput: boolean;
+    studioTransfer: StudioTransferEvidence | null;
+    units: "SI";
+    validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY";
+    meshConvergenceStatus: "NOT_ASSESSED";
     warnings: string[];
   };
 }
@@ -455,4 +523,61 @@ export async function readStaticStructural(
   }, 12_000);
   if (!response.ok) throw new Error(`Analiz durumu HTTP ${response.status} döndürdü.`);
   return validateStaticJob(await response.json() as StaticStructuralJob);
+}
+
+function validateModalJob(job: ModalAnalysisJob): ModalAnalysisJob {
+  if (!job.jobId || !["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"].includes(job.state)) {
+    throw new Error("Modal analiz yanıtı geçersiz.");
+  }
+  if (job.state !== "SUCCEEDED") {
+    if (job.result !== null) throw new Error("Tamamlanmamış modal analiz sonuç içeremez.");
+    return job;
+  }
+  const result = job.result;
+  if (!result || result.solverStatus !== "Done" || result.units !== "SI"
+    || result.validationStatus !== "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY"
+    || result.meshConvergenceStatus !== "NOT_ASSESSED"
+    || !/^[a-f0-9]{64}$/.test(result.geometrySha256)
+    || !Number.isInteger(result.meshNodes) || result.meshNodes <= 0
+    || !Number.isInteger(result.meshElements) || result.meshElements <= 0
+    || !Array.isArray(result.modes) || result.modes.length < 1 || result.modes.length > 6
+    || result.modes.some((mode, index) => mode.modeNumber !== index + 1
+      || !Number.isFinite(mode.frequencyHz) || mode.frequencyHz <= 0
+      || (index > 0 && mode.frequencyHz < result.modes[index - 1].frequencyHz))
+    || !Array.isArray(result.warnings)
+    || !result.warnings.every((warning) => typeof warning === "string")
+    || !result.productInfo?.toLocaleLowerCase("en-US").includes("ansys mechanical")) {
+    throw new Error("Mechanical modal çözüm veya frekans kanıtı eksik.");
+  }
+  return job;
+}
+
+export async function startModalAnalysis(
+  baseUrl: string, token: string, input: ModalAnalysisInput,
+): Promise<ModalAnalysisJob> {
+  const normalized = normalizeLoopbackBridgeUrl(baseUrl);
+  if (!token.trim()) throw new Error("Modal analiz için yerel köprü tokenı gerekli.");
+  const response = await fetchWithTimeout(`${normalized}/bridge/v1/analyses/modal`, {
+    method: "POST",
+    headers: { "X-MSKU-Bridge-Token": token.trim(), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }, 12_000);
+  if (!response.ok) {
+    const error = await response.json().catch(() => null) as { detail?: { message?: string } } | null;
+    throw new Error(error?.detail?.message ?? `Modal analiz HTTP ${response.status} döndürdü.`);
+  }
+  return validateModalJob(await response.json() as ModalAnalysisJob);
+}
+
+export async function readModalAnalysis(
+  baseUrl: string, token: string, jobId: string,
+): Promise<ModalAnalysisJob> {
+  if (!/^[a-f0-9-]{36}$/.test(jobId)) throw new Error("Geçersiz modal iş kimliği.");
+  const normalized = normalizeLoopbackBridgeUrl(baseUrl);
+  if (!token.trim()) throw new Error("Modal analiz için yerel köprü tokenı gerekli.");
+  const response = await fetchWithTimeout(`${normalized}/bridge/v1/analyses/modal/${jobId}`, {
+    headers: { "X-MSKU-Bridge-Token": token.trim() },
+  }, 12_000);
+  if (!response.ok) throw new Error(`Modal analiz durumu HTTP ${response.status} döndürdü.`);
+  return validateModalJob(await response.json() as ModalAnalysisJob);
 }

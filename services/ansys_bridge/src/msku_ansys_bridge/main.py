@@ -12,6 +12,7 @@ from . import __version__
 from .adapter import AnsysAdapter, ConnectionTestResult, LocalAnsysAdapter
 from .analysis import AnalysisError, StaticAnalysisManager, StaticAnalysisRequest, StaticJobResponse
 from .config import BridgeSettings
+from .modal import ModalAnalysisManager, ModalAnalysisRequest, ModalJobResponse
 from .models import (
     AdapterStatusResponse,
     BridgeStatusResponse,
@@ -48,6 +49,7 @@ def create_app(
     active_settings = settings or BridgeSettings.from_environment()
     active_adapter = adapter or LocalAnsysAdapter(active_settings)
     analysis_manager = StaticAnalysisManager(active_adapter)
+    modal_manager = ModalAnalysisManager(active_adapter)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -204,6 +206,32 @@ def create_app(
         job = analysis_manager.snapshot(job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="Analiz işi bulunamadı.")
+        return job
+
+    @application.post(
+        "/bridge/v1/analyses/modal",
+        response_model=ModalJobResponse,
+        status_code=202,
+        dependencies=[Depends(require_bridge_token(active_settings))],
+    )
+    async def start_modal(request: ModalAnalysisRequest) -> ModalJobResponse:
+        try:
+            return modal_manager.start(request)
+        except AnalysisError as exc:
+            raise HTTPException(
+                status_code=409 if exc.code == "ANALYSIS_ALREADY_RUNNING" else 422,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+
+    @application.get(
+        "/bridge/v1/analyses/modal/{job_id}",
+        response_model=ModalJobResponse,
+        dependencies=[Depends(require_bridge_token(active_settings))],
+    )
+    async def modal_status(job_id: str) -> ModalJobResponse:
+        job = modal_manager.snapshot(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Modal analiz işi bulunamadı.")
         return job
 
     return application

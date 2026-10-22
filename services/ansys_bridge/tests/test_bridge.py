@@ -106,10 +106,30 @@ def test_live_health_exposes_only_bridge_readiness() -> None:
     assert response.json() == {
         "status": "ok",
         "service": "msku-ansys-local-bridge",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "scope": "localhost_only",
         "tokenConfigured": True,
     }
+
+
+def test_modal_endpoint_requires_token_and_existing_local_cad(tmp_path: Path) -> None:
+    payload = {
+        "geometryPath": str(tmp_path / "missing-modal.agdb"),
+        "material": "Structural Steel",
+        "fixedNamedSelection": "NS_Fixed",
+        "meshSizeMm": 25,
+        "modeCount": 3,
+    }
+    with client() as bridge:
+        unauthorized = bridge.post("/bridge/v1/analyses/modal", json=payload)
+        missing_cad = bridge.post(
+            "/bridge/v1/analyses/modal",
+            json=payload,
+            headers={"X-MSKU-Bridge-Token": TOKEN, "Origin": ORIGIN},
+        )
+    assert unauthorized.status_code == 401
+    assert missing_cad.status_code == 422
+    assert missing_cad.json()["detail"]["code"] == "CAD_FILE_UNREADABLE"
 
 
 def test_status_reports_installation_and_compatibility_without_claiming_connection() -> None:
@@ -228,7 +248,7 @@ def test_authenticated_readiness_does_not_enable_simulations() -> None:
     assert response.json() == {
         "status": "ready",
         "service": "msku-ansys-local-bridge",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "adapterState": "READY_FOR_CONNECTION_TEST",
         "ansysConnected": False,
         "simulationsEnabled": False,

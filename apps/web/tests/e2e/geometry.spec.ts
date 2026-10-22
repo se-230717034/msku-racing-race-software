@@ -3,10 +3,12 @@ import { expect, test } from "@playwright/test";
 test.describe.configure({ mode: "serial" });
 
 test("shows compatibility and verifies an explicit-path Mechanical launch", async ({ page }) => {
+  test.setTimeout(90_000);
   const token = "browser-session-token";
   let processVerified = false;
   let startedByBridge = false;
   let analysisStarted = false;
+  let modalStarted = false;
   const connection = () => ({
     state: processVerified ? "VERIFIED" : "NOT_TESTED",
     processVerified,
@@ -28,7 +30,7 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
         body: JSON.stringify({
           status: "ok",
           service: "msku-ansys-local-bridge",
-          version: "0.3.0",
+          version: "0.4.0",
           scope: "localhost_only",
           tokenConfigured: true,
         }),
@@ -81,12 +83,45 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
       }) });
       return;
     }
+    if (path.endsWith("/analyses/modal") && route.request().method() === "POST") {
+      modalStarted = true;
+      expect(route.request().postDataJSON()).toMatchObject({
+        material: "Structural Steel", fixedNamedSelection: "NS_Fixed", modeCount: 3,
+      });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        jobId: "22222222-2222-4222-8222-222222222222",
+        state: "QUEUED", stage: "queued", message: "Modal iş kuyruğa alındı",
+        startedAt: "2026-10-21T10:00:00Z", completedAt: null, errorCode: null, result: null,
+      }) });
+      return;
+    }
+    if (path.includes("/analyses/modal/") && modalStarted) {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        jobId: "22222222-2222-4222-8222-222222222222",
+        state: "SUCCEEDED", stage: "done", message: "Mechanical modal çözüm ve frekanslar doğrulandı.",
+        startedAt: "2026-10-21T10:00:00Z", completedAt: "2026-10-21T10:01:00Z", errorCode: null,
+        result: {
+          solverStatus: "Done", modes: [
+            { modeNumber: 1, frequencyHz: 21.6 }, { modeNumber: 2, frequencyHz: 35.0 },
+            { modeNumber: 3, frequencyHz: 56.4 },
+          ],
+          meshNodes: 500, meshElements: 200, meshSizeMm: 25,
+          meshQuality: { status: "MEASURED_BY_MECHANICAL", metric: "ElementQuality", minimum: 0.5, average: 0.8, maximum: 0.95 },
+          geometrySha256: "a".repeat(64), material: "Structural Steel",
+          fixedNamedSelection: "NS_Fixed", mechanicalVersion: "261", productInfo: "Ansys Mechanical",
+          shapeCheckInSolverInput: true, studioTransfer: null, units: "SI",
+          validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY", meshConvergenceStatus: "NOT_ASSESSED",
+          warnings: ["Modal mesh yakınsaması değerlendirilmedi."],
+        },
+      }) });
+      return;
+    }
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         status: "ready",
         service: "msku-ansys-local-bridge",
-        version: "0.3.0",
+        version: "0.4.0",
         transport: "localhost_token_wnua",
         adapter: {
           adapter: "pymechanical",
@@ -153,6 +188,15 @@ test("shows compatibility and verifies an explicit-path Mechanical launch", asyn
   await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("MAPDL 3 uyarı bildirdi.");
   await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("şekil denetimi kapalı");
   await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("azaltılmış integrasyonlu");
+  const modal = page.getByRole("region", { name: "Modal analiz" });
+  await modal.getByRole("button", { name: "Modal analizi açıkça başlat" }).click();
+  await expect(modal).toContainText("Mechanical modal çözüm ve frekanslar doğrulandı.", { timeout: 15_000 });
+  await expect(modal).toContainText("21.6000 Hz");
+  await expect(modal).toContainText("fiziksel olarak doğrulanmamıştır");
+  await expect(modal.getByRole("note", { name: "Modal mühendislik uyarıları" })).toContainText("yakınsaması değerlendirilmedi");
+  await analysis.getByRole("checkbox", { name: "Studio köşe/hardpoint bağlamını ekle" }).check();
+  await modal.getByRole("button", { name: "Modal analizi açıkça başlat" }).click();
+  await expect(modal.getByRole("alert")).toContainText("CAD anchor");
 });
 
 test("edits geometry and runs the constrained kinematics workflow", async ({ page }) => {

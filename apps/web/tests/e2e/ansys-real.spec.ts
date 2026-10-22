@@ -88,4 +88,29 @@ test("real browser → local bridge → Mechanical mesh study → browser", asyn
     maximumTotalDeformationM: result!.maximumTotalDeformationM,
     warnings: result!.warnings,
   }));
+
+  const modal = page.getByRole("region", { name: "Modal analiz" });
+  const completedModalResponse = page.waitForResponse(async (response) => {
+    if (!response.url().includes("/bridge/v1/analyses/modal/") || !response.ok()) return false;
+    const payload = await response.json() as { state: string };
+    return payload.state === "SUCCEEDED";
+  }, { timeout: 240_000 });
+  await modal.getByRole("button", { name: "Modal analizi açıkça başlat" }).click();
+  await expect(modal).toContainText("Mechanical modal çözüm ve frekanslar doğrulandı.", { timeout: 240_000 });
+  const completedModal = await completedModalResponse;
+  const modalPayload = await completedModal.json() as { result: null | {
+    solverStatus: string; geometrySha256: string; modes: Array<{ frequencyHz: number }>;
+    meshQuality: { status: string }; validationStatus: string; meshConvergenceStatus: string;
+  } };
+  const modalResult = modalPayload.result;
+  expect(modalResult).not.toBeNull();
+  expect(modalResult?.solverStatus).toBe("Done");
+  expect(modalResult?.geometrySha256).toBe(pinnedCadSha);
+  expect(modalResult?.modes).toHaveLength(3);
+  expect(modalResult?.modes.every((mode) => mode.frequencyHz > 0)).toBe(true);
+  expect(modalResult?.meshQuality.status).toBe("MEASURED_BY_MECHANICAL");
+  expect(modalResult?.validationStatus).toBe("NUMERIC_RESULT_UNVALIDATED_PHYSICALLY");
+  expect(modalResult?.meshConvergenceStatus).toBe("NOT_ASSESSED");
+  await expect(modal).toContainText("fiziksel olarak doğrulanmamıştır");
+  await expect(modal.getByRole("note", { name: "Modal mühendislik uyarıları" })).toContainText("yakınsaması değerlendirilmedi");
 });

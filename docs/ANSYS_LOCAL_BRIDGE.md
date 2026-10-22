@@ -1,8 +1,16 @@
-# ANSYS Local Bridge — Phase 2 connection and Phase 3 analysis
+# ANSYS Local Bridge — local connection and explicit analyses
 
 ## Scope and security
 
 The separate `services/ansys_bridge` process discovers local Mechanical installations, checks PyMechanical compatibility, tests an existing process, and can launch Mechanical when the engineer explicitly requests it. Phase 3 adds a separately requested Static Structural workflow in a bridge-owned process; see [the Phase 3 guide](./ANSYS_PHASE_3_STATIC_STRUCTURAL.md). `simulationsEnabled` remains `false` in the legacy readiness response to signal that no automatic simulation is enabled. The bridge is excluded from the Vercel Python function bundle and runs only on the engineer's Windows computer.
+
+Phase 5 adds the authenticated `POST /bridge/v1/analyses/modal` and
+`GET /bridge/v1/analyses/modal/{job_id}` endpoints. The explicit Modal request
+uses a local CAD path, `Structural Steel`, a nonempty fixed-face named selection,
+mesh size in mm, and 1–6 modes. Optional Studio coordinate evidence may accompany
+either analysis. Only a real Mechanical `Done` plus a nonempty result file and
+finite positive hertz frequencies yields modal results. See the
+[Phase 5 evidence report](./ANSYS_PHASE_5_MODAL_STUDIO_INTEGRATION_2026-10-22.md).
 
 Phase 1 controls remain: binding to `127.0.0.1:8765`, loopback client checks, an exact browser Origin allowlist, a random session token for protected endpoints, and a strict loopback browser URL. The token remains in browser `sessionStorage`. Mechanical gRPC uses Windows Named User Authentication (`wnua`) at `127.0.0.1`; there is no insecure fallback.
 

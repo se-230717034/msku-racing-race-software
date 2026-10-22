@@ -118,6 +118,7 @@ const format = (value: number | null | undefined, digits = 2): string =>
 
 export function QuasiStaticWorkspace() {
   const project = useWorkspace((state) => state.project);
+  const setLatestAnsysWrench = useWorkspace((state) => state.setLatestAnsysWrench);
   const wheelCenter = useMemo(() => {
     const point = project.suspension.hardpoints.find((item) => item.id === "wheel_center");
     return point?.position ?? { x: 0, y: 0, z: 0 };
@@ -183,9 +184,22 @@ export function QuasiStaticWorkspace() {
             }
           : undefined,
       });
-      setEquilibrium(uprightEquilibriumResponseSchema.parse(payload));
+      const accepted = uprightEquilibriumResponseSchema.parse(payload);
+      setEquilibrium(accepted);
+      setLatestAnsysWrench(accepted.calculationStatus === "VERIFIED_NUMERICALLY" ? {
+        projectId: project.projectId,
+        projectUpdatedAt: project.updatedAt,
+        cornerId: project.activeCornerId,
+        forceN: { ...force },
+        momentNm: { ...moment },
+        applicationPointM: { ...application },
+        sourceLabel: "Kabul edilmiş quasi-static analizin kullanıcı dış kuvvet girdisi",
+        inputSha256: accepted.inputProvenance.projectInputSha256,
+        physicalStatus: "UNVALIDATED_PHYSICALLY",
+      } : null);
     } catch (reason) {
       setEquilibrium(undefined);
+      setLatestAnsysWrench(null);
       setEquilibriumError(reason instanceof Error ? reason.message : "Denge isteği başarısız oldu.");
     } finally {
       setEquilibriumLoading(false);
@@ -201,6 +215,7 @@ export function QuasiStaticWorkspace() {
     setActuationUpright({ ...wheelCenter });
     setActuationChassis({ x: wheelCenter.x, y: wheelCenter.y, z: wheelCenter.z + 1 });
     setEquilibrium(undefined);
+    setLatestAnsysWrench(null);
   };
 
   const runLoadTransfer = async () => {

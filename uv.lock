@@ -693,7 +693,7 @@ wheels = [
 
 [[package]]
 name = "msku-ansys-bridge"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "services/ansys_bridge" }
 dependencies = [
     { name = "ansys-mechanical-core" },

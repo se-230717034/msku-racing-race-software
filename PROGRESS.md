@@ -2,6 +2,20 @@
 
 Updated: 2026-10-22
 
+## ANSYS local integration — Phase 5 Studio transfer and real Modal
+
+- [x] New `codex/ansys-local-bridge-phase-5` branch from merged Phase 4 main; no automatic main merge
+- [x] Preserve explicit local Static Structural and its `NOT_CONVERGED`/physical-unvalidation results
+- [x] Real local Mechanical modal solve with named fixed support, 1–6 positive ordered Hz results, `Done`/result-file gates and no mock fallback
+- [x] Measured Mechanical element-quality min/average/max or an explicit unavailable state in static and modal results
+- [x] Optional one-corner Studio hardpoint context: proper right-handed metre-to-millimetre transform, three non-collinear declared CAD anchors and explicit not-topology-verified evidence
+- [x] Accepted quasi-static external *input* force may be transferred only with a CAD frame; reject moments and rotate the vector into CAD axes without scaling its newton units
+- [x] Real Student 2026 R1 sample smoke: Static `Done` (253.5319357825563 Pa, 7.250757351503458e-9 m); Modal `Done` (21.609975179192634, 21.609977898586124, 56.38194648923333 Hz); 4,464 nodes, 840 elements, two cores
+- [ ] Real MSKU Racing structural CAD/face registration, measured material mapping, verified load application, modal mesh convergence, independent benchmark and physical correlation
+- [x] Phase 5 local gates: 209 Python tests, Ruff, mypy, ESLint, TypeScript, 65 frontend unit tests, production build, 13 regular Chromium flows and one opt-in real Student Chromium static-plus-modal flow
+
+See `docs/ANSYS_PHASE_5_MODAL_STUDIO_INTEGRATION_2026-10-22.md` for scope, evidence and limitations.
+
 ## ANSYS local integration — Phase 4 solver/mesh verification
 
 - [x] New `codex/ansys-local-bridge-phase-4` branch from completed Phase 3; no main merge

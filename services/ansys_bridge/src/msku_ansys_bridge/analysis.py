@@ -19,6 +19,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .adapter import MechanicalClient
+from .studio_transfer import StudioTransfer, StudioTransferEvidence, Vector3, transfer_evidence
 
 _T = TypeVar("_T")
 AnalysisStage = Literal["queued", "importing", "meshing", "solving", "extracting", "done"]
@@ -44,8 +45,11 @@ class StaticAnalysisRequest(BaseModel):
     forceNamedSelection: str = Field(min_length=1, max_length=100)
     forceAxis: Literal["X", "Y", "Z"] = "Z"
     forceN: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
+    forceComponentsN: Vector3 | None = None
+    forceInputSha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     meshSizeMm: float = Field(ge=0.1, le=1_000, allow_inf_nan=False)
     meshConvergenceSizesMm: list[float] | None = Field(default=None, min_length=3, max_length=3)
+    studioTransfer: StudioTransfer | None = None
 
     @field_validator("fixedNamedSelection", "forceNamedSelection")
     @classmethod
@@ -58,8 +62,15 @@ class StaticAnalysisRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_load(self) -> StaticAnalysisRequest:
-        if self.forceN == 0:
+        if self.forceComponentsN is None and self.forceN == 0:
             raise ValueError("Kuvvet sıfır olamaz.")
+        if self.forceComponentsN is not None:
+            components = self.forceComponentsN.components()
+            magnitude = math.dist(components, (0, 0, 0))
+            if magnitude <= 0 or any(abs(component) > 1_000_000 for component in components):
+                raise ValueError("Kuvvet bileşenleri sonlu, sınırlı ve sıfırdan farklı olmalı.")
+            if not math.isclose(self.forceN, magnitude, rel_tol=1e-9, abs_tol=1e-9):
+                raise ValueError("forceN, vektör kuvvetin büyüklüğüne eşit olmalı.")
         if self.fixedNamedSelection == self.forceNamedSelection:
             raise ValueError("Mesnet ve kuvvet için farklı named selection gerekir.")
         sizes = self.meshConvergenceSizesMm
@@ -81,6 +92,14 @@ class MeshConvergencePoint(BaseModel):
     maximumTotalDeformationM: float
     solverStatus: Literal["Done"] = "Done"
     warnings: list[str] = Field(default_factory=list)
+
+
+class MeshQualityEvidence(BaseModel):
+    status: Literal["MEASURED_BY_MECHANICAL", "UNAVAILABLE"]
+    metric: Literal["ElementQuality"] = "ElementQuality"
+    minimum: float | None = None
+    average: float | None = None
+    maximum: float | None = None
 
 
 class MeshConvergenceAssessment(BaseModel):
@@ -108,6 +127,8 @@ class StaticAnalysisResult(BaseModel):
     forceNamedSelection: str
     forceAxis: Literal["X", "Y", "Z"]
     forceN: float
+    forceComponentsN: Vector3 | None = None
+    forceInputSha256: str | None = None
     meshSizeMm: float
     mechanicalVersion: str
     productInfo: str
@@ -117,6 +138,10 @@ class StaticAnalysisResult(BaseModel):
     )
     shapeCheckInSolverInput: bool = False
     meshConvergence: MeshConvergenceAssessment | None = None
+    meshQuality: MeshQualityEvidence = Field(
+        default_factory=lambda: MeshQualityEvidence(status="UNAVAILABLE")
+    )
+    studioTransfer: StudioTransferEvidence | None = None
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -202,6 +227,41 @@ def _si_quantity(value: object, expected_unit: str) -> float:
             "RESULT_VALUE_INVALID", "Mechanical negatif veya sonlu olmayan sonuç döndürdü."
         )
     return numeric
+
+
+def _mesh_quality(client: MechanicalClient) -> MeshQualityEvidence:
+    """Read Mechanical's dimensionless element-quality metric; never synthesize it."""
+    try:
+        payload = _payload(
+            client.run_python_script(
+                "MSKU_METRIC = Ansys.Mechanical.DataModel.Enums.MeshMetricType.ElementQuality\n"
+                "Model.Mesh.MeshMetric = MSKU_METRIC\n"
+                "Model.Mesh.ComputeMeshQualityMetrics()\n"
+                "import json\njson.dumps({'minimum': str(Model.Mesh.Minimum), "
+                "'average': str(Model.Mesh.Average), 'maximum': str(Model.Mesh.Maximum)})"
+            ),
+            "mesh quality",
+        )
+        values = []
+        for key in ("minimum", "average", "maximum"):
+            raw = payload.get(key)
+            if not isinstance(raw, str):
+                raise ValueError("missing metric")
+            numeric = float(raw.split()[0])
+            if not math.isfinite(numeric) or not 0 <= numeric <= 1:
+                raise ValueError("invalid element quality")
+            values.append(numeric)
+        if not values[0] <= values[1] <= values[2]:
+            raise ValueError("invalid metric ordering")
+        return MeshQualityEvidence(
+            status="MEASURED_BY_MECHANICAL",
+            minimum=values[0],
+            average=values[1],
+            maximum=values[2],
+        )
+    except Exception:
+        # API availability differs by Mechanical release/mesh type. Report unavailable.
+        return MeshQualityEvidence(status="UNAVAILABLE")
 
 
 def _solver_failure(working_dir: Path | None, solver_status: str) -> AnalysisError:
@@ -370,9 +430,29 @@ def _ascii_project_path() -> str:
 
 def _setup_script(request: StaticAnalysisRequest, path: Path) -> str:
     # repr() produces quoted Python literals, never executable user-supplied source.
+    if request.forceComponentsN is None:
+        force_script = (
+            f"MSKU_FORCE.{request.forceAxis}Component.Output.DiscreteValues = "
+            f'[Quantity({request.forceN!r}, "N")]'
+        )
+    else:
+        components = request.forceComponentsN
+        force_script = "\n".join(
+            f'MSKU_FORCE.{axis}Component.Output.DiscreteValues = [Quantity({value!r}, "N")]'
+            for axis, value in zip("XYZ", components.components(), strict=True)
+        )
+    studio_points = (
+        {
+            key: point.components()
+            for key, point in transfer_evidence(request.studioTransfer).hardpointsCadMm.items()
+        }
+        if request.studioTransfer is not None
+        else {}
+    )
     return f"""
 import json
 ExtAPI.Application.ActiveUnitSystem = MechanicalUnitSystem.StandardMKS
+MSKU_STUDIO_HARDPOINTS_CAD_MM = {studio_points!r}
 MSKU_IMPORT = Model.GeometryImportGroup.AddGeometryImport()
 MSKU_PREF = Ansys.ACT.Mechanical.Utilities.GeometryImportPreferences()
 MSKU_PREF.ProcessNamedSelections = True
@@ -410,11 +490,12 @@ MSKU_SUPPORT.Location = MSKU_FIXED[0]
 MSKU_FORCE = MSKU_ANALYSIS.AddForce()
 MSKU_FORCE.Location = MSKU_FORCE_SCOPE[0]
 MSKU_FORCE.DefineBy = LoadDefineBy.Components
-MSKU_FORCE.{request.forceAxis}Component.Output.DiscreteValues = [Quantity({request.forceN!r}, "N")]
+{force_script}
 MSKU_DEFORMATION = MSKU_ANALYSIS.Solution.AddTotalDeformation()
 MSKU_STRESS = MSKU_ANALYSIS.Solution.AddEquivalentStress()
 json.dumps({{"bodies": len(MSKU_BODIES), "fixedFaces": len(MSKU_FIXED[0].Ids),
             "forceFaces": len(MSKU_FORCE_SCOPE[0].Ids),
+            "studioHardpoints": len(MSKU_STUDIO_HARDPOINTS_CAD_MM),
             "solverType": str(MSKU_ANALYSIS.AnalysisSettings.SolverType)}})
 """.strip()
 
@@ -433,6 +514,11 @@ def run_static_structural(
     _count(setup.get("bodies"), "gövde")
     _count(setup.get("fixedFaces"), "mesnet yüzeyi")
     _count(setup.get("forceFaces"), "kuvvet yüzeyi")
+    if request.studioTransfer is not None and setup.get("studioHardpoints") != 9:
+        raise AnalysisError(
+            "STUDIO_TRANSFER_NOT_CONFIRMED",
+            "Studio hardpoint koordinatları Mechanical oturumuna aktarılmadı.",
+        )
     if str(setup.get("solverType", "")).split(".")[-1] != "Direct":
         raise AnalysisError(
             "DIRECT_SOLVER_NOT_CONFIRMED",
@@ -482,6 +568,7 @@ def run_static_structural(
 
     sizes = request.meshConvergenceSizesMm or [request.meshSizeMm]
     points: list[MeshConvergencePoint] = []
+    mesh_quality = MeshQualityEvidence(status="UNAVAILABLE")
     for index, size in enumerate(sizes):
         progress(
             "meshing",
@@ -504,6 +591,8 @@ def run_static_structural(
                 "STUDENT_MESH_LIMIT_PRECHECK",
                 "Mesh 128.000 düğüm/eleman ön kontrolünü aştı; solve başlatılmadı.",
             )
+        if index == len(sizes) - 1:
+            mesh_quality = _mesh_quality(client)
 
         progress("solving", f"Static Structural çözümü {index + 1}/{len(sizes)} çalışıyor.")
         solved = _payload(
@@ -570,6 +659,22 @@ def run_static_structural(
         warnings.append(
             "APDL şekil denetimi solver girdisinde doğrulanamadı; mesh kalitesi belirsiz."
         )
+    if mesh_quality.status == "UNAVAILABLE":
+        warnings.append("Mechanical eleman kalite metriği okunamadı; mesh kalitesi bilinmiyor.")
+    if request.studioTransfer is not None:
+        warnings.append(
+            "Studio hardpointleri Mechanical oturumuna izleme verisi olarak aktarıldı; "
+            "CAD topolojisine veya yük/mesnet yüzeylerine otomatik bağlanmadı. "
+            "CAD anchor eşleşmesi kullanıcı beyanıdır, fiziksel doğrulama değildir."
+        )
+        if request.studioTransfer.dataClassification == "demonstration":
+            warnings.append("DEMO/SYNTHETIC Studio geometrisi gerçek araç CAD verisi değildir.")
+    if request.forceComponentsN is not None:
+        warnings.append(
+            "Studio kuvvet vektörü CAD named face üzerine uygulandı; bildirilen uygulama "
+            "noktası ve moment otomatik aktarılmadı. Fiziksel yük yolu ayrıca doğrulanmalı."
+        )
+    warnings.append("Structural Steel ANSYS kütüphane malzemesidir; takım ölçümü değildir.")
     return StaticAnalysisResult(
         solverStatus=solver_status,
         maximumVonMisesStressPa=final.maximumVonMisesStressPa,
@@ -582,11 +687,19 @@ def run_static_structural(
         forceNamedSelection=request.forceNamedSelection,
         forceAxis=request.forceAxis,
         forceN=request.forceN,
+        forceComponentsN=request.forceComponentsN,
+        forceInputSha256=request.forceInputSha256,
         meshSizeMm=request.meshSizeMm,
         mechanicalVersion=str(client.version),
         productInfo=str(client.get_product_info())[:500],
         shapeCheckInSolverInput=shape_check_in_input,
         meshConvergence=convergence,
+        meshQuality=mesh_quality,
+        studioTransfer=(
+            transfer_evidence(request.studioTransfer)
+            if request.studioTransfer is not None
+            else None
+        ),
         warnings=warnings,
     )
 
@@ -660,6 +773,12 @@ class StaticAnalysisManager:
                     "CAD içe aktarıldı ancak katı gövde bulunamadı.",
                 ),
                 ("license", "ANSYS_LICENSE_ERROR", "Mechanical lisansı çözüme izin vermedi."),
+                (
+                    "material",
+                    "MATERIAL_NOT_AVAILABLE",
+                    "Structural Steel malzemesi Mechanical içinde atanamadı; "
+                    "yerel malzeme kütüphanesini kontrol edin.",
+                ),
             )
             match = next((item for item in known_failures if item[0] in lowered), None)
             code = match[1] if match else "MECHANICAL_ANALYSIS_FAILED"
