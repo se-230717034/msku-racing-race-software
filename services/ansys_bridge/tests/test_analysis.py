@@ -81,10 +81,14 @@ class FakeMechanical:
         if self.failure is not None:
             raise self.failure
         if "AddGeometryImport" in script:
-            return json.dumps({
-                "bodies": 1, "fixedFaces": 1, "forceFaces": 1,
-                "solverType": self.solver_type,
-            })
+            return json.dumps(
+                {
+                    "bodies": 1,
+                    "fixedFaces": 1,
+                    "forceFaces": 1,
+                    "solverType": self.solver_type,
+                }
+            )
         if "GenerateMesh()" in script:
             self.mesh_index += 1
             if self.mesh_sequence is not None:
@@ -200,9 +204,7 @@ def test_shape_check_evidence_requires_both_commands(tmp_path: Path) -> None:
 
 
 def test_three_real_solve_contract_and_numeric_convergence(tmp_path: Path) -> None:
-    payload = request(tmp_path).model_copy(
-        update={"meshConvergenceSizesMm": [40.0, 30.0, 25.0]}
-    )
+    payload = request(tmp_path).model_copy(update={"meshConvergenceSizesMm": [40.0, 30.0, 25.0]})
     client = FakeMechanical(
         mesh_sequence=[(300, 120), (500, 230), (700, 380)],
         result_sequence=[
@@ -226,8 +228,11 @@ def test_three_real_solve_contract_and_numeric_convergence(tmp_path: Path) -> No
 def test_nonmonotone_mesh_count_cannot_pass_numeric_convergence() -> None:
     points = [
         MeshConvergencePoint(
-            meshSizeMm=size, meshNodes=nodes, meshElements=elements,
-            maximumVonMisesStressPa=1000, maximumTotalDeformationM=0.0002,
+            meshSizeMm=size,
+            meshNodes=nodes,
+            meshElements=elements,
+            maximumVonMisesStressPa=1000,
+            maximumTotalDeformationM=0.0002,
         )
         for size, nodes, elements in [(40, 300, 100), (30, 500, 200), (25, 400, 150)]
     ]
@@ -244,8 +249,11 @@ def test_real_smoke_stress_trend_does_not_pass_numeric_convergence() -> None:
     ]
     points = [
         MeshConvergencePoint(
-            meshSizeMm=size, meshNodes=nodes, meshElements=elements,
-            maximumVonMisesStressPa=stress, maximumTotalDeformationM=deformation,
+            meshSizeMm=size,
+            meshNodes=nodes,
+            meshElements=elements,
+            maximumVonMisesStressPa=stress,
+            maximumTotalDeformationM=deformation,
         )
         for size, nodes, elements, stress, deformation in measured
     ]
@@ -256,9 +264,7 @@ def test_real_smoke_stress_trend_does_not_pass_numeric_convergence() -> None:
 
 
 def test_failed_later_student_precheck_returns_no_result(tmp_path: Path) -> None:
-    payload = request(tmp_path).model_copy(
-        update={"meshConvergenceSizesMm": [40.0, 30.0, 25.0]}
-    )
+    payload = request(tmp_path).model_copy(update={"meshConvergenceSizesMm": [40.0, 30.0, 25.0]})
     client = FakeMechanical(mesh_sequence=[(300, 120), (128_001, 200)])
     with pytest.raises(AnalysisError) as failure:
         run_static_structural(client, payload, lambda *_: None)
@@ -415,9 +421,7 @@ def test_request_rejects_zero_force_overlapping_selection_and_extra_fields(tmp_p
         StaticAnalysisRequest.model_validate({**valid, "script": "arbitrary()"})
     for sizes in ([25, 30, 40], [40, 30], [40, 30, 20], [40, float("nan"), 25]):
         with pytest.raises(ValidationError):
-            StaticAnalysisRequest.model_validate(
-                {**valid, "meshConvergenceSizesMm": sizes}
-            )
+            StaticAnalysisRequest.model_validate({**valid, "meshConvergenceSizesMm": sizes})
 
 
 def test_manager_reports_failure_without_mock_fallback_or_raw_secret(tmp_path: Path) -> None:

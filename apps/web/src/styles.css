@@ -121,6 +121,12 @@ button { color: inherit; }
 .ansys-result-warnings strong { font-size: 9px; }
 .ansys-result-warnings ul { margin: 5px 0 0; padding-left: 16px; }
 .ansys-result-warnings li + li { margin-top: 4px; }
+.ansys-studio-transfer { display: grid; gap: 8px; padding: 9px; border: 1px solid #40526b; background: #121c2a; }
+.ansys-studio-transfer strong { color: #d6e7fb; font-size: 10px; }
+.ansys-frequency-chart { display: grid; gap: 6px; padding: 8px; border: 1px solid #34495d; }
+.ansys-frequency-chart > div { display: grid; grid-template-columns: 42px minmax(0, 1fr) 85px; align-items: center; gap: 6px; }
+.ansys-frequency-chart i { display: block; height: 7px; min-width: 2px; background: #69a4dc; }
+.ansys-frequency-chart b { color: #dbeafe; font: 600 9px/1 ui-monospace, monospace; text-align: right; }
 .ansys-security-note { margin: 11px 0 0; padding-top: 10px; border-top: 1px solid #252c36; color: #7f8999; font-size: 8px; line-height: 1.55; }
 .ansys-security-note code { color: #c8ced7; }
 

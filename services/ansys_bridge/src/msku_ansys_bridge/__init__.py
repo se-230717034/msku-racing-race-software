@@ -4,4 +4,4 @@ from .adapter import LocalAnsysAdapter
 from .config import BridgeSettings
 
 __all__ = ["BridgeSettings", "LocalAnsysAdapter"]
-__version__ = "0.3.0"
+__version__ = "0.4.0"

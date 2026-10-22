@@ -4,7 +4,9 @@ import {
   launchRealAnsysConnection,
   normalizeLoopbackBridgeUrl,
   probeAnsysBridge,
+  readModalAnalysis,
   readStaticStructural,
+  startModalAnalysis,
   startStaticStructural,
   testRealAnsysConnection,
 } from "./ansysBridge";
@@ -12,7 +14,7 @@ import {
 const live = {
   status: "ok",
   service: "msku-ansys-local-bridge",
-  version: "0.3.0",
+  version: "0.4.0",
   scope: "localhost_only",
   tokenConfigured: true,
 };
@@ -22,7 +24,7 @@ function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false, s
   return {
     status: "ready",
     service: "msku-ansys-local-bridge",
-    version: "0.3.0",
+    version: "0.4.0",
     transport: "localhost_token_wnua",
     adapter: {
       adapter: "pymechanical",
@@ -71,6 +73,45 @@ function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false, s
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("modal Mechanical evidence", () => {
+  const jobId = "11111111-1111-4111-8111-111111111111";
+  const queued = {
+    jobId, state: "QUEUED", stage: "queued", message: "Queued",
+    startedAt: "2026-10-21T10:00:00Z", completedAt: null, errorCode: null, result: null,
+  };
+
+  it("posts an explicit local modal job and never sends it to Vercel", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(queued), { status: 202 }));
+    await startModalAnalysis("http://127.0.0.1:8765", "secure-token", {
+      geometryPath: "C:\\CAD\\small.agdb", material: "Structural Steel",
+      fixedNamedSelection: "NS_Fixed", meshSizeMm: 25, modeCount: 3,
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://127.0.0.1:8765/bridge/v1/analyses/modal");
+    const submitted = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as { modeCount: number };
+    expect(submitted.modeCount).toBe(3);
+  });
+
+  it("rejects zero or fabricated modal frequencies", async () => {
+    const completed = {
+      ...queued, state: "SUCCEEDED", stage: "done", completedAt: "2026-10-21T10:01:00Z",
+      result: {
+        solverStatus: "Done", modes: [{ modeNumber: 1, frequencyHz: 0 }],
+        meshNodes: 10, meshElements: 2, meshSizeMm: 25,
+        meshQuality: { status: "UNAVAILABLE", metric: "ElementQuality", minimum: null, average: null, maximum: null },
+        geometrySha256: "a".repeat(64), material: "Structural Steel",
+        fixedNamedSelection: "NS_Fixed", mechanicalVersion: "261",
+        productInfo: "Ansys Mechanical", shapeCheckInSolverInput: true,
+        studioTransfer: null, units: "SI", validationStatus: "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY",
+        meshConvergenceStatus: "NOT_ASSESSED", warnings: [],
+      },
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify(completed)));
+    await expect(readModalAnalysis("http://127.0.0.1:8765", "secure-token", jobId))
+      .rejects.toThrow(/kanıtı/);
+  });
 });
 
 describe("ANSYS local bridge client", () => {

@@ -15,6 +15,18 @@ export type VehicleViewMode = "full_vehicle" | "front_axle" | "rear_axle" | "act
 export type CadViewMode = "technical" | "detailed" | "hybrid";
 export type VisualModelSource = "glb" | "procedural";
 
+export interface AnsysWrenchInput {
+  projectId: string;
+  projectUpdatedAt: string;
+  cornerId: CornerId;
+  forceN: Vec3;
+  momentNm: Vec3;
+  applicationPointM: Vec3;
+  sourceLabel: string;
+  inputSha256: string;
+  physicalStatus: "UNVALIDATED_PHYSICALLY";
+}
+
 export interface VisibilityState {
   upper: boolean;
   lower: boolean;
@@ -47,6 +59,7 @@ interface WorkspaceState {
   visibility: VisibilityState;
   latestFullCarResult: FullCarSimulationResponse | null;
   latestBicycleResult: BicycleSimulationResponse | null;
+  latestAnsysWrench: AnsysWrenchInput | null;
   setActiveModule: (module: ModuleId) => void;
   setSelectedHardpoint: (id: string) => void;
   setCameraPreset: (preset: CameraPreset) => void;
@@ -65,6 +78,7 @@ interface WorkspaceState {
   addValidationEvidence: (evidence: ValidationEvidence) => void;
   setLatestFullCarResult: (result: FullCarSimulationResponse | null) => void;
   setLatestBicycleResult: (result: BicycleSimulationResponse | null) => void;
+  setLatestAnsysWrench: (value: AnsysWrenchInput | null) => void;
   renameProject: (name: string) => void;
   replaceProject: (project: Project) => void;
   resetDemo: (projectId?: string) => void;
@@ -97,6 +111,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   visualModelSource: "glb",
   latestFullCarResult: null,
   latestBicycleResult: null,
+  latestAnsysWrench: null,
   visibility: {
     upper: true,
     lower: true,
@@ -189,6 +204,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   })),
   setLatestFullCarResult: (latestFullCarResult) => set({ latestFullCarResult }),
   setLatestBicycleResult: (latestBicycleResult) => set({ latestBicycleResult }),
+  setLatestAnsysWrench: (latestAnsysWrench) => set({ latestAnsysWrench }),
   renameProject: (name) => set((state) => ({ project: stamp({ ...state.project, name }) })),
   replaceProject: (project) => set({
     project,
@@ -196,6 +212,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     activeModule: "vehicle",
     latestFullCarResult: null,
     latestBicycleResult: null,
+    latestAnsysWrench: null,
   }),
   resetDemo: (projectId) => {
     const now = new Date().toISOString();
@@ -210,6 +227,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       activeModule: "vehicle",
       latestFullCarResult: null,
       latestBicycleResult: null,
+      latestAnsysWrench: null,
     });
   },
 }));
