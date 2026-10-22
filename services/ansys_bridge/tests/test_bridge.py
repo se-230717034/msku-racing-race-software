@@ -112,9 +112,9 @@ def test_live_health_exposes_only_bridge_readiness() -> None:
     }
 
 
-def test_modal_endpoint_requires_token_and_existing_local_cad() -> None:
+def test_modal_endpoint_requires_token_and_existing_local_cad(tmp_path: Path) -> None:
     payload = {
-        "geometryPath": "C:/not-present/modal.agdb",
+        "geometryPath": str(tmp_path / "missing-modal.agdb"),
         "material": "Structural Steel",
         "fixedNamedSelection": "NS_Fixed",
         "meshSizeMm": 25,
