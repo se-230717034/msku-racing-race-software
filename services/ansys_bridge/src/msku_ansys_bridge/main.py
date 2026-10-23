@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import __version__
@@ -23,6 +24,7 @@ from .models import (
     LiveHealthResponse,
     ReadyHealthResponse,
 )
+from .reporting import build_modal_report, build_static_report
 from .security import TOKEN_HEADER, LocalOnlyMiddleware, require_bridge_token
 
 
@@ -208,6 +210,31 @@ def create_app(
             raise HTTPException(status_code=404, detail="Analiz işi bulunamadı.")
         return job
 
+    @application.get(
+        "/bridge/v1/analyses/static-structural/{job_id}/report",
+        dependencies=[Depends(require_bridge_token(active_settings))],
+    )
+    async def static_structural_report(job_id: str) -> JSONResponse:
+        source = analysis_manager.report_source(job_id)
+        if source is None:
+            raise HTTPException(status_code=404, detail="Tamamlanmış analiz raporu bulunamadı.")
+        try:
+            report = build_static_report(*source)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=409, detail="Analiz kanıtı rapor için yetersiz."
+            ) from exc
+        return JSONResponse(
+            report.model_dump(mode="json"),
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="msku-ansys-static-{report.jobId}.json"'
+                ),
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
     @application.post(
         "/bridge/v1/analyses/modal",
         response_model=ModalJobResponse,
@@ -233,6 +260,31 @@ def create_app(
         if job is None:
             raise HTTPException(status_code=404, detail="Modal analiz işi bulunamadı.")
         return job
+
+    @application.get(
+        "/bridge/v1/analyses/modal/{job_id}/report",
+        dependencies=[Depends(require_bridge_token(active_settings))],
+    )
+    async def modal_report(job_id: str) -> JSONResponse:
+        source = modal_manager.report_source(job_id)
+        if source is None:
+            raise HTTPException(status_code=404, detail="Tamamlanmış modal rapor bulunamadı.")
+        try:
+            report = build_modal_report(*source)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=409, detail="Modal kanıtı rapor için yetersiz."
+            ) from exc
+        return JSONResponse(
+            report.model_dump(mode="json"),
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="msku-ansys-modal-{report.jobId}.json"'
+                ),
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     return application
 

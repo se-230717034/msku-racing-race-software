@@ -12,6 +12,13 @@ either analysis. Only a real Mechanical `Done` plus a nonempty result file and
 finite positive hertz frequencies yields modal results. See the
 [Phase 5 evidence report](./ANSYS_PHASE_5_MODAL_STUDIO_INTEGRATION_2026-10-22.md).
 
+Phase 6 adds authenticated `GET /bridge/v1/analyses/{static-structural|modal}/{job_id}/report`
+endpoints. They return downloadable JSON evidence only after a successful real
+job with a nonempty Mechanical result file. The private absolute CAD path is
+excluded, physical approval remains false, and only the latest job is held in
+bridge memory. See the
+[Phase 6 release-readiness report](./ANSYS_PHASE_6_RELEASE_READINESS_2026-10-22.md).
+
 Phase 1 controls remain: binding to `127.0.0.1:8765`, loopback client checks, an exact browser Origin allowlist, a random session token for protected endpoints, and a strict loopback browser URL. The token remains in browser `sessionStorage`. Mechanical gRPC uses Windows Named User Authentication (`wnua`) at `127.0.0.1`; there is no insecure fallback.
 
 ## Student 2026 R1 executable and discovery
@@ -73,8 +80,12 @@ Do not commit tokens or license-server details.
 | `POST` | `/bridge/v1/connection/launch` | User-triggered explicit-path launch and verification |
 | `POST` | `/bridge/v1/analyses/static-structural` | Explicit local Static Structural job start |
 | `GET` | `/bridge/v1/analyses/static-structural/{jobId}` | Poll submitted job and actual results |
+| `POST` | `/bridge/v1/analyses/modal` | Explicit local Modal job start |
+| `GET` | `/bridge/v1/analyses/modal/{jobId}` | Poll Modal status and actual frequencies |
+| `GET` | `/bridge/v1/analyses/static-structural/{jobId}/report` | Download accepted Static evidence JSON |
+| `GET` | `/bridge/v1/analyses/modal/{jobId}/report` | Download accepted Modal evidence JSON |
 
-All but `/health/live` require the bridge token. All requests require a loopback socket and allowed browser Origin. The only solve endpoint is the explicit Static Structural job described in the Phase 3 guide. There is no arbitrary-script or general upload endpoint.
+All but `/health/live` require the bridge token. All requests require a loopback socket and allowed browser Origin. Static and Modal solve endpoints require explicit user action. There is no arbitrary-script or general upload endpoint.
 
 ## Student and license limits
 

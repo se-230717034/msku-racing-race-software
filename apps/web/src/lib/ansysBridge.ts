@@ -327,6 +327,7 @@ export interface StaticStructuralInput {
   forceN: number;
   forceComponentsN?: Vec3;
   forceInputSha256?: string;
+  forceApplicationPointVehicleM?: Vec3;
   meshSizeMm: number;
   meshConvergenceSizesMm?: [number, number, number];
   studioTransfer?: StudioTransferInput;
@@ -373,6 +374,11 @@ export interface StaticStructuralJob {
     forceN: number;
     forceComponentsN?: Vec3 | null;
     forceInputSha256?: string | null;
+    forceApplicationPointVehicleM?: Vec3 | null;
+    resultFileBytes: number;
+    bodyCount: number;
+    fixedScopeEntityCount: number;
+    forceScopeEntityCount: number;
     meshSizeMm: number;
     mechanicalVersion: string;
     productInfo: string;
@@ -396,6 +402,7 @@ export interface StaticStructuralJob {
         maximumVonMisesStressPa: number;
         maximumTotalDeformationM: number;
         solverStatus: "Done";
+        resultFileBytes: number;
         warnings: string[];
       }>;
     };
@@ -425,6 +432,9 @@ export interface ModalAnalysisJob {
     modes: Array<{ modeNumber: number; frequencyHz: number }>;
     meshNodes: number;
     meshElements: number;
+    resultFileBytes: number;
+    bodyCount: number;
+    fixedScopeEntityCount: number;
     meshSizeMm: number;
     meshQuality: MeshQualityEvidence;
     geometrySha256: string;
@@ -439,6 +449,61 @@ export interface ModalAnalysisJob {
     meshConvergenceStatus: "NOT_ASSESSED";
     warnings: string[];
   };
+}
+
+export interface AnsysTechnicalReport {
+  schemaVersion: "1.0";
+  reportType: "LOCAL_ANSYS_NUMERICAL_EVIDENCE";
+  analysisType: "STATIC_STRUCTURAL" | "MODAL";
+  generatedAt: string;
+  jobId: string;
+  releaseReadiness: "BLOCKED";
+  physicalValidation: "UNVERIFIED";
+  approvedForEngineeringUse: false;
+  inputProvenance: Record<string, unknown>;
+  solverResult: Record<string, unknown>;
+  checks: Array<{
+    code: string;
+    status: "VERIFIED" | "UNVERIFIED" | "BLOCKED";
+    observation: string;
+    limitation: string | null;
+  }>;
+  unresolvedItems: string[];
+  warnings: string[];
+}
+
+export async function readAnsysTechnicalReport(
+  baseUrl: string,
+  token: string,
+  analysis: "static-structural" | "modal",
+  jobId: string,
+): Promise<AnsysTechnicalReport> {
+  if (!/^[a-f0-9-]{36}$/.test(jobId)) throw new Error("Geçersiz analiz iş kimliği.");
+  if (!token.trim()) throw new Error("Teknik rapor için yerel köprü tokenı gerekli.");
+  const normalized = normalizeLoopbackBridgeUrl(baseUrl);
+  const response = await fetchWithTimeout(
+    `${normalized}/bridge/v1/analyses/${analysis}/${jobId}/report`,
+    { headers: { "X-MSKU-Bridge-Token": token.trim() } },
+    12_000,
+  );
+  if (!response.ok) throw new Error(`Teknik rapor HTTP ${response.status} döndürdü.`);
+  const report = await response.json() as AnsysTechnicalReport;
+  if (report.schemaVersion !== "1.0"
+    || report.reportType !== "LOCAL_ANSYS_NUMERICAL_EVIDENCE"
+    || report.analysisType !== (analysis === "modal" ? "MODAL" : "STATIC_STRUCTURAL")
+    || report.jobId !== jobId
+    || report.releaseReadiness !== "BLOCKED"
+    || report.physicalValidation !== "UNVERIFIED"
+    || report.approvedForEngineeringUse !== false
+    || !Array.isArray(report.checks)
+    || !report.checks.every((check) => ["VERIFIED", "UNVERIFIED", "BLOCKED"].includes(check.status)
+      && typeof check.observation === "string" && typeof check.code === "string")
+    || !Array.isArray(report.unresolvedItems)
+    || !Array.isArray(report.warnings)
+    || Object.hasOwn(report.inputProvenance ?? {}, "geometryPath")) {
+    throw new Error("Teknik raporun kanıt veya gizlilik sözleşmesi geçersiz.");
+  }
+  return report;
 }
 
 function validateStaticJob(job: StaticStructuralJob): StaticStructuralJob {
@@ -456,6 +521,8 @@ function validateStaticJob(job: StaticStructuralJob): StaticStructuralJob {
       || result.maximumVonMisesStressPa < 0
       || result.maximumTotalDeformationM < 0
       || result.meshNodes <= 0 || result.meshElements <= 0
+      || result.resultFileBytes <= 0 || result.bodyCount <= 0
+      || result.fixedScopeEntityCount <= 0 || result.forceScopeEntityCount <= 0
       || !/^[a-f0-9]{64}$/.test(result.geometrySha256)
       || !Array.isArray(result.warnings)
       || !result.warnings.every((warning) => typeof warning === "string")
@@ -471,6 +538,7 @@ function validateStaticJob(job: StaticStructuralJob): StaticStructuralJob {
         || result.meshConvergence.points.length !== 3
         || !result.meshConvergence.points.every((point) =>
           point.solverStatus === "Done" && point.meshNodes > 0 && point.meshElements > 0
+          && point.resultFileBytes > 0
           && Number.isFinite(point.maximumVonMisesStressPa)
           && Number.isFinite(point.maximumTotalDeformationM)
           && point.maximumVonMisesStressPa >= 0 && point.maximumTotalDeformationM >= 0
@@ -540,6 +608,8 @@ function validateModalJob(job: ModalAnalysisJob): ModalAnalysisJob {
     || !/^[a-f0-9]{64}$/.test(result.geometrySha256)
     || !Number.isInteger(result.meshNodes) || result.meshNodes <= 0
     || !Number.isInteger(result.meshElements) || result.meshElements <= 0
+    || result.resultFileBytes <= 0 || result.bodyCount <= 0
+    || result.fixedScopeEntityCount <= 0
     || !Array.isArray(result.modes) || result.modes.length < 1 || result.modes.length > 6
     || result.modes.some((mode, index) => mode.modeNumber !== index + 1
       || !Number.isFinite(mode.frequencyHz) || mode.frequencyHz <= 0

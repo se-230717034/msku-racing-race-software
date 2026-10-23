@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -55,6 +55,7 @@ class FakeMechanical:
         mesh_sequence: list[tuple[int, int]] | None = None,
         result_sequence: list[tuple[str, str]] | None = None,
         solver_type: str = "Direct",
+        result_file_present: bool = True,
     ) -> None:
         self.calls: list[str] = []
         self.nodes = nodes
@@ -64,13 +65,13 @@ class FakeMechanical:
         self.deformation = deformation
         self.failure = failure
         self.configured_cores = configured_cores
-        self.working_dir = working_dir or Path(
-            "C:/ansys-test" if os.name == "nt" else "/tmp/ansys-test"
-        )
+        self._temporary_workdir = tempfile.TemporaryDirectory(prefix="msku-ansys-test-")
+        self.working_dir = working_dir or Path(self._temporary_workdir.name)
         self.save_failure = save_failure
         self.mesh_sequence = mesh_sequence
         self.result_sequence = result_sequence
         self.solver_type = solver_type
+        self.result_file_present = result_file_present
         self.mesh_index = -1
 
     def clear(self) -> None:
@@ -102,6 +103,9 @@ class FakeMechanical:
                 raise RuntimeError("SaveAs unavailable")
             return ""
         if "Solution.Solve(True)" in script:
+            if self.solver_status == "Done" and self.result_file_present:
+                self.working_dir.mkdir(parents=True, exist_ok=True)
+                (self.working_dir / "file.rst").write_bytes(b"fake test-only result")
             return json.dumps({"status": self.solver_status})
         if "MSKU_ANALYSIS.WorkingDir" in script:
             return str(self.working_dir)
@@ -149,6 +153,7 @@ def test_real_workflow_contract_extracts_only_solver_values(tmp_path: Path) -> N
     assert result.maximumTotalDeformationM == 0.0002
     assert result.meshNodes == 500
     assert result.meshElements == 200
+    assert result.resultFileBytes > 0
     assert result.geometrySha256 != ""
     assert result.validationStatus == "NUMERIC_RESULT_UNVALIDATED_PHYSICALLY"
     assert result.forceN == 1000
@@ -163,6 +168,13 @@ def test_real_workflow_contract_extracts_only_solver_values(tmp_path: Path) -> N
     save_index = next(i for i, call in enumerate(client.calls) if "Project.SaveAs(" in call)
     solve_index = next(i for i, call in enumerate(client.calls) if "Solution.Solve(True)" in call)
     assert save_index < solve_index
+
+
+def test_done_without_nonempty_result_file_is_rejected(tmp_path: Path) -> None:
+    client = FakeMechanical(result_file_present=False)
+    with pytest.raises(AnalysisError) as failure:
+        run_static_structural(client, request(tmp_path), lambda *_: None)
+    assert failure.value.code == "STATIC_RESULT_FILE_MISSING"
 
 
 @pytest.mark.parametrize("status", ["Failed", "SolveRequiredPartialResultsAvailable"])

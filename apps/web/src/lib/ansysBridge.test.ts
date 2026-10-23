@@ -4,6 +4,7 @@ import {
   launchRealAnsysConnection,
   normalizeLoopbackBridgeUrl,
   probeAnsysBridge,
+  readAnsysTechnicalReport,
   readModalAnalysis,
   readStaticStructural,
   startModalAnalysis,
@@ -18,6 +19,42 @@ const live = {
   scope: "localhost_only",
   tokenConfigured: true,
 };
+
+describe("local ANSYS technical report", () => {
+  const jobId = "11111111-1111-4111-8111-111111111111";
+  const report = {
+    schemaVersion: "1.0",
+    reportType: "LOCAL_ANSYS_NUMERICAL_EVIDENCE",
+    analysisType: "STATIC_STRUCTURAL",
+    generatedAt: "2026-10-22T10:00:00Z",
+    jobId,
+    releaseReadiness: "BLOCKED",
+    physicalValidation: "UNVERIFIED",
+    approvedForEngineeringUse: false,
+    inputProvenance: { meshSizeMm: 25 },
+    solverResult: { resultFileBytes: 1024 },
+    checks: [{ code: "STATIC_MESH_CONVERGENCE", status: "BLOCKED", observation: "Not converged", limitation: null }],
+    unresolvedItems: ["Physical correlation"],
+    warnings: ["Unvalidated"],
+  };
+
+  it("reads a blocked report only from the authenticated loopback bridge", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(report), { status: 200 }));
+    const actual = await readAnsysTechnicalReport("http://127.0.0.1:8765", "secure-token", "static-structural", jobId);
+    expect(actual.checks[0]?.status).toBe("BLOCKED");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`http://127.0.0.1:8765/bridge/v1/analyses/static-structural/${jobId}/report`);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ headers: { "X-MSKU-Bridge-Token": "secure-token" } });
+  });
+
+  it("rejects an approval claim or a leaked local CAD path", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...report, approvedForEngineeringUse: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...report, inputProvenance: { geometryPath: "C:/private.agdb" } }), { status: 200 }));
+    await expect(readAnsysTechnicalReport("http://127.0.0.1:8765", "secure-token", "static-structural", jobId)).rejects.toThrow(/sözleşmesi/);
+    await expect(readAnsysTechnicalReport("http://127.0.0.1:8765", "secure-token", "static-structural", jobId)).rejects.toThrow(/sözleşmesi/);
+  });
+});
 
 function bridgeStatus(connectionState = "NOT_TESTED", processVerified = false, startedByBridge = false) {
   const verified = connectionState === "VERIFIED" && processVerified;

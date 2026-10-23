@@ -47,6 +47,7 @@ class StaticAnalysisRequest(BaseModel):
     forceN: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
     forceComponentsN: Vector3 | None = None
     forceInputSha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    forceApplicationPointVehicleM: Vector3 | None = None
     meshSizeMm: float = Field(ge=0.1, le=1_000, allow_inf_nan=False)
     meshConvergenceSizesMm: list[float] | None = Field(default=None, min_length=3, max_length=3)
     studioTransfer: StudioTransfer | None = None
@@ -71,6 +72,10 @@ class StaticAnalysisRequest(BaseModel):
                 raise ValueError("Kuvvet bileşenleri sonlu, sınırlı ve sıfırdan farklı olmalı.")
             if not math.isclose(self.forceN, magnitude, rel_tol=1e-9, abs_tol=1e-9):
                 raise ValueError("forceN, vektör kuvvetin büyüklüğüne eşit olmalı.")
+        if self.forceApplicationPointVehicleM is not None and (
+            self.studioTransfer is None or self.forceComponentsN is None
+        ):
+            raise ValueError("Studio kuvvet uygulama noktası CAD çerçevesi ve vektör gerektirir.")
         if self.fixedNamedSelection == self.forceNamedSelection:
             raise ValueError("Mesnet ve kuvvet için farklı named selection gerekir.")
         sizes = self.meshConvergenceSizesMm
@@ -91,6 +96,7 @@ class MeshConvergencePoint(BaseModel):
     maximumVonMisesStressPa: float
     maximumTotalDeformationM: float
     solverStatus: Literal["Done"] = "Done"
+    resultFileBytes: int = Field(default=0, ge=0)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -121,6 +127,7 @@ class StaticAnalysisResult(BaseModel):
     maximumTotalDeformationM: float
     meshNodes: int
     meshElements: int
+    resultFileBytes: int = Field(default=0, ge=0)
     geometrySha256: str
     material: str
     fixedNamedSelection: str
@@ -129,6 +136,10 @@ class StaticAnalysisResult(BaseModel):
     forceN: float
     forceComponentsN: Vector3 | None = None
     forceInputSha256: str | None = None
+    forceApplicationPointVehicleM: Vector3 | None = None
+    bodyCount: int = Field(default=0, ge=0)
+    fixedScopeEntityCount: int = Field(default=0, ge=0)
+    forceScopeEntityCount: int = Field(default=0, ge=0)
     meshSizeMm: float
     mechanicalVersion: str
     productInfo: str
@@ -368,9 +379,7 @@ def _assess_mesh_convergence(points: list[MeshConvergencePoint]) -> MeshConverge
     coarse_deformation_change = _relative_change(
         coarse.maximumTotalDeformationM, middle.maximumTotalDeformationM
     )
-    stress_change = _relative_change(
-        middle.maximumVonMisesStressPa, fine.maximumVonMisesStressPa
-    )
+    stress_change = _relative_change(middle.maximumVonMisesStressPa, fine.maximumVonMisesStressPa)
     deformation_change = _relative_change(
         middle.maximumTotalDeformationM, fine.maximumTotalDeformationM
     )
@@ -511,9 +520,9 @@ def run_static_structural(
     # starts a fresh Mechanical project rather than inheriting stale loads/results.
     client.clear()
     setup = _payload(client.run_python_script(_setup_script(request, path)), "CAD ve yük")
-    _count(setup.get("bodies"), "gövde")
-    _count(setup.get("fixedFaces"), "mesnet yüzeyi")
-    _count(setup.get("forceFaces"), "kuvvet yüzeyi")
+    body_count = _count(setup.get("bodies"), "gövde")
+    fixed_count = _count(setup.get("fixedFaces"), "mesnet yüzeyi")
+    force_count = _count(setup.get("forceFaces"), "kuvvet yüzeyi")
     if request.studioTransfer is not None and setup.get("studioHardpoints") != 9:
         raise AnalysisError(
             "STUDIO_TRANSFER_NOT_CONFIRMED",
@@ -605,6 +614,13 @@ def run_static_structural(
         solver_status = str(solved.get("status", ""))
         if solver_status.split(".")[-1] != "Done":
             raise _solver_failure(working_dir, solver_status)
+        result_file = working_dir / "file.rst"
+        if not result_file.is_file() or result_file.stat().st_size == 0:
+            raise AnalysisError(
+                "STATIC_RESULT_FILE_MISSING",
+                "Mechanical Done bildirdi ancak statik sonuç dosyası eksik veya boş.",
+            )
+        result_file_bytes = result_file.stat().st_size
 
         progress("extracting", f"Gerilme ve deformasyon {index + 1}/{len(sizes)} okunuyor.")
         results = _payload(
@@ -633,6 +649,7 @@ def run_static_structural(
                 meshElements=elements,
                 maximumVonMisesStressPa=_si_quantity(results.get("stress"), "Pa"),
                 maximumTotalDeformationM=_si_quantity(results.get("deformation"), "m"),
+                resultFileBytes=result_file_bytes,
                 warnings=step_warnings,
             )
         )
@@ -681,6 +698,7 @@ def run_static_structural(
         maximumTotalDeformationM=final.maximumTotalDeformationM,
         meshNodes=final.meshNodes,
         meshElements=final.meshElements,
+        resultFileBytes=final.resultFileBytes,
         geometrySha256=digest,
         material=request.material,
         fixedNamedSelection=request.fixedNamedSelection,
@@ -689,6 +707,10 @@ def run_static_structural(
         forceN=request.forceN,
         forceComponentsN=request.forceComponentsN,
         forceInputSha256=request.forceInputSha256,
+        forceApplicationPointVehicleM=request.forceApplicationPointVehicleM,
+        bodyCount=body_count,
+        fixedScopeEntityCount=fixed_count,
+        forceScopeEntityCount=force_count,
         meshSizeMm=request.meshSizeMm,
         mechanicalVersion=str(client.version),
         productInfo=str(client.get_product_info())[:500],
@@ -709,6 +731,7 @@ class StaticAnalysisManager:
         self._adapter = adapter
         self._lock = threading.Lock()
         self._job: StaticJobResponse | None = None
+        self._request: StaticAnalysisRequest | None = None
 
     def start(self, request: StaticAnalysisRequest) -> StaticJobResponse:
         _validated_geometry(request.geometryPath)
@@ -724,6 +747,7 @@ class StaticAnalysisManager:
                 message="Açık kullanıcı isteği alındı; yerel Mechanical oturumu bekleniyor.",
                 startedAt=datetime.now(UTC).isoformat(),
             )
+            self._request = request.model_copy(deep=True)
             job = self._job.model_copy(deep=True)
         threading.Thread(target=self._work, args=(request,), daemon=False).start()
         return job
@@ -733,6 +757,18 @@ class StaticAnalysisManager:
             if self._job is None or self._job.jobId != job_id:
                 return None
             return self._job.model_copy(deep=True)
+
+    def report_source(self, job_id: str) -> tuple[StaticAnalysisRequest, StaticJobResponse] | None:
+        with self._lock:
+            if (
+                self._job is None
+                or self._job.jobId != job_id
+                or self._job.state != "SUCCEEDED"
+                or self._job.result is None
+                or self._request is None
+            ):
+                return None
+            return self._request.model_copy(deep=True), self._job.model_copy(deep=True)
 
     def _progress(self, stage: AnalysisStage, message: str) -> None:
         with self._lock:

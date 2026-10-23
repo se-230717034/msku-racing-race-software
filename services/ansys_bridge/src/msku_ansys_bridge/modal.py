@@ -62,6 +62,9 @@ class ModalAnalysisResult(BaseModel):
     modes: list[ModalMode]
     meshNodes: int
     meshElements: int
+    resultFileBytes: int = Field(default=0, ge=0)
+    bodyCount: int = Field(default=0, ge=0)
+    fixedScopeEntityCount: int = Field(default=0, ge=0)
     meshSizeMm: float
     meshQuality: MeshQualityEvidence
     geometrySha256: str
@@ -150,8 +153,8 @@ def run_modal_analysis(
     progress("importing", "Modal CAD, malzeme ve sabit mesnet kapsamı doğrulanıyor.")
     client.clear()
     setup = _payload(client.run_python_script(_modal_setup_script(request, path)), "modal CAD")
-    _count(setup.get("bodies"), "gövde")
-    _count(setup.get("fixedFaces"), "mesnet yüzeyi")
+    body_count = _count(setup.get("bodies"), "gövde")
+    fixed_count = _count(setup.get("fixedFaces"), "mesnet yüzeyi")
     if setup.get("configuredModes") != request.modeCount:
         raise AnalysisError("MODAL_MODE_COUNT_NOT_CONFIRMED", "Modal mod sayısı doğrulanamadı.")
     if request.studioTransfer is not None and setup.get("studioHardpoints") != 9:
@@ -264,6 +267,9 @@ def run_modal_analysis(
         ],
         meshNodes=nodes,
         meshElements=elements,
+        resultFileBytes=result_file.stat().st_size,
+        bodyCount=body_count,
+        fixedScopeEntityCount=fixed_count,
         meshSizeMm=request.meshSizeMm,
         meshQuality=quality,
         geometrySha256=digest,
@@ -284,6 +290,7 @@ class ModalAnalysisManager:
         self._adapter = adapter
         self._lock = threading.Lock()
         self._job: ModalJobResponse | None = None
+        self._request: ModalAnalysisRequest | None = None
 
     def start(self, request: ModalAnalysisRequest) -> ModalJobResponse:
         _validated_geometry(request.geometryPath)
@@ -297,6 +304,7 @@ class ModalAnalysisManager:
                 message="Açık modal analiz isteği alındı; yerel Mechanical bekleniyor.",
                 startedAt=datetime.now(UTC).isoformat(),
             )
+            self._request = request.model_copy(deep=True)
             job = self._job.model_copy(deep=True)
         threading.Thread(target=self._work, args=(request,), daemon=False).start()
         return job
@@ -306,6 +314,18 @@ class ModalAnalysisManager:
             if self._job is None or self._job.jobId != job_id:
                 return None
             return self._job.model_copy(deep=True)
+
+    def report_source(self, job_id: str) -> tuple[ModalAnalysisRequest, ModalJobResponse] | None:
+        with self._lock:
+            if (
+                self._job is None
+                or self._job.jobId != job_id
+                or self._job.state != "SUCCEEDED"
+                or self._job.result is None
+                or self._request is None
+            ):
+                return None
+            return self._request.model_copy(deep=True), self._job.model_copy(deep=True)
 
     def _progress(self, stage: AnalysisStage, message: str) -> None:
         with self._lock:
@@ -334,8 +354,10 @@ class ModalAnalysisManager:
                 )
             elif "material" in lowered:
                 self._finish(
-                    "FAILED", "MATERIAL_NOT_AVAILABLE",
-                    "Structural Steel malzemesi Mechanical içinde atanamadı.", None,
+                    "FAILED",
+                    "MATERIAL_NOT_AVAILABLE",
+                    "Structural Steel malzemesi Mechanical içinde atanamadı.",
+                    None,
                 )
             else:
                 self._finish(
