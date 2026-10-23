@@ -11,10 +11,14 @@ Updated: 2026-10-23
 - [x] Quasi-static load application point is preserved as **unmapped provenance**, not falsely applied to a CAD face
 - [x] Real v261 Student Static/Modal and browser→bridge→Mechanical→browser/report downloads passed; two material-energy warnings remain visible
 - [ ] Real vehicle CAD topology/face and load-point registration, measured materials, justified BC/contact, spatial static/modal convergence, benchmark, vehicle correlation and team license review
-- [x] Phase 6 local gates: 217 Python tests, Ruff, mypy, ESLint, TypeScript, 67 frontend tests, production build, 13 regular Chromium flows and one opt-in real Student Chromium flow (first run)
-- [ ] Repeatability gate: 2026-10-23 second licensed Chromium run timed out at Modal `importing` after Static/report succeeded; cause not established, no Modal result accepted
+- [x] Phase 6 repeat investigation: three direct 3-mesh Static→Modal pairs and three browser→bridge→ANSYS→browser Static→Modal pairs completed with real Student v261; each duration/job status is recorded in the repeat-evidence report
+- [x] Per-stage timeout, distinct project-clear/CAD-import messages, late-result rejection, quarantined session, safe re-launch gate, and cross-analysis single-process exclusion
+- [x] Final local gates: 222 Python tests, Ruff, mypy, ESLint, TypeScript, 67 frontend tests, production build and 13 normal Chromium flows (two opt-in licensed tests skipped by default)
+- [x] Final-code opt-in Student Chromium 3-mesh Static + Modal smoke and report download passed; `NOT_CONVERGED`, MP/TB and physical-unvalidation warnings remained visible
+- [ ] Historical second licensed Chromium run timed out at Modal `importing` after Static/report succeeded; exact RPC/Mechanical root cause remains unknown because the old trace did not split clear/import. It is not counted as a pass.
 
-See `docs/ANSYS_PHASE_6_RELEASE_READINESS_2026-10-22.md` for evidence, statuses and risks.
+See `docs/ANSYS_PHASE_6_RELEASE_READINESS_2026-10-22.md` and
+`docs/ANSYS_PHASE_6_REPEAT_EVIDENCE_2026-10-23.md` for evidence, statuses and risks.
 
 ## ANSYS local integration — Phase 5 Studio transfer and real Modal
 

@@ -63,11 +63,23 @@ Enter the printed token in the **ANSYS YEREL** panel. Then choose **Mechanical'�
 | `MSKU_ANSYS_MECHANICAL_PORT` | `10000` | `1024`–`65535`, loopback only |
 | `MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS` | `8` | `1`–`30` seconds |
 | `MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS` | `180` | `30`–`300` seconds |
+| `MSKU_ANSYS_ANALYSIS_STAGE_TIMEOUT_SECONDS` | `300` | `30`–`3600` seconds per queued/import/mesh/solve/extract step; not a solver cancellation |
 | `MSKU_ANSYS_MECHANICAL_EXECUTABLE` | Discovered path | Absolute local `v###\aisol\bin\winx64\AnsysWBU.exe` |
 | `MSKU_ANSYS_START_LICENSE` | `auto` | `auto` and `none` delegate selection to ANSYS; explicit `aa_t_i`, `ansys`, `mech_1`, `mech_2` are accepted on v261+ but require real entitlement |
 | `MSKU_ANSYS_PROJECT_DIRECTORY` | Per-user TEMP short ASCII path | Optional existing, local, absolute ASCII directory for documented Mechanical `Project.SaveAs`; Unicode/UNC/invalid paths fail before solve |
 
 Do not commit tokens or license-server details.
+
+If a Mechanical gRPC step does not advance before this deadline, the job becomes
+`FAILED` with `MECHANICAL_STAGE_TIMEOUT`, **without a result or downloadable
+report**. The bridge quarantines that Mechanical session; a late response cannot
+turn the job into success. Once the blocked call returns, the bridge attempts to
+close only its own Mechanical session. If the call remains blocked, the bridge
+cannot prove that the process exited or release its license seat: stop the local
+bridge, confirm the owned Mechanical process has ended, and restart explicitly.
+Do not retry against an unresponsive or externally owned session. The status
+message distinguishes project clearing from CAD import, and local bridge logs
+record job ID, stage, and elapsed step time without CAD paths or token values.
 
 ## HTTP endpoints
 

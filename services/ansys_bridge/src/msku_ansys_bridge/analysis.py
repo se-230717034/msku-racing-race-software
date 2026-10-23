@@ -5,11 +5,13 @@ from __future__ import annotations
 import ctypes
 import hashlib
 import json
+import logging
 import math
 import os
 import re
 import tempfile
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +21,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .adapter import MechanicalClient
+from .job_safety import StageWatchdog
 from .studio_transfer import StudioTransfer, StudioTransferEvidence, Vector3, transfer_evidence
 
 _T = TypeVar("_T")
@@ -515,10 +518,11 @@ def run_static_structural(
     progress: Callable[[AnalysisStage, str], None],
 ) -> StaticAnalysisResult:
     path, digest = _validated_geometry(request.geometryPath)
-    progress("importing", "CAD içe aktarılıyor ve named selection kapsamları doğrulanıyor.")
+    progress("importing", "Önceki Mechanical projesi temizleniyor.")
     # Only a bridge-owned blank session reaches this function. Each new explicit run
     # starts a fresh Mechanical project rather than inheriting stale loads/results.
     client.clear()
+    progress("importing", "CAD içe aktarılıyor ve named selection kapsamları doğrulanıyor.")
     setup = _payload(client.run_python_script(_setup_script(request, path)), "CAD ve yük")
     body_count = _count(setup.get("bodies"), "gövde")
     fixed_count = _count(setup.get("fixedFaces"), "mesnet yüzeyi")
@@ -727,14 +731,20 @@ def run_static_structural(
 
 
 class StaticAnalysisManager:
-    def __init__(self, adapter: OwnedMechanical) -> None:
+    def __init__(self, adapter: OwnedMechanical, stage_timeout_seconds: float = 300) -> None:
         self._adapter = adapter
+        self._stage_timeout_seconds = stage_timeout_seconds
         self._lock = threading.Lock()
         self._job: StaticJobResponse | None = None
         self._request: StaticAnalysisRequest | None = None
+        self._watchdog: StageWatchdog | None = None
+        self._last_progress_monotonic: float | None = None
 
     def start(self, request: StaticAnalysisRequest) -> StaticJobResponse:
         _validated_geometry(request.geometryPath)
+        ready = getattr(self._adapter, "assert_ready_for_job", None)
+        if ready is not None:
+            ready()
         with self._lock:
             if self._job and self._job.state in {"QUEUED", "RUNNING"}:
                 raise AnalysisError(
@@ -748,8 +758,14 @@ class StaticAnalysisManager:
                 startedAt=datetime.now(UTC).isoformat(),
             )
             self._request = request.model_copy(deep=True)
+            job_id = self._job.jobId
+            self._watchdog = StageWatchdog(
+                self._stage_timeout_seconds, lambda stage: self._timeout(job_id, stage)
+            )
+            self._last_progress_monotonic = time.monotonic()
+            self._watchdog.pulse("queued")
             job = self._job.model_copy(deep=True)
-        threading.Thread(target=self._work, args=(request,), daemon=False).start()
+        threading.Thread(target=self._work, args=(request, job_id), daemon=True).start()
         return job
 
     def snapshot(self, job_id: str) -> StaticJobResponse | None:
@@ -770,20 +786,41 @@ class StaticAnalysisManager:
                 return None
             return self._request.model_copy(deep=True), self._job.model_copy(deep=True)
 
-    def _progress(self, stage: AnalysisStage, message: str) -> None:
+    def _progress(self, stage: AnalysisStage, message: str, job_id: str | None = None) -> None:
         with self._lock:
-            if self._job is not None:
+            if (
+                self._job is not None
+                and (job_id is None or self._job.jobId == job_id)
+                and self._job.state in {"QUEUED", "RUNNING"}
+            ):
                 self._job.state = "RUNNING"
                 self._job.stage = stage
                 self._job.message = message
+                now = time.monotonic()
+                elapsed = (
+                    0.0
+                    if self._last_progress_monotonic is None
+                    else now - self._last_progress_monotonic
+                )
+                self._last_progress_monotonic = now
+                logging.getLogger("uvicorn.error").info(
+                    "static job=%s stage=%s previous_step_seconds=%.3f",
+                    self._job.jobId,
+                    stage,
+                    elapsed,
+                )
+                if self._watchdog is not None:
+                    self._watchdog.pulse(stage)
 
-    def _work(self, request: StaticAnalysisRequest) -> None:
+    def _work(self, request: StaticAnalysisRequest, job_id: str | None = None) -> None:
         try:
             result = self._adapter.run_with_owned_client(
-                lambda client: run_static_structural(client, request, self._progress)
+                lambda client: run_static_structural(
+                    client, request, lambda stage, message: self._progress(stage, message, job_id)
+                )
             )
         except AnalysisError as exc:
-            self._finish("FAILED", exc.code, exc.message, None)
+            self._finish("FAILED", exc.code, exc.message, None, job_id)
         except Exception as exc:
             # Raw gRPC/Mechanical errors may contain local paths or license-server secrets.
             lowered = f"{type(exc).__name__} {exc}".casefold()
@@ -829,9 +866,34 @@ class StaticAnalysisManager:
                 code,
                 message,
                 None,
+                job_id,
             )
         else:
-            self._finish("SUCCEEDED", None, "Mechanical çözümü ve sonuçları doğrulandı.", result)
+            self._finish(
+                "SUCCEEDED", None, "Mechanical çözümü ve sonuçları doğrulandı.", result, job_id
+            )
+
+    def _timeout(self, job_id: str, stage: str) -> None:
+        with self._lock:
+            if (
+                self._job is None
+                or self._job.jobId != job_id
+                or self._job.state not in {"QUEUED", "RUNNING"}
+            ):
+                return
+            self._job.state = "FAILED"
+            self._job.errorCode = "MECHANICAL_STAGE_TIMEOUT"
+            self._job.message = (
+                f"Mechanical {stage} aşamasında zaman aşımı; sonuç reddedildi. Yeni proses gerekli."
+            )
+            self._job.completedAt = datetime.now(UTC).isoformat()
+            self._job.result = None
+        quarantine = getattr(self._adapter, "quarantine_timeout", None)
+        if quarantine is not None:
+            quarantine()
+        logging.getLogger("uvicorn.error").error(
+            "static job=%s stage=%s timed out; session quarantined", job_id, stage
+        )
 
     def _finish(
         self,
@@ -839,9 +901,16 @@ class StaticAnalysisManager:
         error_code: str | None,
         message: str,
         result: StaticAnalysisResult | None,
+        job_id: str | None = None,
     ) -> None:
         with self._lock:
-            if self._job is not None:
+            if (
+                self._job is not None
+                and (job_id is None or self._job.jobId == job_id)
+                and self._job.state in {"QUEUED", "RUNNING"}
+            ):
+                if self._watchdog is not None:
+                    self._watchdog.stop()
                 self._job.state = state
                 self._job.stage = "done"
                 self._job.message = message

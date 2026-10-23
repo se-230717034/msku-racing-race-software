@@ -100,6 +100,14 @@ is rechecked when exporting. The Student sample's peak stress remains
 Mechanical and report generation stay on the user's computer, never on Vercel.
 See the [ANSYS Phase 6 release-readiness report](./docs/ANSYS_PHASE_6_RELEASE_READINESS_2026-10-22.md).
 
+The local bridge now bounds each ANSYS stage, distinguishes project clearing
+from CAD import, rejects late results after timeout, and prevents retries on
+an uncertain Mechanical session. Three consecutive real Student Static+Modal
+browser workflows passed after an earlier Modal import timeout; that earlier
+failure's exact root cause remains unknown. These software checks do not
+override `NOT_CONVERGED` or physical-unvalidation warnings. See the
+[repeat investigation and per-run evidence](./docs/ANSYS_PHASE_6_REPEAT_EVIDENCE_2026-10-23.md).
+
 See [PROGRESS.md](./PROGRESS.md), the [ANSYS local bridge guide](./docs/ANSYS_LOCAL_BRIDGE.md), the [Phase 3 Static Structural guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites

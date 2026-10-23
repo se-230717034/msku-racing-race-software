@@ -116,13 +116,25 @@ ayrıştırılamadı. Kök neden için proses/RPC ve Mechanical mesaj zaman çiz
 toplanmalı, art arda analizler yinelenmeli. Bu nedenle uçtan uca
 tekrarlanabilirlik ve üretim güvenilirliği **BLOCKED** olarak kalır.
 
+**23 Ekim takip incelemesi:** [ayrıntılı gerçek koşu kanıtı](ANSYS_PHASE_6_REPEAT_EVIDENCE_2026-10-23.md)
+ile aynı yazılabilir Mechanical oturumunda üç doğrudan 3-mesh Static→Modal
+çifti ve ayrı bir tarayıcı→localhost bridge→ANSYS→tarayıcı oturumunda üç
+Static→Modal çifti art arda tamamlandı. Önceki tekil 600 sn import takılması
+yeniden üretilemedi. Eski logda `importing` aşaması proje temizleme ile CAD
+içe aktarmayı ayırmadığı ve RPC zaman çizelgesi bulunmadığı için kesin kök
+neden **bilinmiyor**. Yeni aşama mesajları, 300 sn varsayılan bekleme sınırı,
+geç sonuç reddi ve oturum karantinası güvenli başarısızlığı sağlar; takılmış
+Mechanical çağrısının işletim sistemi seviyesinde zorla iptal edildiği iddia
+edilmez. Bu tekrarlı yazılım testi önceki başarısız denemeyi silmez veya
+gerçek araç sonuçlarını fiziksel olarak doğrulamaz.
+
 ## Sürüm kararı ve açık eksikler
 
 | Durum | Gözlem | Gereken sonraki kanıt |
 | --- | --- | --- |
 | `VERIFIED` (yazılım/sayısal) | Yerel güvenlik kapısı, gerçek örnek Static/Modal `Done`, dosya/birim/sonlu değer kontrolleri, tarayıcı rapor akışı | Diğer ANSYS sürümleri ve gerçek parça konfigürasyonlarında tekrar |
 | `UNVERIFIED` (mühendislik) | Gerçek araç CAD-topoloji kaydı, measured malzeme ve yoğunluk, yük yüzeyi/noktası, gerçek mesnet/mafsal/temas, modal mesh ve fiziksel test korelasyonu yok | CAD revizyonu + ölçümler + test düzeneği/araç korelasyonu ve bağımsız benchmark |
-| `BLOCKED` | Örnek küresel max gerilme `NOT_CONVERGED`; gerçek araç sonucu için fiziksel onay yok; ikinci lisanslı tarayıcı koşusu Modal import'ta zaman aşımına uğradı | Uzaysal ve yük/BC duyarlılığıyla tekillik araştırması, mesh yakınsaması, art arda analizlerde Mechanical/RPC tanısı, uzman incelemesi |
+| `BLOCKED` | Örnek küresel max gerilme `NOT_CONVERGED`; gerçek araç sonucu için fiziksel onay yok. Tarihsel Modal import timeout'unun kesin nedeni saptanmadı; sonraki üçlü tekrar geçti. | Uzaysal ve yük/BC duyarlılığıyla tekillik araştırması, mesh yakınsaması, timeout tekrarlarsa yeni aşama/RPC logları, uzman incelemesi |
 
 Yazılım entegrasyonu PR incelemesine hazır olabilir; gerçek Formula Student
 tasarım kararları için **yayın/onay hazır değildir**. ANSYS Student sınırları

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 import msku_ansys_bridge.adapter as adapter_module
 import pytest
 from msku_ansys_bridge.adapter import LocalAnsysAdapter, PyMechanicalLauncher
+from msku_ansys_bridge.analysis import AnalysisError
 from msku_ansys_bridge.config import BridgeSettings
 from msku_ansys_bridge.discovery import (
     AnsysInstallation,
@@ -81,13 +83,15 @@ class FakeLauncher:
         timeout_seconds: int,
         start_license: str,
     ) -> FakeClient:
-        self.calls.append({
-            "installation": installation,
-            "host": host,
-            "port": port,
-            "timeout_seconds": timeout_seconds,
-            "start_license": start_license,
-        })
+        self.calls.append(
+            {
+                "installation": installation,
+                "host": host,
+                "port": port,
+                "timeout_seconds": timeout_seconds,
+                "start_license": start_license,
+            }
+        )
         if self.failure:
             raise self.failure
         return self.client
@@ -389,3 +393,74 @@ def test_owned_nonstructural_product_is_not_accepted_as_structural_license(
     assert result.state == "LICENSE_ERROR"
     assert result.error_code == "MECHANICAL_STRUCTURAL_LICENSE_NOT_CHECKED_OUT"
     assert result.process_verified is False
+
+
+def test_timeout_quarantines_owned_client_until_new_verified_launch() -> None:
+    client = FakeClient()
+    instance, _, launcher = adapter(client, port_open=False)
+    assert instance.launch_connection().process_verified is True
+    instance.quarantine_timeout()
+    assert instance.status().ansys_connected is False
+    assert instance.status().connection.error_code == "MECHANICAL_TIMEOUT_RESTART_REQUIRED"
+    with pytest.raises(AnalysisError, match="Zaman aşımına"):
+        instance.assert_ready_for_job()
+    assert instance.test_connection().process_verified is False
+    instance.close()
+    assert client.exit_calls == 1
+    assert instance.launch_connection().process_verified is True
+    assert len(launcher.calls) == 2
+    instance.assert_ready_for_job()
+
+
+def test_parallel_static_modal_actions_never_queue_against_one_mechanical() -> None:
+    instance, _, _ = adapter(FakeClient(), port_open=False)
+    assert instance.launch_connection().process_verified is True
+    entered = threading.Event()
+    release = threading.Event()
+
+    def hold(_client: FakeClient) -> None:
+        entered.set()
+        release.wait(1)
+
+    worker = threading.Thread(target=lambda: instance.run_with_owned_client(hold))
+    worker.start()
+    try:
+        assert entered.wait(1)
+        with pytest.raises(AnalysisError) as failure:
+            instance.run_with_owned_client(lambda _client: None)
+        assert failure.value.code == "ANALYSIS_ALREADY_RUNNING"
+    finally:
+        release.set()
+        worker.join(2)
+        instance.close()
+
+
+def test_close_during_blocked_owned_call_quarantines_then_closes_on_return() -> None:
+    client = FakeClient()
+    instance, _, _ = adapter(client, port_open=False)
+    assert instance.launch_connection().process_verified is True
+    entered = threading.Event()
+    release = threading.Event()
+    failures: list[AnalysisError] = []
+
+    def hold(_client: FakeClient) -> None:
+        entered.set()
+        release.wait(1)
+
+    def work() -> None:
+        try:
+            instance.run_with_owned_client(hold)
+        except AnalysisError as exc:
+            failures.append(exc)
+
+    worker = threading.Thread(target=work)
+    worker.start()
+    assert entered.wait(1)
+    instance.close()
+    assert instance.status().ansys_connected is False
+    assert client.exit_calls == 0
+    release.set()
+    worker.join(2)
+    assert not worker.is_alive()
+    assert client.exit_calls == 1
+    assert [failure.code for failure in failures] == ["MECHANICAL_TIMEOUT_RESTART_REQUIRED"]

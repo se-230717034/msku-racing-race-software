@@ -147,7 +147,7 @@ def test_real_workflow_contract_extracts_only_solver_values(tmp_path: Path) -> N
 
     result = run_static_structural(client, payload, lambda stage, _message: stages.append(stage))
 
-    assert stages == ["importing", "meshing", "solving", "extracting"]
+    assert stages == ["importing", "importing", "meshing", "solving", "extracting"]
     assert result.solverStatus == "Done"
     assert result.maximumVonMisesStressPa == 1250
     assert result.maximumTotalDeformationM == 0.0002

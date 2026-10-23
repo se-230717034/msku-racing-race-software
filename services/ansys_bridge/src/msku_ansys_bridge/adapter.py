@@ -230,6 +230,7 @@ class LocalAnsysAdapter:
         self._port_probe = port_probe
         self._connection = _not_tested(settings.mechanical_port)
         self._connection_lock = threading.Lock()
+        self._timed_out = threading.Event()
         self._owned_client: MechanicalClient | None = None
         self._connected_client: MechanicalClient | None = None
 
@@ -475,6 +476,13 @@ class LocalAnsysAdapter:
         return result
 
     def test_connection(self) -> ConnectionTestResult:
+        if self._timed_out.is_set():
+            return self._failure(
+                "VERIFICATION_FAILED",
+                "MECHANICAL_TIMEOUT_RESTART_REQUIRED",
+                "Zaman aşımından sonra eski Mechanical oturumu yeniden kullanılamaz; "
+                "bridge tarafından yeni proses başlatılmalıdır.",
+            )
         if not self._connection_lock.acquire(blocking=False):
             return ConnectionTestResult(
                 state="TEST_IN_PROGRESS",
@@ -586,6 +594,7 @@ class LocalAnsysAdapter:
             result = self._verify_client(client, discovery, started_by_bridge=True)
             if result.process_verified:
                 self._owned_client = client
+                self._timed_out.clear()
             else:
                 try:
                     client.exit(force=True)
@@ -596,7 +605,12 @@ class LocalAnsysAdapter:
             self._connection_lock.release()
 
     def close(self) -> None:
-        with self._connection_lock:
+        # A blocked gRPC stream cannot safely be cancelled by another Python thread.
+        # Never hold bridge shutdown indefinitely waiting for that stream's lock.
+        if not self._connection_lock.acquire(blocking=False):
+            self.quarantine_timeout()
+            return
+        try:
             client = self._owned_client
             self._owned_client = None
             if client is None:
@@ -609,11 +623,40 @@ class LocalAnsysAdapter:
             finally:
                 self._connected_client = None
                 self._connection = _not_tested(self._settings.mechanical_port)
+        finally:
+            self._connection_lock.release()
+
+    def quarantine_timeout(self) -> None:
+        self._timed_out.set()
+        self._failure(
+            "VERIFICATION_FAILED",
+            "MECHANICAL_TIMEOUT_RESTART_REQUIRED",
+            "Mechanical yanıtı zaman aşımına uğradı. Sonuç reddedildi; eski proses "
+            "temizlenmeden veya yeni bridge prosesi açılmadan tekrar çözüm başlatılamaz.",
+            started_by_bridge=True,
+        )
+
+    def assert_ready_for_job(self) -> None:
+        from .analysis import AnalysisError
+
+        if self._timed_out.is_set():
+            raise AnalysisError(
+                "MECHANICAL_TIMEOUT_RESTART_REQUIRED",
+                "Zaman aşımına uğrayan Mechanical oturumuyla tekrar analiz başlatılamaz.",
+            )
+        if self._connection_lock.locked():
+            raise AnalysisError("ANALYSIS_ALREADY_RUNNING", "Mechanical oturumu başka bir işlemde.")
 
     def run_with_owned_client(self, action: Callable[[MechanicalClient], _T]) -> _T:
         # An externally connected Mechanical process may contain unsaved user work.
         # Static jobs clear a project, so they are allowed only in bridge-owned sessions.
-        with self._connection_lock:
+        self.assert_ready_for_job()
+        if not self._connection_lock.acquire(blocking=False):
+            from .analysis import AnalysisError
+
+            raise AnalysisError("ANALYSIS_ALREADY_RUNNING", "Mechanical oturumu başka bir işlemde.")
+        try:
+            self.assert_not_quarantined()
             client = self._owned_client
             if (
                 client is None
@@ -628,4 +671,26 @@ class LocalAnsysAdapter:
                     "Analiz için bridge tarafından başlatılmış ve doğrulanmış "
                     "Mechanical oturumu gerekli.",
                 )
-            return action(client)
+            try:
+                result = action(client)
+                self.assert_not_quarantined()
+                return result
+            finally:
+                if self._timed_out.is_set():
+                    try:
+                        client.exit(force=True)
+                    except Exception:
+                        pass
+                    self._owned_client = None
+                    self._connected_client = None
+        finally:
+            self._connection_lock.release()
+
+    def assert_not_quarantined(self) -> None:
+        if self._timed_out.is_set():
+            from .analysis import AnalysisError
+
+            raise AnalysisError(
+                "MECHANICAL_TIMEOUT_RESTART_REQUIRED",
+                "Zaman aşımına uğrayan Mechanical oturumunun sonucu reddedildi.",
+            )

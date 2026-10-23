@@ -50,8 +50,12 @@ def create_app(
 ) -> FastAPI:
     active_settings = settings or BridgeSettings.from_environment()
     active_adapter = adapter or LocalAnsysAdapter(active_settings)
-    analysis_manager = StaticAnalysisManager(active_adapter)
-    modal_manager = ModalAnalysisManager(active_adapter)
+    analysis_manager = StaticAnalysisManager(
+        active_adapter, active_settings.analysis_stage_timeout_seconds
+    )
+    modal_manager = ModalAnalysisManager(
+        active_adapter, active_settings.analysis_stage_timeout_seconds
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -195,7 +199,9 @@ def create_app(
             return analysis_manager.start(request)
         except AnalysisError as exc:
             raise HTTPException(
-                status_code=409 if exc.code == "ANALYSIS_ALREADY_RUNNING" else 422,
+                status_code=409
+                if exc.code in {"ANALYSIS_ALREADY_RUNNING", "MECHANICAL_TIMEOUT_RESTART_REQUIRED"}
+                else 422,
                 detail={"code": exc.code, "message": exc.message},
             ) from exc
 
@@ -246,7 +252,9 @@ def create_app(
             return modal_manager.start(request)
         except AnalysisError as exc:
             raise HTTPException(
-                status_code=409 if exc.code == "ANALYSIS_ALREADY_RUNNING" else 422,
+                status_code=409
+                if exc.code in {"ANALYSIS_ALREADY_RUNNING", "MECHANICAL_TIMEOUT_RESTART_REQUIRED"}
+                else 422,
                 detail={"code": exc.code, "message": exc.message},
             ) from exc
 
