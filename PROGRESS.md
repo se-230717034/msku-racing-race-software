@@ -1,6 +1,24 @@
 # Implementation progress
 
-Updated: 2026-10-22
+Updated: 2026-10-23
+
+## ANSYS local integration — Phase 6 verification and release gate
+
+- [x] New `codex/ansys-local-bridge-phase-6` branch from current merged `main`; no automatic merge
+- [x] Static and Modal `Done` require a nonempty Mechanical `.rst`; result-file size, CAD hash and scope/body counts are retained as runtime evidence
+- [x] Three-mesh report recomputes relative differences and rejects inconsistent convergence claims; `NOT_CONVERGED` remains `BLOCKED`
+- [x] Versioned, authenticated, downloadable local JSON technical reports with provenance, units, warnings and explicit no-approval state
+- [x] Quasi-static load application point is preserved as **unmapped provenance**, not falsely applied to a CAD face
+- [x] Real v261 Student Static/Modal and browser→bridge→Mechanical→browser/report downloads passed; two material-energy warnings remain visible
+- [ ] Real vehicle CAD topology/face and load-point registration, measured materials, justified BC/contact, spatial static/modal convergence, benchmark, vehicle correlation and team license review
+- [x] Phase 6 repeat investigation: three direct 3-mesh Static→Modal pairs and three browser→bridge→ANSYS→browser Static→Modal pairs completed with real Student v261; each duration/job status is recorded in the repeat-evidence report
+- [x] Per-stage timeout, distinct project-clear/CAD-import messages, late-result rejection, quarantined session, safe re-launch gate, and cross-analysis single-process exclusion
+- [x] Final local gates: 222 Python tests, Ruff, mypy, ESLint, TypeScript, 67 frontend tests, production build and 13 normal Chromium flows (two opt-in licensed tests skipped by default)
+- [x] Final-code opt-in Student Chromium 3-mesh Static + Modal smoke and report download passed; `NOT_CONVERGED`, MP/TB and physical-unvalidation warnings remained visible
+- [ ] Historical second licensed Chromium run timed out at Modal `importing` after Static/report succeeded; exact RPC/Mechanical root cause remains unknown because the old trace did not split clear/import. It is not counted as a pass.
+
+See `docs/ANSYS_PHASE_6_RELEASE_READINESS_2026-10-22.md` and
+`docs/ANSYS_PHASE_6_REPEAT_EVIDENCE_2026-10-23.md` for evidence, statuses and risks.
 
 ## ANSYS local integration — Phase 5 Studio transfer and real Modal
 

@@ -6,12 +6,14 @@ import {
   ANSYS_BRIDGE_URL,
   launchRealAnsysConnection,
   probeAnsysBridge,
+  readAnsysTechnicalReport,
   readModalAnalysis,
   readStaticStructural,
   startModalAnalysis,
   startStaticStructural,
   testRealAnsysConnection,
   type AnsysBridgeStatus,
+  type AnsysTechnicalReport,
   type AnsysConnectionState,
   type CompatibilityState,
   type ConnectionTestState,
@@ -57,6 +59,48 @@ const connectionLabels: Record<ConnectionTestState, string> = {
   VERIFICATION_FAILED: "Proses doğrulanamadı",
 };
 
+const evidenceLabels: Record<string, string> = {
+  SOLVER_AND_RESULT_FILE: "Çözücü ve sonuç dosyası",
+  CAD_CONTENT_PROVENANCE: "CAD dosyası izi",
+  FIXED_SCOPE_PRESENT: "Mesnet seçimi",
+  ELEMENT_QUALITY_METRIC: "Eleman kalitesi",
+  SHAPE_CHECK_INPUT: "Eleman şekli komutu",
+  STUDIO_CAD_REGISTRATION: "Studio–CAD bağlantısı",
+  MATERIAL_PROPERTIES: "Malzeme özellikleri",
+  PHYSICAL_CORRELATION: "Fiziksel karşılaştırma",
+  STATIC_SI_RESULTS: "SI sonuç birimleri",
+  LOAD_SCOPE_PRESENT: "Yük yüzeyi",
+  LOAD_APPLICATION_POINT: "Yük uygulama noktası",
+  BOUNDARY_CONDITION_PHYSICS: "Sınır koşulu fiziği",
+  STATIC_MESH_CONVERGENCE: "Statik mesh yakınsaması",
+  MODAL_FREQUENCIES_HZ: "Doğal frekanslar",
+  MODAL_MESH_CONVERGENCE: "Modal mesh yakınsaması",
+  MODAL_BOUNDARY_PHYSICS: "Modal sınır koşulu",
+};
+
+function downloadReport(report: AnsysTechnicalReport): void {
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+  const address = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = address;
+  anchor.download = `msku-ansys-${report.analysisType.toLowerCase()}-${report.jobId}.json`;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(address), 0);
+}
+
+function ReportEvidence({ report }: { report: AnsysTechnicalReport }) {
+  return <div className="ansys-result-warnings" role="note" aria-label="Teknik doğrulama durumu">
+    <strong>Teknik rapor · mühendislik onayı: ENGELLENDİ</strong>
+    <p>Sayısal kanıt fiziksel doğrulama değildir. Fiziksel durum: DOĞRULANMADI.</p>
+    <ul>{report.checks.map((check) => <li key={check.code}>
+      {evidenceLabels[check.code] ?? check.code}: {check.status === "VERIFIED" ? "sayısal kanıt var" : check.status === "BLOCKED" ? "engelli" : "doğrulanmadı"}
+    </li>)}</ul>
+    <button type="button" onClick={() => downloadReport(report)}>Kanıtlı teknik raporu indir (JSON)</button>
+  </div>;
+}
+
 function initialToken(): string {
   try {
     return window.sessionStorage.getItem(ANSYS_BRIDGE_TOKEN_STORAGE_KEY) ?? "";
@@ -94,6 +138,8 @@ export function AnsysConnectionPanel() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [analysisJob, setAnalysisJob] = useState<StaticStructuralJob | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [staticReport, setStaticReport] = useState<AnsysTechnicalReport | null>(null);
+  const [modalReport, setModalReport] = useState<AnsysTechnicalReport | null>(null);
   const activeJobId = analysisJob?.jobId;
   const activeJobState = analysisJob?.state;
   const activeModalJobId = modalJob?.jobId;
@@ -136,6 +182,28 @@ export function AnsysConnectionPanel() {
         });
     }, 2_000);
     return () => { active = false; window.clearInterval(timer); };
+  }, [activeModalJobId, activeModalState, token]);
+
+  useEffect(() => {
+    if (!activeJobId || activeJobState !== "SUCCEEDED") return;
+    let active = true;
+    void readAnsysTechnicalReport(ANSYS_BRIDGE_URL, token, "static-structural", activeJobId)
+      .then((report) => { if (active) setStaticReport(report); })
+      .catch((error: unknown) => {
+        if (active) setAnalysisError(error instanceof Error ? error.message : "Teknik rapor alınamadı.");
+      });
+    return () => { active = false; };
+  }, [activeJobId, activeJobState, token]);
+
+  useEffect(() => {
+    if (!activeModalJobId || activeModalState !== "SUCCEEDED") return;
+    let active = true;
+    void readAnsysTechnicalReport(ANSYS_BRIDGE_URL, token, "modal", activeModalJobId)
+      .then((report) => { if (active) setModalReport(report); })
+      .catch((error: unknown) => {
+        if (active) setModalError(error instanceof Error ? error.message : "Modal rapor alınamadı.");
+      });
+    return () => { active = false; };
   }, [activeModalJobId, activeModalState, token]);
 
   const persistToken = (): string | null => {
@@ -218,6 +286,7 @@ export function AnsysConnectionPanel() {
     if (!saved) return;
     setAnalysisError(null);
     setAnalysisJob(null);
+    setStaticReport(null);
     let transfer;
     try {
       transfer = studioContext();
@@ -242,6 +311,7 @@ export function AnsysConnectionPanel() {
       ...(importedWrench ? {
         forceComponentsN: vehicleVectorToCad(importedWrench.forceN, cadAxes),
         forceInputSha256: importedWrench.inputSha256,
+        forceApplicationPointVehicleM: importedWrench.applicationPointM,
       } : {}),
       meshSizeMm: Number(meshSizeMm),
       ...(transfer ? { studioTransfer: transfer } : {}),
@@ -262,6 +332,7 @@ export function AnsysConnectionPanel() {
     if (!saved) return;
     setModalError(null);
     setModalJob(null);
+    setModalReport(null);
     let transfer;
     try {
       transfer = studioContext();
@@ -320,7 +391,7 @@ export function AnsysConnectionPanel() {
       {open && (
         <section id="ansys-connection-panel" className="ansys-panel" aria-label="ANSYS yerel bağlantı durumu">
           <header>
-            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR · PHASE 5</span><h2>ANSYS Yerel Köprüsü</h2></div>
+            <div><span className="eyebrow">YALNIZCA BU BİLGİSAYAR · AŞAMA 6</span><h2>ANSYS Yerel Köprüsü</h2></div>
             <button type="button" aria-label="Paneli kapat" onClick={() => setOpen(false)}><X size={16} /></button>
           </header>
 
@@ -459,6 +530,7 @@ export function AnsysConnectionPanel() {
                     <ul>{analysisJob.result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
                   </div>
                 )}
+                {staticReport?.jobId === analysisJob.jobId && <ReportEvidence report={staticReport} />}
               </div>
             )}
           </section>
@@ -492,6 +564,7 @@ export function AnsysConnectionPanel() {
                   <strong>Modal uyarılar</strong>
                   <ul>{modalJob.result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
                 </div>
+                {modalReport?.jobId === modalJob.jobId && <ReportEvidence report={modalReport} />}
               </>}
             </div>}
           </section>

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,6 +32,7 @@ from .analysis import (
     _solver_warning_summary,
     _validated_geometry,
 )
+from .job_safety import StageWatchdog
 from .studio_transfer import StudioTransfer, StudioTransferEvidence, transfer_evidence
 
 
@@ -62,6 +65,9 @@ class ModalAnalysisResult(BaseModel):
     modes: list[ModalMode]
     meshNodes: int
     meshElements: int
+    resultFileBytes: int = Field(default=0, ge=0)
+    bodyCount: int = Field(default=0, ge=0)
+    fixedScopeEntityCount: int = Field(default=0, ge=0)
     meshSizeMm: float
     meshQuality: MeshQualityEvidence
     geometrySha256: str
@@ -147,11 +153,12 @@ def run_modal_analysis(
     progress: Callable[[AnalysisStage, str], None],
 ) -> ModalAnalysisResult:
     path, digest = _validated_geometry(request.geometryPath)
-    progress("importing", "Modal CAD, malzeme ve sabit mesnet kapsamı doğrulanıyor.")
+    progress("importing", "Önceki Mechanical projesi temizleniyor.")
     client.clear()
+    progress("importing", "Modal CAD, malzeme ve sabit mesnet kapsamı doğrulanıyor.")
     setup = _payload(client.run_python_script(_modal_setup_script(request, path)), "modal CAD")
-    _count(setup.get("bodies"), "gövde")
-    _count(setup.get("fixedFaces"), "mesnet yüzeyi")
+    body_count = _count(setup.get("bodies"), "gövde")
+    fixed_count = _count(setup.get("fixedFaces"), "mesnet yüzeyi")
     if setup.get("configuredModes") != request.modeCount:
         raise AnalysisError("MODAL_MODE_COUNT_NOT_CONFIRMED", "Modal mod sayısı doğrulanamadı.")
     if request.studioTransfer is not None and setup.get("studioHardpoints") != 9:
@@ -264,6 +271,9 @@ def run_modal_analysis(
         ],
         meshNodes=nodes,
         meshElements=elements,
+        resultFileBytes=result_file.stat().st_size,
+        bodyCount=body_count,
+        fixedScopeEntityCount=fixed_count,
         meshSizeMm=request.meshSizeMm,
         meshQuality=quality,
         geometrySha256=digest,
@@ -280,13 +290,20 @@ def run_modal_analysis(
 
 
 class ModalAnalysisManager:
-    def __init__(self, adapter: OwnedMechanical) -> None:
+    def __init__(self, adapter: OwnedMechanical, stage_timeout_seconds: float = 300) -> None:
         self._adapter = adapter
+        self._stage_timeout_seconds = stage_timeout_seconds
         self._lock = threading.Lock()
         self._job: ModalJobResponse | None = None
+        self._request: ModalAnalysisRequest | None = None
+        self._watchdog: StageWatchdog | None = None
+        self._last_progress_monotonic: float | None = None
 
     def start(self, request: ModalAnalysisRequest) -> ModalJobResponse:
         _validated_geometry(request.geometryPath)
+        ready = getattr(self._adapter, "assert_ready_for_job", None)
+        if ready is not None:
+            ready()
         with self._lock:
             if self._job and self._job.state in {"QUEUED", "RUNNING"}:
                 raise AnalysisError("ANALYSIS_ALREADY_RUNNING", "Modal analiz zaten çalışıyor.")
@@ -297,8 +314,15 @@ class ModalAnalysisManager:
                 message="Açık modal analiz isteği alındı; yerel Mechanical bekleniyor.",
                 startedAt=datetime.now(UTC).isoformat(),
             )
+            self._request = request.model_copy(deep=True)
+            job_id = self._job.jobId
+            self._watchdog = StageWatchdog(
+                self._stage_timeout_seconds, lambda stage: self._timeout(job_id, stage)
+            )
+            self._last_progress_monotonic = time.monotonic()
+            self._watchdog.pulse("queued")
             job = self._job.model_copy(deep=True)
-        threading.Thread(target=self._work, args=(request,), daemon=False).start()
+        threading.Thread(target=self._work, args=(request, job_id), daemon=True).start()
         return job
 
     def snapshot(self, job_id: str) -> ModalJobResponse | None:
@@ -307,35 +331,79 @@ class ModalAnalysisManager:
                 return None
             return self._job.model_copy(deep=True)
 
-    def _progress(self, stage: AnalysisStage, message: str) -> None:
+    def report_source(self, job_id: str) -> tuple[ModalAnalysisRequest, ModalJobResponse] | None:
         with self._lock:
-            if self._job is not None:
+            if (
+                self._job is None
+                or self._job.jobId != job_id
+                or self._job.state != "SUCCEEDED"
+                or self._job.result is None
+                or self._request is None
+            ):
+                return None
+            return self._request.model_copy(deep=True), self._job.model_copy(deep=True)
+
+    def _progress(self, stage: AnalysisStage, message: str, job_id: str | None = None) -> None:
+        with self._lock:
+            if (
+                self._job is not None
+                and (job_id is None or self._job.jobId == job_id)
+                and self._job.state in {"QUEUED", "RUNNING"}
+            ):
                 self._job.state = "RUNNING"
                 self._job.stage = stage
                 self._job.message = message
+                now = time.monotonic()
+                elapsed = (
+                    0.0
+                    if self._last_progress_monotonic is None
+                    else now - self._last_progress_monotonic
+                )
+                self._last_progress_monotonic = now
+                logging.getLogger("uvicorn.error").info(
+                    "modal job=%s stage=%s previous_step_seconds=%.3f",
+                    self._job.jobId,
+                    stage,
+                    elapsed,
+                )
+                if self._watchdog is not None:
+                    self._watchdog.pulse(stage)
 
-    def _work(self, request: ModalAnalysisRequest) -> None:
+    def _work(self, request: ModalAnalysisRequest, job_id: str | None = None) -> None:
         try:
             result = self._adapter.run_with_owned_client(
-                lambda client: run_modal_analysis(client, request, self._progress)
+                lambda client: run_modal_analysis(
+                    client, request, lambda stage, message: self._progress(stage, message, job_id)
+                )
             )
         except AnalysisError as exc:
-            self._finish("FAILED", exc.code, exc.message, None)
+            self._finish("FAILED", exc.code, exc.message, None, job_id)
         except Exception as exc:
             # Never expose raw Mechanical logs, CAD paths, or license information.
             lowered = f"{type(exc).__name__} {exc}".casefold()
             if "msku_fixed_selection_missing_or_empty" in lowered:
                 self._finish(
-                    "FAILED", "FIXED_SELECTION_MISSING", "Modal CAD mesnet seçimi eksik.", None
+                    "FAILED",
+                    "FIXED_SELECTION_MISSING",
+                    "Modal CAD mesnet seçimi eksik.",
+                    None,
+                    job_id,
                 )
             elif "license" in lowered:
                 self._finish(
-                    "FAILED", "ANSYS_LICENSE_ERROR", "Modal çözüm lisansı kullanılamıyor.", None
+                    "FAILED",
+                    "ANSYS_LICENSE_ERROR",
+                    "Modal çözüm lisansı kullanılamıyor.",
+                    None,
+                    job_id,
                 )
             elif "material" in lowered:
                 self._finish(
-                    "FAILED", "MATERIAL_NOT_AVAILABLE",
-                    "Structural Steel malzemesi Mechanical içinde atanamadı.", None,
+                    "FAILED",
+                    "MATERIAL_NOT_AVAILABLE",
+                    "Structural Steel malzemesi Mechanical içinde atanamadı.",
+                    None,
+                    job_id,
                 )
             else:
                 self._finish(
@@ -343,11 +411,38 @@ class ModalAnalysisManager:
                     "MECHANICAL_MODAL_FAILED",
                     "Mechanical modal analiz başarısız; yerel günlükleri kontrol edin.",
                     None,
+                    job_id,
                 )
         else:
             self._finish(
-                "SUCCEEDED", None, "Mechanical modal çözüm ve frekanslar doğrulandı.", result
+                "SUCCEEDED",
+                None,
+                "Mechanical modal çözüm ve frekanslar doğrulandı.",
+                result,
+                job_id,
             )
+
+    def _timeout(self, job_id: str, stage: str) -> None:
+        with self._lock:
+            if (
+                self._job is None
+                or self._job.jobId != job_id
+                or self._job.state not in {"QUEUED", "RUNNING"}
+            ):
+                return
+            self._job.state = "FAILED"
+            self._job.errorCode = "MECHANICAL_STAGE_TIMEOUT"
+            self._job.message = (
+                f"Mechanical {stage} aşamasında zaman aşımı; sonuç reddedildi. Yeni proses gerekli."
+            )
+            self._job.completedAt = datetime.now(UTC).isoformat()
+            self._job.result = None
+        quarantine = getattr(self._adapter, "quarantine_timeout", None)
+        if quarantine is not None:
+            quarantine()
+        logging.getLogger("uvicorn.error").error(
+            "modal job=%s stage=%s timed out; session quarantined", job_id, stage
+        )
 
     def _finish(
         self,
@@ -355,9 +450,16 @@ class ModalAnalysisManager:
         code: str | None,
         message: str,
         result: ModalAnalysisResult | None,
+        job_id: str | None = None,
     ) -> None:
         with self._lock:
-            if self._job is not None:
+            if (
+                self._job is not None
+                and (job_id is None or self._job.jobId == job_id)
+                and self._job.state in {"QUEUED", "RUNNING"}
+            ):
+                if self._watchdog is not None:
+                    self._watchdog.stop()
                 self._job.state = state
                 self._job.stage = "done"
                 self._job.errorCode = code

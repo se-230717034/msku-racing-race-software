@@ -132,6 +132,17 @@ def test_modal_endpoint_requires_token_and_existing_local_cad(tmp_path: Path) ->
     assert missing_cad.json()["detail"]["code"] == "CAD_FILE_UNREADABLE"
 
 
+def test_reports_require_token_and_completed_job() -> None:
+    job_id = "11111111-1111-4111-8111-111111111111"
+    with client() as bridge:
+        for analysis in ("static-structural", "modal"):
+            path = f"/bridge/v1/analyses/{analysis}/{job_id}/report"
+            assert bridge.get(path).status_code == 401
+            response = bridge.get(path, headers={"X-MSKU-Bridge-Token": TOKEN})
+            assert response.status_code == 404
+            assert "geometryPath" not in response.text
+
+
 def test_status_reports_installation_and_compatibility_without_claiming_connection() -> None:
     with client() as bridge:
         response = bridge.get(

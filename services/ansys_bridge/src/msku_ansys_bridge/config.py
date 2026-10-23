@@ -27,6 +27,7 @@ class BridgeSettings:
     # "auto" and "none" leave product selection to Mechanical; an actual
     # writable process and successful solver checkout are checked separately.
     start_license: str = "auto"
+    analysis_stage_timeout_seconds: int = 300
 
     @property
     def token_configured(self) -> bool:
@@ -46,6 +47,9 @@ class BridgeSettings:
         mechanical_port = int(os.getenv("MSKU_ANSYS_MECHANICAL_PORT", "10000"))
         timeout_seconds = int(os.getenv("MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS", "8"))
         launch_timeout_seconds = int(os.getenv("MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS", "180"))
+        analysis_stage_timeout_seconds = int(
+            os.getenv("MSKU_ANSYS_ANALYSIS_STAGE_TIMEOUT_SECONDS", "300")
+        )
         executable_value = os.getenv("MSKU_ANSYS_MECHANICAL_EXECUTABLE", "").strip()
         start_license = os.getenv("MSKU_ANSYS_START_LICENSE", "auto").strip().lower()
         if not 1_024 <= mechanical_port <= 65_535:
@@ -54,6 +58,10 @@ class BridgeSettings:
             raise ValueError("MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS must be between 1 and 30.")
         if not 30 <= launch_timeout_seconds <= 300:
             raise ValueError("MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS must be between 30 and 300.")
+        if not 30 <= analysis_stage_timeout_seconds <= 3600:
+            raise ValueError(
+                "MSKU_ANSYS_ANALYSIS_STAGE_TIMEOUT_SECONDS must be between 30 and 3600."
+            )
         if start_license not in {"auto", "none", "aa_t_i", "ansys", "mech_1", "mech_2"}:
             raise ValueError(
                 "MSKU_ANSYS_START_LICENSE must be auto, none, aa_t_i, ansys, mech_1, or mech_2."
@@ -64,6 +72,7 @@ class BridgeSettings:
             mechanical_port=mechanical_port,
             connection_timeout_seconds=timeout_seconds,
             launch_timeout_seconds=launch_timeout_seconds,
+            analysis_stage_timeout_seconds=analysis_stage_timeout_seconds,
             mechanical_executable=Path(executable_value) if executable_value else None,
             start_license=start_license,
         )

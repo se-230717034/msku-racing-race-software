@@ -90,6 +90,24 @@ modal mesh convergence and physical correlation remain unassessed. Existing
 `NOT_CONVERGED` static warnings are retained. See the
 [Phase 5 evidence report](./docs/ANSYS_PHASE_5_MODAL_STUDIO_INTEGRATION_2026-10-22.md).
 
+ANSYS integration Phase 6 adds authenticated, downloadable **local** technical
+reports for completed Static Structural and Modal jobs. Each report records CAD
+content hash, source inputs (without the private CAD path), Mechanical result
+file and scope evidence, units, warnings, and separate `VERIFIED`
+(numerical/software), `UNVERIFIED` and `BLOCKED` checks. The three-mesh trend
+is rechecked when exporting. The Student sample's peak stress remains
+`NOT_CONVERGED`; physical validation and engineering approval are blocked.
+Mechanical and report generation stay on the user's computer, never on Vercel.
+See the [ANSYS Phase 6 release-readiness report](./docs/ANSYS_PHASE_6_RELEASE_READINESS_2026-10-22.md).
+
+The local bridge now bounds each ANSYS stage, distinguishes project clearing
+from CAD import, rejects late results after timeout, and prevents retries on
+an uncertain Mechanical session. Three consecutive real Student Static+Modal
+browser workflows passed after an earlier Modal import timeout; that earlier
+failure's exact root cause remains unknown. These software checks do not
+override `NOT_CONVERGED` or physical-unvalidation warnings. See the
+[repeat investigation and per-run evidence](./docs/ANSYS_PHASE_6_REPEAT_EVIDENCE_2026-10-23.md).
+
 See [PROGRESS.md](./PROGRESS.md), the [ANSYS local bridge guide](./docs/ANSYS_LOCAL_BRIDGE.md), the [Phase 3 Static Structural guide](./docs/ANSYS_PHASE_3_STATIC_STRUCTURAL.md), the [GLB integration report](./docs/GLB_MODEL_INTEGRATION.md), the [Vehicle Parameter Manifest specification](./docs/VEHICLE_PARAMETER_MANIFEST.md), the [Phase 6 architecture](./docs/PHASE_6_ENGINEERING_ARCHITECTURE.md), the [Phase 6 verification report](./docs/PHASE_6_VERIFICATION_REPORT.md), prior phase model/verification reports, and [docs/LIMITATIONS.md](./docs/LIMITATIONS.md) before engineering use.
 
 ## Prerequisites

@@ -79,6 +79,21 @@ test("real browser → local bridge → Mechanical mesh study → browser", asyn
   await expect(analysis.getByRole("note", { name: "Mesh yakınsama değerlendirmesi" })).toContainText("yakınsama gösterilemedi");
   await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("sayısal yakınsama ölçütünü karşılamadı");
   await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText("MP/TB");
+  const staticEvidence = analysis.getByRole("note", { name: "Teknik doğrulama durumu" });
+  await expect(staticEvidence).toContainText("Statik mesh yakınsaması: engelli");
+  await expect(staticEvidence).toContainText("Fiziksel karşılaştırma: doğrulanmadı");
+  const staticDownload = page.waitForEvent("download");
+  await staticEvidence.getByRole("button", { name: "Kanıtlı teknik raporu indir (JSON)" }).click();
+  const staticArtifact = await staticDownload;
+  const staticReport = JSON.parse(readFileSync(await staticArtifact.path(), "utf8")) as {
+    releaseReadiness: string; approvedForEngineeringUse: boolean;
+    checks: Array<{ code: string; status: string }>;
+    inputProvenance: Record<string, unknown>;
+  };
+  expect(staticReport.releaseReadiness).toBe("BLOCKED");
+  expect(staticReport.approvedForEngineeringUse).toBe(false);
+  expect(staticReport.checks.find((check) => check.code === "STATIC_MESH_CONVERGENCE")?.status).toBe("BLOCKED");
+  expect(staticReport.inputProvenance).not.toHaveProperty("geometryPath");
   for (const warning of result!.warnings) {
     await expect(analysis.getByRole("note", { name: "Analiz uyarıları" })).toContainText(warning);
   }
@@ -113,4 +128,15 @@ test("real browser → local bridge → Mechanical mesh study → browser", asyn
   expect(modalResult?.meshConvergenceStatus).toBe("NOT_ASSESSED");
   await expect(modal).toContainText("fiziksel olarak doğrulanmamıştır");
   await expect(modal.getByRole("note", { name: "Modal mühendislik uyarıları" })).toContainText("yakınsaması değerlendirilmedi");
+  const modalEvidence = modal.getByRole("note", { name: "Teknik doğrulama durumu" });
+  await expect(modalEvidence).toContainText("Modal mesh yakınsaması: doğrulanmadı");
+  const modalDownload = page.waitForEvent("download");
+  await modalEvidence.getByRole("button", { name: "Kanıtlı teknik raporu indir (JSON)" }).click();
+  const modalArtifact = await modalDownload;
+  const modalReport = JSON.parse(readFileSync(await modalArtifact.path(), "utf8")) as {
+    analysisType: string; physicalValidation: string; approvedForEngineeringUse: boolean;
+  };
+  expect(modalReport.analysisType).toBe("MODAL");
+  expect(modalReport.physicalValidation).toBe("UNVERIFIED");
+  expect(modalReport.approvedForEngineeringUse).toBe(false);
 });

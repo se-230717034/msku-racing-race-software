@@ -5,11 +5,13 @@ from __future__ import annotations
 import ctypes
 import hashlib
 import json
+import logging
 import math
 import os
 import re
 import tempfile
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +21,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .adapter import MechanicalClient
+from .job_safety import StageWatchdog
 from .studio_transfer import StudioTransfer, StudioTransferEvidence, Vector3, transfer_evidence
 
 _T = TypeVar("_T")
@@ -47,6 +50,7 @@ class StaticAnalysisRequest(BaseModel):
     forceN: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
     forceComponentsN: Vector3 | None = None
     forceInputSha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    forceApplicationPointVehicleM: Vector3 | None = None
     meshSizeMm: float = Field(ge=0.1, le=1_000, allow_inf_nan=False)
     meshConvergenceSizesMm: list[float] | None = Field(default=None, min_length=3, max_length=3)
     studioTransfer: StudioTransfer | None = None
@@ -71,6 +75,10 @@ class StaticAnalysisRequest(BaseModel):
                 raise ValueError("Kuvvet bileşenleri sonlu, sınırlı ve sıfırdan farklı olmalı.")
             if not math.isclose(self.forceN, magnitude, rel_tol=1e-9, abs_tol=1e-9):
                 raise ValueError("forceN, vektör kuvvetin büyüklüğüne eşit olmalı.")
+        if self.forceApplicationPointVehicleM is not None and (
+            self.studioTransfer is None or self.forceComponentsN is None
+        ):
+            raise ValueError("Studio kuvvet uygulama noktası CAD çerçevesi ve vektör gerektirir.")
         if self.fixedNamedSelection == self.forceNamedSelection:
             raise ValueError("Mesnet ve kuvvet için farklı named selection gerekir.")
         sizes = self.meshConvergenceSizesMm
@@ -91,6 +99,7 @@ class MeshConvergencePoint(BaseModel):
     maximumVonMisesStressPa: float
     maximumTotalDeformationM: float
     solverStatus: Literal["Done"] = "Done"
+    resultFileBytes: int = Field(default=0, ge=0)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -121,6 +130,7 @@ class StaticAnalysisResult(BaseModel):
     maximumTotalDeformationM: float
     meshNodes: int
     meshElements: int
+    resultFileBytes: int = Field(default=0, ge=0)
     geometrySha256: str
     material: str
     fixedNamedSelection: str
@@ -129,6 +139,10 @@ class StaticAnalysisResult(BaseModel):
     forceN: float
     forceComponentsN: Vector3 | None = None
     forceInputSha256: str | None = None
+    forceApplicationPointVehicleM: Vector3 | None = None
+    bodyCount: int = Field(default=0, ge=0)
+    fixedScopeEntityCount: int = Field(default=0, ge=0)
+    forceScopeEntityCount: int = Field(default=0, ge=0)
     meshSizeMm: float
     mechanicalVersion: str
     productInfo: str
@@ -368,9 +382,7 @@ def _assess_mesh_convergence(points: list[MeshConvergencePoint]) -> MeshConverge
     coarse_deformation_change = _relative_change(
         coarse.maximumTotalDeformationM, middle.maximumTotalDeformationM
     )
-    stress_change = _relative_change(
-        middle.maximumVonMisesStressPa, fine.maximumVonMisesStressPa
-    )
+    stress_change = _relative_change(middle.maximumVonMisesStressPa, fine.maximumVonMisesStressPa)
     deformation_change = _relative_change(
         middle.maximumTotalDeformationM, fine.maximumTotalDeformationM
     )
@@ -506,14 +518,15 @@ def run_static_structural(
     progress: Callable[[AnalysisStage, str], None],
 ) -> StaticAnalysisResult:
     path, digest = _validated_geometry(request.geometryPath)
-    progress("importing", "CAD içe aktarılıyor ve named selection kapsamları doğrulanıyor.")
+    progress("importing", "Önceki Mechanical projesi temizleniyor.")
     # Only a bridge-owned blank session reaches this function. Each new explicit run
     # starts a fresh Mechanical project rather than inheriting stale loads/results.
     client.clear()
+    progress("importing", "CAD içe aktarılıyor ve named selection kapsamları doğrulanıyor.")
     setup = _payload(client.run_python_script(_setup_script(request, path)), "CAD ve yük")
-    _count(setup.get("bodies"), "gövde")
-    _count(setup.get("fixedFaces"), "mesnet yüzeyi")
-    _count(setup.get("forceFaces"), "kuvvet yüzeyi")
+    body_count = _count(setup.get("bodies"), "gövde")
+    fixed_count = _count(setup.get("fixedFaces"), "mesnet yüzeyi")
+    force_count = _count(setup.get("forceFaces"), "kuvvet yüzeyi")
     if request.studioTransfer is not None and setup.get("studioHardpoints") != 9:
         raise AnalysisError(
             "STUDIO_TRANSFER_NOT_CONFIRMED",
@@ -605,6 +618,13 @@ def run_static_structural(
         solver_status = str(solved.get("status", ""))
         if solver_status.split(".")[-1] != "Done":
             raise _solver_failure(working_dir, solver_status)
+        result_file = working_dir / "file.rst"
+        if not result_file.is_file() or result_file.stat().st_size == 0:
+            raise AnalysisError(
+                "STATIC_RESULT_FILE_MISSING",
+                "Mechanical Done bildirdi ancak statik sonuç dosyası eksik veya boş.",
+            )
+        result_file_bytes = result_file.stat().st_size
 
         progress("extracting", f"Gerilme ve deformasyon {index + 1}/{len(sizes)} okunuyor.")
         results = _payload(
@@ -633,6 +653,7 @@ def run_static_structural(
                 meshElements=elements,
                 maximumVonMisesStressPa=_si_quantity(results.get("stress"), "Pa"),
                 maximumTotalDeformationM=_si_quantity(results.get("deformation"), "m"),
+                resultFileBytes=result_file_bytes,
                 warnings=step_warnings,
             )
         )
@@ -681,6 +702,7 @@ def run_static_structural(
         maximumTotalDeformationM=final.maximumTotalDeformationM,
         meshNodes=final.meshNodes,
         meshElements=final.meshElements,
+        resultFileBytes=final.resultFileBytes,
         geometrySha256=digest,
         material=request.material,
         fixedNamedSelection=request.fixedNamedSelection,
@@ -689,6 +711,10 @@ def run_static_structural(
         forceN=request.forceN,
         forceComponentsN=request.forceComponentsN,
         forceInputSha256=request.forceInputSha256,
+        forceApplicationPointVehicleM=request.forceApplicationPointVehicleM,
+        bodyCount=body_count,
+        fixedScopeEntityCount=fixed_count,
+        forceScopeEntityCount=force_count,
         meshSizeMm=request.meshSizeMm,
         mechanicalVersion=str(client.version),
         productInfo=str(client.get_product_info())[:500],
@@ -705,13 +731,20 @@ def run_static_structural(
 
 
 class StaticAnalysisManager:
-    def __init__(self, adapter: OwnedMechanical) -> None:
+    def __init__(self, adapter: OwnedMechanical, stage_timeout_seconds: float = 300) -> None:
         self._adapter = adapter
+        self._stage_timeout_seconds = stage_timeout_seconds
         self._lock = threading.Lock()
         self._job: StaticJobResponse | None = None
+        self._request: StaticAnalysisRequest | None = None
+        self._watchdog: StageWatchdog | None = None
+        self._last_progress_monotonic: float | None = None
 
     def start(self, request: StaticAnalysisRequest) -> StaticJobResponse:
         _validated_geometry(request.geometryPath)
+        ready = getattr(self._adapter, "assert_ready_for_job", None)
+        if ready is not None:
+            ready()
         with self._lock:
             if self._job and self._job.state in {"QUEUED", "RUNNING"}:
                 raise AnalysisError(
@@ -724,8 +757,15 @@ class StaticAnalysisManager:
                 message="Açık kullanıcı isteği alındı; yerel Mechanical oturumu bekleniyor.",
                 startedAt=datetime.now(UTC).isoformat(),
             )
+            self._request = request.model_copy(deep=True)
+            job_id = self._job.jobId
+            self._watchdog = StageWatchdog(
+                self._stage_timeout_seconds, lambda stage: self._timeout(job_id, stage)
+            )
+            self._last_progress_monotonic = time.monotonic()
+            self._watchdog.pulse("queued")
             job = self._job.model_copy(deep=True)
-        threading.Thread(target=self._work, args=(request,), daemon=False).start()
+        threading.Thread(target=self._work, args=(request, job_id), daemon=True).start()
         return job
 
     def snapshot(self, job_id: str) -> StaticJobResponse | None:
@@ -734,20 +774,53 @@ class StaticAnalysisManager:
                 return None
             return self._job.model_copy(deep=True)
 
-    def _progress(self, stage: AnalysisStage, message: str) -> None:
+    def report_source(self, job_id: str) -> tuple[StaticAnalysisRequest, StaticJobResponse] | None:
         with self._lock:
-            if self._job is not None:
+            if (
+                self._job is None
+                or self._job.jobId != job_id
+                or self._job.state != "SUCCEEDED"
+                or self._job.result is None
+                or self._request is None
+            ):
+                return None
+            return self._request.model_copy(deep=True), self._job.model_copy(deep=True)
+
+    def _progress(self, stage: AnalysisStage, message: str, job_id: str | None = None) -> None:
+        with self._lock:
+            if (
+                self._job is not None
+                and (job_id is None or self._job.jobId == job_id)
+                and self._job.state in {"QUEUED", "RUNNING"}
+            ):
                 self._job.state = "RUNNING"
                 self._job.stage = stage
                 self._job.message = message
+                now = time.monotonic()
+                elapsed = (
+                    0.0
+                    if self._last_progress_monotonic is None
+                    else now - self._last_progress_monotonic
+                )
+                self._last_progress_monotonic = now
+                logging.getLogger("uvicorn.error").info(
+                    "static job=%s stage=%s previous_step_seconds=%.3f",
+                    self._job.jobId,
+                    stage,
+                    elapsed,
+                )
+                if self._watchdog is not None:
+                    self._watchdog.pulse(stage)
 
-    def _work(self, request: StaticAnalysisRequest) -> None:
+    def _work(self, request: StaticAnalysisRequest, job_id: str | None = None) -> None:
         try:
             result = self._adapter.run_with_owned_client(
-                lambda client: run_static_structural(client, request, self._progress)
+                lambda client: run_static_structural(
+                    client, request, lambda stage, message: self._progress(stage, message, job_id)
+                )
             )
         except AnalysisError as exc:
-            self._finish("FAILED", exc.code, exc.message, None)
+            self._finish("FAILED", exc.code, exc.message, None, job_id)
         except Exception as exc:
             # Raw gRPC/Mechanical errors may contain local paths or license-server secrets.
             lowered = f"{type(exc).__name__} {exc}".casefold()
@@ -793,9 +866,34 @@ class StaticAnalysisManager:
                 code,
                 message,
                 None,
+                job_id,
             )
         else:
-            self._finish("SUCCEEDED", None, "Mechanical çözümü ve sonuçları doğrulandı.", result)
+            self._finish(
+                "SUCCEEDED", None, "Mechanical çözümü ve sonuçları doğrulandı.", result, job_id
+            )
+
+    def _timeout(self, job_id: str, stage: str) -> None:
+        with self._lock:
+            if (
+                self._job is None
+                or self._job.jobId != job_id
+                or self._job.state not in {"QUEUED", "RUNNING"}
+            ):
+                return
+            self._job.state = "FAILED"
+            self._job.errorCode = "MECHANICAL_STAGE_TIMEOUT"
+            self._job.message = (
+                f"Mechanical {stage} aşamasında zaman aşımı; sonuç reddedildi. Yeni proses gerekli."
+            )
+            self._job.completedAt = datetime.now(UTC).isoformat()
+            self._job.result = None
+        quarantine = getattr(self._adapter, "quarantine_timeout", None)
+        if quarantine is not None:
+            quarantine()
+        logging.getLogger("uvicorn.error").error(
+            "static job=%s stage=%s timed out; session quarantined", job_id, stage
+        )
 
     def _finish(
         self,
@@ -803,9 +901,16 @@ class StaticAnalysisManager:
         error_code: str | None,
         message: str,
         result: StaticAnalysisResult | None,
+        job_id: str | None = None,
     ) -> None:
         with self._lock:
-            if self._job is not None:
+            if (
+                self._job is not None
+                and (job_id is None or self._job.jobId == job_id)
+                and self._job.state in {"QUEUED", "RUNNING"}
+            ):
+                if self._watchdog is not None:
+                    self._watchdog.stop()
                 self._job.state = state
                 self._job.stage = "done"
                 self._job.message = message

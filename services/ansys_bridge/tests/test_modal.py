@@ -83,6 +83,7 @@ def test_modal_contract_returns_only_real_client_frequencies(tmp_path: Path) -> 
     assert result.meshConvergenceStatus == "NOT_ASSESSED"
     assert result.meshQuality.minimum == 0.12
     assert result.meshQuality.status == "MEASURED_BY_MECHANICAL"
+    assert result.resultFileBytes > 0
     assert any("AddModalAnalysis()" in call for call in mechanical.calls)
     assert any("MaximumModesToFind = 3" in call for call in mechanical.calls)
     assert any("MaxNumberOfCores = 2" in call for call in mechanical.calls)

@@ -12,6 +12,13 @@ either analysis. Only a real Mechanical `Done` plus a nonempty result file and
 finite positive hertz frequencies yields modal results. See the
 [Phase 5 evidence report](./ANSYS_PHASE_5_MODAL_STUDIO_INTEGRATION_2026-10-22.md).
 
+Phase 6 adds authenticated `GET /bridge/v1/analyses/{static-structural|modal}/{job_id}/report`
+endpoints. They return downloadable JSON evidence only after a successful real
+job with a nonempty Mechanical result file. The private absolute CAD path is
+excluded, physical approval remains false, and only the latest job is held in
+bridge memory. See the
+[Phase 6 release-readiness report](./ANSYS_PHASE_6_RELEASE_READINESS_2026-10-22.md).
+
 Phase 1 controls remain: binding to `127.0.0.1:8765`, loopback client checks, an exact browser Origin allowlist, a random session token for protected endpoints, and a strict loopback browser URL. The token remains in browser `sessionStorage`. Mechanical gRPC uses Windows Named User Authentication (`wnua`) at `127.0.0.1`; there is no insecure fallback.
 
 ## Student 2026 R1 executable and discovery
@@ -56,11 +63,23 @@ Enter the printed token in the **ANSYS YEREL** panel. Then choose **Mechanical'�
 | `MSKU_ANSYS_MECHANICAL_PORT` | `10000` | `1024`–`65535`, loopback only |
 | `MSKU_ANSYS_CONNECTION_TIMEOUT_SECONDS` | `8` | `1`–`30` seconds |
 | `MSKU_ANSYS_LAUNCH_TIMEOUT_SECONDS` | `180` | `30`–`300` seconds |
+| `MSKU_ANSYS_ANALYSIS_STAGE_TIMEOUT_SECONDS` | `300` | `30`–`3600` seconds per queued/import/mesh/solve/extract step; not a solver cancellation |
 | `MSKU_ANSYS_MECHANICAL_EXECUTABLE` | Discovered path | Absolute local `v###\aisol\bin\winx64\AnsysWBU.exe` |
 | `MSKU_ANSYS_START_LICENSE` | `auto` | `auto` and `none` delegate selection to ANSYS; explicit `aa_t_i`, `ansys`, `mech_1`, `mech_2` are accepted on v261+ but require real entitlement |
 | `MSKU_ANSYS_PROJECT_DIRECTORY` | Per-user TEMP short ASCII path | Optional existing, local, absolute ASCII directory for documented Mechanical `Project.SaveAs`; Unicode/UNC/invalid paths fail before solve |
 
 Do not commit tokens or license-server details.
+
+If a Mechanical gRPC step does not advance before this deadline, the job becomes
+`FAILED` with `MECHANICAL_STAGE_TIMEOUT`, **without a result or downloadable
+report**. The bridge quarantines that Mechanical session; a late response cannot
+turn the job into success. Once the blocked call returns, the bridge attempts to
+close only its own Mechanical session. If the call remains blocked, the bridge
+cannot prove that the process exited or release its license seat: stop the local
+bridge, confirm the owned Mechanical process has ended, and restart explicitly.
+Do not retry against an unresponsive or externally owned session. The status
+message distinguishes project clearing from CAD import, and local bridge logs
+record job ID, stage, and elapsed step time without CAD paths or token values.
 
 ## HTTP endpoints
 
@@ -73,8 +92,12 @@ Do not commit tokens or license-server details.
 | `POST` | `/bridge/v1/connection/launch` | User-triggered explicit-path launch and verification |
 | `POST` | `/bridge/v1/analyses/static-structural` | Explicit local Static Structural job start |
 | `GET` | `/bridge/v1/analyses/static-structural/{jobId}` | Poll submitted job and actual results |
+| `POST` | `/bridge/v1/analyses/modal` | Explicit local Modal job start |
+| `GET` | `/bridge/v1/analyses/modal/{jobId}` | Poll Modal status and actual frequencies |
+| `GET` | `/bridge/v1/analyses/static-structural/{jobId}/report` | Download accepted Static evidence JSON |
+| `GET` | `/bridge/v1/analyses/modal/{jobId}/report` | Download accepted Modal evidence JSON |
 
-All but `/health/live` require the bridge token. All requests require a loopback socket and allowed browser Origin. The only solve endpoint is the explicit Static Structural job described in the Phase 3 guide. There is no arbitrary-script or general upload endpoint.
+All but `/health/live` require the bridge token. All requests require a loopback socket and allowed browser Origin. Static and Modal solve endpoints require explicit user action. There is no arbitrary-script or general upload endpoint.
 
 ## Student and license limits
 
